@@ -47,7 +47,7 @@ Documentation of all members: D3D12MemAlloc.h
 		
 \section main_see_also See also
 
-- [Product page on GPUOpen](https://gpuopen.com/gaming-product/D3D12MemoryAllocator/) (TODO)
+- [Product page on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/)
 - [Source repository on GitHub](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator)
 
 

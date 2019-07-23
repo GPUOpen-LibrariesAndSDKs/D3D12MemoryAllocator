@@ -6,7 +6,7 @@ Easy to integrate memory allocation library for Direct3D 12.
 
 **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
 
-**Product page:** [Vulkan Memory Allocator on GPUOpen](https://gpuopen.com/gaming-product/D3D12MemoryAllocator/) (TODO)
+**Product page:** [Vulkan Memory Allocator on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/) (TODO)
 
 **Build status:**
 
@@ -21,7 +21,7 @@ Memory allocation and resource (buffer and texture) creation in new, explicit gr
 This library can help developers to manage memory allocations and resource creation by offering function `Allocator::CreateResource` similar to the standard `ID3D12Device::CreateCommittedResource`. It internally:
 
 - Allocates and keeps track of bigger memory heaps, used and unused ranges inside them, finds best matching unused ranges to create new resources there as placed resources.
-- Automatically respects aligment requirements for created resources.
+- Automatically respects alignment requirements for created resources.
 - Automatically handles resource heap tier - whether it's `D3D12_RESOURCE_HEAP_TIER_1` that requires to keep certain classes of resources separate or `D3D12_RESOURCE_HEAP_TIER_2` that allows to keep them all together.
 
 Additional features:
