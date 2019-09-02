@@ -6,7 +6,7 @@ Easy to integrate memory allocation library for Direct3D 12.
 
 **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
 
-**Product page:** [Vulkan Memory Allocator on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/)
+**Product page:** [D3D12 Memory Allocator on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/)
 
 **Build status:**
 
