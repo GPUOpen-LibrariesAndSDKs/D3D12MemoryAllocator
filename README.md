@@ -6,7 +6,7 @@ Easy to integrate memory allocation library for Direct3D 12.
 
 **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
 
-**Product page:** [Vulkan Memory Allocator on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/) (TODO)
+**Product page:** [Vulkan Memory Allocator on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/)
 
 **Build status:**
 
@@ -14,7 +14,7 @@ TODO
 
 # Problem
 
-Memory allocation and resource (buffer and texture) creation in new, explicit graphics APIs (Vulkan and Direct3D 12) is difficult comparing to older graphics APIs like Direct3D 11 or OpenGL because it is recommended to allocate bigger blocks of memory and assign parts of them to resources. [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/) is a library that implements this functionality for Vulkan. It is available online since 2017 and it is successfully used in many software projects, including some AAA game studios. This is an equivalent library for D3D12.
+Memory allocation and resource (buffer and texture) creation in new, explicit graphics APIs (Vulkan® and Direct3D 12) is difficult comparing to older graphics APIs like Direct3D 11 or OpenGL® because it is recommended to allocate bigger blocks of memory and assign parts of them to resources. [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/) is a library that implements this functionality for Vulkan. It is available online since 2017 and it is successfully used in many software projects, including some AAA game studios. This is an equivalent library for D3D12.
 
 # Features
 
@@ -31,7 +31,7 @@ Additional features:
 - Configuration: Fill optional members of `ALLOCATOR_DESC` structure to provide custom CPU memory allocator and other parameters.
 - Customization: Predefine appropriate macros to provide your own implementation of external facilities used by the library, like assert, mutex, and atomic.
 
-# Prequisites
+# Prerequisites
 
 - Self-contained C++ library in single pair of H + CPP files. No external dependencies other than standard C, C++ library and Windows SDK. STL containers, C++ exceptions, and RTTI are not used.
 - Object-oriented interface in a convention similar to D3D12.
