@@ -10,7 +10,7 @@ Easy to integrate memory allocation library for Direct3D 12.
 
 **Build status:**
 
-TODO
+Windows: [![Build status](https://ci.appveyor.com/api/projects/status/860i07bxv55ydgvg?svg=true)](https://ci.appveyor.com/project/adam-sawicki-amd/d3d12memoryallocator)
 
 # Problem
 
