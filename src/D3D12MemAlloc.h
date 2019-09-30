@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 1.0.0</b> (2019-09-02)
+<b>Version 1.0.0-development</b> (2019-09-30)
 
 Copyright (c) 2019 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -295,8 +295,7 @@ Near future: feature parity with [Vulkan Memory Allocator](https://github.com/GP
 
 - Custom memory pools
 - Alternative allocation algorithms: linear allocator, buddy allocator
-- Statistics about memory usage, number of allocations, allocated blocks etc.,
-  along with JSON dump that can be visualized on a picture
+- JSON dump that can be visualized on a picture
 - Support for priorities using `ID3D12Device1::SetResidencyPriority`
 - Support for "lost" allocations
 
@@ -537,6 +536,48 @@ struct ALLOCATOR_DESC
 };
 
 /**
+\brief Number of D3D12 memory heap types supported.
+*/
+const UINT HEAP_TYPE_COUNT = 3;
+
+/**
+\brief Calculated statistics of memory usage in entire allocator.
+*/
+struct StatInfo
+{
+    /// Number of memory blocks (heaps) allocated.
+    UINT BlockCount;
+    /// Number of D3D12MA::Allocation objects allocated.
+    UINT AllocationCount;
+    /// Number of free ranges of memory between allocations.
+    UINT UnusedRangeCount;
+    /// Total number of bytes occupied by all allocations.
+    UINT64 UsedBytes;
+    /// Total number of bytes occupied by unused ranges.
+    UINT64 UnusedBytes;
+    UINT64 AllocationSizeMin;
+    UINT64 AllocationSizeAvg;
+    UINT64 AllocationSizeMax;
+    UINT64 UnusedRangeSizeMin;
+    UINT64 UnusedRangeSizeAvg;
+    UINT64 UnusedRangeSizeMax;
+};
+
+/**
+\brief General statistics from the current state of the allocator.
+*/
+struct Stats
+{
+    /// Total statistics from all heap types.
+    StatInfo Total;
+    /**
+    One StatInfo for each type of heap located at the following indices:
+    0 - DEFAULT, 1 - UPLOAD, 2 - READBACK.
+    */
+    StatInfo HeapType[HEAP_TYPE_COUNT];
+};
+
+/**
 \brief Represents main object of this library initialized for particular `ID3D12Device`.
 
 Fill structure D3D12MA::ALLOCATOR_DESC and call function CreateAllocator() to create it.
@@ -576,6 +617,10 @@ public:
         Allocation** ppAllocation,
         REFIID riidResource,
         void** ppvResource);
+
+    /** \brief Retrieves statistics from the current state of the allocator.
+    */
+    void CalculateStats(Stats* pStats);
 
 private:
     friend HRESULT CreateAllocator(const ALLOCATOR_DESC*, Allocator**);

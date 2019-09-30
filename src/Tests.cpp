@@ -281,6 +281,95 @@ static void TestMapping(const TestContext& ctx)
     }
 }
 
+static inline bool StatInfoEqual(const D3D12MA::StatInfo& lhs, const D3D12MA::StatInfo& rhs)
+{
+    return lhs.BlockCount == rhs.BlockCount &&
+        lhs.AllocationCount == rhs.AllocationCount &&
+        lhs.UnusedRangeCount == rhs.UnusedRangeCount &&
+        lhs.UsedBytes == rhs.UsedBytes &&
+        lhs.UnusedBytes == rhs.UnusedBytes &&
+        lhs.AllocationSizeMin == rhs.AllocationSizeMin &&
+        lhs.AllocationSizeMax == rhs.AllocationSizeMax &&
+        lhs.AllocationSizeAvg == rhs.AllocationSizeAvg &&
+        lhs.UnusedRangeSizeMin == rhs.UnusedRangeSizeMin &&
+        lhs.UnusedRangeSizeMax == rhs.UnusedRangeSizeMax &&
+        lhs.UnusedRangeSizeAvg == rhs.UnusedRangeSizeAvg;
+}
+
+static void CheckStatInfo(const D3D12MA::StatInfo& statInfo)
+{
+    if(statInfo.AllocationCount > 0)
+    {
+        CHECK_BOOL(statInfo.AllocationSizeAvg >= statInfo.AllocationSizeMin &&
+            statInfo.AllocationSizeAvg <= statInfo.AllocationSizeMax);
+    }
+    if(statInfo.UsedBytes > 0)
+    {
+        CHECK_BOOL(statInfo.AllocationCount > 0);
+    }
+    if(statInfo.UnusedRangeCount > 0)
+    {
+        CHECK_BOOL(statInfo.UnusedRangeSizeAvg >= statInfo.UnusedRangeSizeMin &&
+            statInfo.UnusedRangeSizeAvg <= statInfo.UnusedRangeSizeMax);
+        CHECK_BOOL(statInfo.UnusedRangeSizeMin > 0);
+        CHECK_BOOL(statInfo.UnusedRangeSizeMax > 0);
+    }
+}
+
+static void TestStats(const TestContext& ctx)
+{
+    wprintf(L"Test stats\n");
+
+    D3D12MA::Stats begStats = {};
+    ctx.allocator->CalculateStats(&begStats);
+
+    const UINT count = 10;
+    const UINT64 bufSize = 64ull * 1024;
+    ResourceWithAllocation resources[count];
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC resourceDesc;
+    FillResourceDescForBuffer(resourceDesc, bufSize);
+
+    for(UINT i = 0; i < count; ++i)
+    {
+        D3D12MA::Allocation* alloc = nullptr;
+        CHECK_HR( ctx.allocator->CreateResource(
+            &allocDesc,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            NULL,
+            &alloc,
+            IID_PPV_ARGS(&resources[i].resource)) );
+        resources[i].allocation.reset(alloc);
+    }
+
+    D3D12MA::Stats endStats = {};
+    ctx.allocator->CalculateStats(&endStats);
+
+    CHECK_BOOL(endStats.Total.BlockCount >= begStats.Total.BlockCount);
+    CHECK_BOOL(endStats.Total.AllocationCount == begStats.Total.AllocationCount + count);
+    CHECK_BOOL(endStats.Total.UsedBytes == begStats.Total.UsedBytes + count * bufSize);
+    CHECK_BOOL(endStats.Total.AllocationSizeMin <= bufSize);
+    CHECK_BOOL(endStats.Total.AllocationSizeMax >= bufSize);
+
+    CHECK_BOOL(endStats.HeapType[1].BlockCount >= begStats.HeapType[1].BlockCount);
+    CHECK_BOOL(endStats.HeapType[1].AllocationCount >= begStats.HeapType[1].AllocationCount + count);
+    CHECK_BOOL(endStats.HeapType[1].UsedBytes >= begStats.HeapType[1].UsedBytes + count * bufSize);
+    CHECK_BOOL(endStats.HeapType[1].AllocationSizeMin <= bufSize);
+    CHECK_BOOL(endStats.HeapType[1].AllocationSizeMax >= bufSize);
+
+    CHECK_BOOL(StatInfoEqual(begStats.HeapType[0], endStats.HeapType[0]));
+    CHECK_BOOL(StatInfoEqual(begStats.HeapType[2], endStats.HeapType[2]));
+
+    CheckStatInfo(endStats.Total);
+    CheckStatInfo(endStats.HeapType[0]);
+    CheckStatInfo(endStats.HeapType[1]);
+    CheckStatInfo(endStats.HeapType[2]);
+}
+
 static void TestTransfer(const TestContext& ctx)
 {
     wprintf(L"Test mapping\n");
@@ -527,6 +616,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCommittedResources(ctx);
     TestPlacedResources(ctx);
     TestMapping(ctx);
+    TestStats(ctx);
     TestTransfer(ctx);
     TestMultithreading(ctx);
 }

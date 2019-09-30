@@ -30,6 +30,8 @@ Additional features:
 - Thread-safety: Library is designed to be used in multithreaded code.
 - Configuration: Fill optional members of `ALLOCATOR_DESC` structure to provide custom CPU memory allocator and other parameters.
 - Customization: Predefine appropriate macros to provide your own implementation of external facilities used by the library, like assert, mutex, and atomic.
+- Statistics: Obtain detailed statistics about the amount of memory used, unused, number of allocated blocks, number of allocations etc. - globally and per memory heap type.
+- Debug annotations: Associate string name with every allocation.
 
 # Prerequisites
 

@@ -466,8 +466,6 @@ struct PointerLess
     }
 };
 
-static const UINT HEAP_TYPE_COUNT = 3;
-
 static UINT HeapTypeToIndex(D3D12_HEAP_TYPE type)
 {
     switch(type)
@@ -477,6 +475,29 @@ static UINT HeapTypeToIndex(D3D12_HEAP_TYPE type)
     case D3D12_HEAP_TYPE_READBACK: return 2;
     default: D3D12MA_ASSERT(0); return UINT_MAX;
     }
+}
+
+// Stat helper functions
+
+static void AddStatInfo(StatInfo& dst, const StatInfo& src)
+{
+    dst.BlockCount += src.BlockCount;
+    dst.AllocationCount += src.AllocationCount;
+    dst.UnusedRangeCount += src.UnusedRangeCount;
+    dst.UsedBytes += src.UsedBytes;
+    dst.UnusedBytes += src.UnusedBytes;
+    dst.AllocationSizeMin = D3D12MA_MIN(dst.AllocationSizeMin, src.AllocationSizeMin);
+    dst.AllocationSizeMax = D3D12MA_MAX(dst.AllocationSizeMax, src.AllocationSizeMax);
+    dst.UnusedRangeSizeMin = D3D12MA_MIN(dst.UnusedRangeSizeMin, src.UnusedRangeSizeMin);
+    dst.UnusedRangeSizeMax = D3D12MA_MAX(dst.UnusedRangeSizeMax, src.UnusedRangeSizeMax);
+}
+
+static void PostProcessStatInfo(StatInfo& statInfo)
+{
+    statInfo.AllocationSizeAvg = statInfo.AllocationCount ?
+        statInfo.UsedBytes / statInfo.AllocationCount : 0;
+    statInfo.UnusedRangeSizeAvg = statInfo.UnusedRangeCount ?
+        statInfo.UnusedBytes / statInfo.UnusedRangeCount : 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1406,11 +1427,15 @@ public:
     virtual void Free(const Allocation* allocation) = 0;
     virtual void FreeAtOffset(UINT64 offset) = 0;
 
+    virtual void CalcAllocationStatInfo(StatInfo& outInfo) const = 0;
+
 protected:
     const ALLOCATION_CALLBACKS* GetAllocs() const { return m_pAllocationCallbacks; }
 
 private:
     UINT64 m_Size;
+
+private:
     const ALLOCATION_CALLBACKS* m_pAllocationCallbacks;
 
     D3D12MA_CLASS_NO_COPY(BlockMetadata);
@@ -1441,6 +1466,8 @@ public:
 
     virtual void Free(const Allocation* allocation);
     virtual void FreeAtOffset(UINT64 offset);
+
+    virtual void CalcAllocationStatInfo(StatInfo& outInfo) const;
 
 private:
     UINT m_FreeCount;
@@ -1482,7 +1509,7 @@ private:
 
 /*
 Represents a single block of device memory (heap) with all the data about its
-regions (aka suballocations, #Allocation), assigned and free.
+regions (aka suballocations, Allocation), assigned and free.
 
 Thread-safety: This class must be externally synchronized.
 */
@@ -1566,6 +1593,8 @@ public:
     void Free(
         Allocation* hAllocation);
 
+    void AddStats(Stats& outpStats);
+
 private:
     static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags);
 
@@ -1645,6 +1674,8 @@ public:
     // Unregisters allocation from the collection of placed allocations.
     // Allocation object must be deleted externally afterwards.
     void FreePlacedMemory(Allocation* allocation);
+
+    void CalculateStats(Stats& outStats);
 
 private:
     friend class Allocator;
@@ -2183,6 +2214,40 @@ void BlockMetadata_Generic::UnregisterFreeSuballocation(SuballocationList::itera
     //D3D12MA_HEAVY_ASSERT(ValidateFreeSuballocationList());
 }
 
+void BlockMetadata_Generic::CalcAllocationStatInfo(StatInfo& outInfo) const
+{
+    outInfo.BlockCount = 1;
+
+    const UINT rangeCount = (UINT)m_Suballocations.size();
+    outInfo.AllocationCount = rangeCount - m_FreeCount;
+    outInfo.UnusedRangeCount = m_FreeCount;
+
+    outInfo.UsedBytes = GetSize() - m_SumFreeSize;
+    outInfo.UnusedBytes = m_SumFreeSize;
+
+    outInfo.AllocationSizeMin = UINT64_MAX;
+    outInfo.AllocationSizeMax = 0;
+    outInfo.UnusedRangeSizeMin = UINT64_MAX;
+    outInfo.UnusedRangeSizeMax = 0;
+
+    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
+        suballocItem != m_Suballocations.cend();
+        ++suballocItem)
+    {
+        const Suballocation& suballoc = *suballocItem;
+        if(suballoc.type == SUBALLOCATION_TYPE_FREE)
+        {
+            outInfo.UnusedRangeSizeMin = D3D12MA_MIN(suballoc.size, outInfo.UnusedRangeSizeMin);
+            outInfo.UnusedRangeSizeMax = D3D12MA_MAX(suballoc.size, outInfo.UnusedRangeSizeMax);
+        }
+        else
+        {
+            outInfo.AllocationSizeMin = D3D12MA_MIN(suballoc.size, outInfo.AllocationSizeMin);
+            outInfo.AllocationSizeMax = D3D12MA_MAX(suballoc.size, outInfo.AllocationSizeMax);
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Private class DeviceMemoryBlock implementation
 
@@ -2624,6 +2689,25 @@ HRESULT BlockVector::CreateD3d12Heap(ID3D12Heap*& outHeap, UINT64 size) const
     return m_hAllocator->GetDevice()->CreateHeap(&heapDesc, IID_PPV_ARGS(&outHeap));
 }
 
+void BlockVector::AddStats(Stats& outStats)
+{
+    const UINT heapTypeIndex = HeapTypeToIndex(m_HeapType);
+    StatInfo* const pStatInfo = &outStats.HeapType[heapTypeIndex];
+
+    MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
+
+    for(size_t i = 0; i < m_Blocks.size(); ++i)
+    {
+        const DeviceMemoryBlock* const pBlock = m_Blocks[i];
+        D3D12MA_ASSERT(pBlock);
+        D3D12MA_HEAVY_ASSERT(pBlock->Validate());
+        StatInfo blockStatInfo;
+        pBlock->m_pMetadata->CalcAllocationStatInfo(blockStatInfo);
+        AddStatInfo(outStats.Total, blockStatInfo);
+        AddStatInfo(*pStatInfo, blockStatInfo);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Private class AllocatorPimpl implementation
 
@@ -2935,6 +3019,57 @@ void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
     blockVector->Free(allocation);
 }
 
+void AllocatorPimpl::CalculateStats(Stats& outStats)
+{
+    // Init stats
+    memset(&outStats, 0, sizeof(outStats));
+    outStats.Total.AllocationSizeMin = UINT64_MAX;
+    outStats.Total.UnusedRangeSizeMin = UINT64_MAX;
+    for(size_t i = 0; i < HEAP_TYPE_COUNT; i++)
+    {
+        outStats.HeapType[i].AllocationSizeMin = UINT64_MAX;
+        outStats.HeapType[i].UnusedRangeSizeMin = UINT64_MAX;
+    }
+
+    // Process deafult pools.
+    for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
+    {
+        BlockVector* const pBlockVector = m_BlockVectors[i];
+        D3D12MA_ASSERT(pBlockVector);
+        pBlockVector->AddStats(outStats);
+    }
+
+    // Process committed allocations.
+    for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
+    {
+        StatInfo& heapStatInfo = outStats.HeapType[i];
+        MutexLockRead lock(m_CommittedAllocationsMutex[i], m_UseMutex);
+        const AllocationVectorType* const allocationVector = m_pCommittedAllocations[i];
+        D3D12MA_ASSERT(allocationVector);
+        for(size_t j = 0, count = allocationVector->size(); j < count; ++j)
+        {
+            UINT64 size = (*allocationVector)[j]->GetSize();
+            StatInfo statInfo = {};
+            statInfo.BlockCount = 1;
+            statInfo.AllocationCount = 1;
+            statInfo.UnusedRangeCount = 0;
+            statInfo.UsedBytes = size;
+            statInfo.UnusedBytes = 0;
+            statInfo.AllocationSizeMin = size;
+            statInfo.AllocationSizeMax = size;
+            statInfo.UnusedRangeSizeMin = 0;
+            statInfo.UnusedRangeSizeMax = 0;
+            AddStatInfo(outStats.Total, statInfo);
+            AddStatInfo(heapStatInfo, statInfo);
+        }
+    }
+
+    // Post process
+    PostProcessStatInfo(outStats.Total);
+    for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
+        PostProcessStatInfo(outStats.HeapType[i]);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Public class Allocation implementation
@@ -3093,6 +3228,13 @@ HRESULT Allocator::CreateResource(
     D3D12MA_ASSERT(pAllocDesc && pResourceDesc && ppAllocation && riidResource != IID_NULL && ppvResource);
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     return m_Pimpl->CreateResource(pAllocDesc, pResourceDesc, InitialResourceState, pOptimizedClearValue, ppAllocation, riidResource, ppvResource);
+}
+
+void Allocator::CalculateStats(Stats* pStats)
+{
+    D3D12MA_ASSERT(pStats);
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    m_Pimpl->CalculateStats(*pStats);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
