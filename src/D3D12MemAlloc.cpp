@@ -614,7 +614,7 @@ public:
             {
                 memcpy(newArray, m_pArray, m_Count * sizeof(T));
             }
-            Free(m_Allocator.m_pCallbacks, m_pArray);
+            Free(m_AllocationCallbacks, m_pArray);
             m_Capacity = newCapacity;
             m_pArray = newArray;
         }
