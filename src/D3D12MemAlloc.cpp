@@ -227,12 +227,7 @@ static inline void D3D12MA_SWAP(T& a, T& b)
 #endif
 
 /*
-If providing your own implementation, you need to implement a subset of std::atomic:
-
-- Constructor(UINT desired)
-- UINT load() const
-- void store(UINT desired)
-- bool compare_exchange_weak(UINT& expected, UINT desired)
+If providing your own implementation, you need to implement a subset of std::atomic.
 */
 #ifndef D3D12MA_ATOMIC_UINT32
     #define D3D12MA_ATOMIC_UINT32 std::atomic<UINT>
@@ -477,6 +472,12 @@ static UINT HeapTypeToIndex(D3D12_HEAP_TYPE type)
     }
 }
 
+static const WCHAR* const HeapTypeNames[] = {
+    L"DEFAULT",
+    L"UPLOAD",
+    L"READBACK",
+};
+
 // Stat helper functions
 
 static void AddStatInfo(StatInfo& dst, const StatInfo& src)
@@ -498,6 +499,27 @@ static void PostProcessStatInfo(StatInfo& statInfo)
         statInfo.UsedBytes / statInfo.AllocationCount : 0;
     statInfo.UnusedRangeSizeAvg = statInfo.UnusedRangeCount ?
         statInfo.UnusedBytes / statInfo.UnusedRangeCount : 0;
+}
+
+static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags)
+{
+    /*
+    Documentation of D3D12_HEAP_DESC structure says:
+
+    - D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT   defined as 64KB.
+    - D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT   defined as 4MB. An
+    application must decide whether the heap will contain multi-sample
+    anti-aliasing (MSAA), in which case, the application must choose [this flag].
+
+    https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/ns-d3d12-d3d12_heap_desc
+    */
+
+    const D3D12_HEAP_FLAGS denyAllTexturesFlags =
+        D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES;
+    const bool canContainAnyTextures =
+        (flags & denyAllTexturesFlags) != denyAllTexturesFlags;
+    return canContainAnyTextures ?
+        D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -740,6 +762,348 @@ private:
     size_t m_Count;
     size_t m_Capacity;
 };
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class StringBuilder
+
+class StringBuilder
+{
+public:
+    StringBuilder(const ALLOCATION_CALLBACKS& allocationCallbacks) : m_Data(allocationCallbacks) { }
+
+    size_t GetLength() const { return m_Data.size(); }
+    LPCWSTR GetData() const { return m_Data.data(); }
+
+    void Add(WCHAR ch) { m_Data.push_back(ch); }
+    void Add(LPCWSTR str);
+    void AddNewLine() { Add(L'\n'); }
+    void AddNumber(UINT num);
+    void AddNumber(UINT64 num);
+
+private:
+    Vector<WCHAR> m_Data;
+};
+
+void StringBuilder::Add(LPCWSTR str)
+{
+    const size_t len = wcslen(str);
+    if (len > 0)
+    {
+        const size_t oldCount = m_Data.size();
+        m_Data.resize(oldCount + len);
+        memcpy(m_Data.data() + oldCount, str, len * sizeof(WCHAR));
+    }
+}
+
+void StringBuilder::AddNumber(UINT num)
+{
+    WCHAR buf[11];
+    buf[10] = L'\0';
+    WCHAR *p = &buf[10];
+    do
+    {
+        *--p = L'0' + (num % 10);
+        num /= 10;
+    }
+    while (num);
+    Add(p);
+}
+
+void StringBuilder::AddNumber(UINT64 num)
+{
+    WCHAR buf[21];
+    buf[20] = L'\0';
+    WCHAR *p = &buf[20];
+    do
+    {
+        *--p = L'0' + (num % 10);
+        num /= 10;
+    }
+    while (num);
+    Add(p);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class JsonWriter
+class JsonWriter
+{
+public:
+    JsonWriter(const ALLOCATION_CALLBACKS& allocationCallbacks, StringBuilder& stringBuilder);
+    ~JsonWriter();
+
+    void BeginObject(bool singleLine = false);
+    void EndObject();
+
+    void BeginArray(bool singleLine = false);
+    void EndArray();
+
+    void WriteString(LPCWSTR pStr);
+    void BeginString(LPCWSTR pStr = NULL);
+    void ContinueString(LPCWSTR pStr);
+    void ContinueString(UINT num);
+    void ContinueString(UINT64 num);
+    // void ContinueString_Pointer(const void* ptr);
+    void EndString(LPCWSTR pStr = NULL);
+
+    void WriteNumber(UINT num);
+    void WriteNumber(UINT64 num);
+    void WriteBool(bool b);
+    void WriteNull();
+
+private:
+    static const WCHAR* const INDENT;
+
+    enum CollectionType
+    {
+        COLLECTION_TYPE_OBJECT,
+        COLLECTION_TYPE_ARRAY,
+    };
+    struct StackItem
+    {
+        CollectionType type;
+        UINT valueCount;
+        bool singleLineMode;
+    };
+
+    StringBuilder& m_SB;
+    Vector<StackItem> m_Stack;
+    bool m_InsideString;
+
+    void BeginValue(bool isString);
+    void WriteIndent(bool oneLess = false);
+};
+
+const WCHAR* const JsonWriter::INDENT = L"  ";
+
+JsonWriter::JsonWriter(const ALLOCATION_CALLBACKS& allocationCallbacks, StringBuilder& stringBuilder) :
+    m_SB(stringBuilder),
+    m_Stack(allocationCallbacks),
+    m_InsideString(false)
+{
+}
+
+JsonWriter::~JsonWriter()
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    D3D12MA_ASSERT(m_Stack.empty());
+}
+
+void JsonWriter::BeginObject(bool singleLine)
+{
+    D3D12MA_ASSERT(!m_InsideString);
+
+    BeginValue(false);
+    m_SB.Add(L'{');
+
+    StackItem stackItem;
+    stackItem.type = COLLECTION_TYPE_OBJECT;
+    stackItem.valueCount = 0;
+    stackItem.singleLineMode = singleLine;
+    m_Stack.push_back(stackItem);
+}
+
+void JsonWriter::EndObject()
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    D3D12MA_ASSERT(!m_Stack.empty() && m_Stack.back().type == COLLECTION_TYPE_OBJECT);
+    D3D12MA_ASSERT(m_Stack.back().valueCount % 2 == 0);
+
+    WriteIndent(true);
+    m_SB.Add(L'}');
+
+    m_Stack.pop_back();
+}
+
+void JsonWriter::BeginArray(bool singleLine)
+{
+    D3D12MA_ASSERT(!m_InsideString);
+
+    BeginValue(false);
+    m_SB.Add(L'[');
+
+    StackItem stackItem;
+    stackItem.type = COLLECTION_TYPE_ARRAY;
+    stackItem.valueCount = 0;
+    stackItem.singleLineMode = singleLine;
+    m_Stack.push_back(stackItem);
+}
+
+void JsonWriter::EndArray()
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    D3D12MA_ASSERT(!m_Stack.empty() && m_Stack.back().type == COLLECTION_TYPE_ARRAY);
+
+    WriteIndent(true);
+    m_SB.Add(L']');
+
+    m_Stack.pop_back();
+}
+
+void JsonWriter::WriteString(LPCWSTR pStr)
+{
+    BeginString(pStr);
+    EndString();
+}
+
+void JsonWriter::BeginString(LPCWSTR pStr)
+{
+    D3D12MA_ASSERT(!m_InsideString);
+
+    BeginValue(true);
+    m_InsideString = true;
+    m_SB.Add(L'"');
+    if (pStr != NULL)
+    {
+        ContinueString(pStr);
+    }
+}
+
+void JsonWriter::ContinueString(LPCWSTR pStr)
+{
+    D3D12MA_ASSERT(m_InsideString);
+    D3D12MA_ASSERT(pStr);
+
+    for (const WCHAR *p = pStr; *p; ++p)
+    {
+        // the strings we encode are assumed to be in UTF-16LE format, the native
+        // windows wide character unicode format. In this encoding unicode code
+        // points U+0000 to U+D7FF and U+E000 to U+FFFF are encoded in two bytes,
+        // and everything else takes more than two bytes. We will reject any
+        // multi wchar character encodings for simplicity.
+        UINT val = (UINT)*p;
+        D3D12MA_ASSERT(((val <= 0xD7FF) || (0xE000 <= val && val <= 0xFFFF)) &&
+            "Character not currently supported.");
+        switch (*p)
+        {
+        case L'"':  m_SB.Add(L'\\'); m_SB.Add(L'"');  break;
+        case L'\\': m_SB.Add(L'\\'); m_SB.Add(L'\\'); break;
+        case L'/':  m_SB.Add(L'\\'); m_SB.Add(L'/');  break;
+        case L'\b': m_SB.Add(L'\\'); m_SB.Add(L'b');  break;
+        case L'\f': m_SB.Add(L'\\'); m_SB.Add(L'f');  break;
+        case L'\n': m_SB.Add(L'\\'); m_SB.Add(L'n');  break;
+        case L'\r': m_SB.Add(L'\\'); m_SB.Add(L'r');  break;
+        case L'\t': m_SB.Add(L'\\'); m_SB.Add(L't');  break;
+        default:
+            // conservatively use encoding \uXXXX for any unicode character
+            // requiring more than one byte.
+            if (32 <= val && val < 256)
+                m_SB.Add(*p);
+            else
+            {
+                m_SB.Add(L'\\');
+                m_SB.Add(L'u');
+                for (UINT i = 0; i < 4; ++i)
+                {
+                    UINT hexDigit = (val & 0xF000) >> 12;
+                    val <<= 4;
+                    if (hexDigit < 10)
+                        m_SB.Add(L'0' + hexDigit);
+                    else
+                        m_SB.Add(L'A' + hexDigit);
+                }
+            }
+            break;
+        }
+    }
+}
+
+void JsonWriter::ContinueString(UINT num)
+{
+    D3D12MA_ASSERT(m_InsideString);
+    m_SB.AddNumber(num);
+}
+
+void JsonWriter::ContinueString(UINT64 num)
+{
+    D3D12MA_ASSERT(m_InsideString);
+    m_SB.AddNumber(num);
+}
+
+void JsonWriter::EndString(LPCWSTR pStr)
+{
+    D3D12MA_ASSERT(m_InsideString);
+
+    if (pStr)
+        ContinueString(pStr);
+    m_SB.Add(L'"');
+    m_InsideString = false;
+}
+
+void JsonWriter::WriteNumber(UINT num)
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    BeginValue(false);
+    m_SB.AddNumber(num);
+}
+
+void JsonWriter::WriteNumber(UINT64 num)
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    BeginValue(false);
+    m_SB.AddNumber(num);
+}
+
+void JsonWriter::WriteBool(bool b)
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    BeginValue(false);
+    if (b)
+        m_SB.Add(L"true");
+    else
+        m_SB.Add(L"false");
+}
+
+void JsonWriter::WriteNull()
+{
+    D3D12MA_ASSERT(!m_InsideString);
+    BeginValue(false);
+    m_SB.Add(L"null");
+}
+
+void JsonWriter::BeginValue(bool isString)
+{
+    if (!m_Stack.empty())
+    {
+        StackItem& currItem = m_Stack.back();
+        if (currItem.type == COLLECTION_TYPE_OBJECT && currItem.valueCount % 2 == 0)
+        {
+            D3D12MA_ASSERT(isString);
+        }
+
+        if (currItem.type == COLLECTION_TYPE_OBJECT && currItem.valueCount % 2 == 1)
+        {
+            m_SB.Add(L':'); m_SB.Add(L' ');
+        }
+        else if (currItem.valueCount > 0)
+        {
+            m_SB.Add(L','); m_SB.Add(L' ');
+            WriteIndent();
+        }
+        else
+        {
+            WriteIndent();
+        }
+        ++currItem.valueCount;
+    }
+}
+
+void JsonWriter::WriteIndent(bool oneLess)
+{
+    if (!m_Stack.empty() && !m_Stack.back().singleLineMode)
+    {
+        m_SB.AddNewLine();
+
+        size_t count = m_Stack.size();
+        if (count > 0 && oneLess)
+        {
+            --count;
+        }
+        for (size_t i = 0; i < count; ++i)
+        {
+            m_SB.Add(INDENT);
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Private class PoolAllocator
@@ -1337,7 +1701,7 @@ enum SuballocationType
 };
 
 /*
-Represents a region of DeviceMemoryBlock that is either assigned and returned as
+Represents a region of NormalBlock that is either assigned and returned as
 allocated memory block or free.
 */
 struct Suballocation
@@ -1379,7 +1743,7 @@ struct SuballocationItemSizeLess
 };
 
 /*
-Parameters of planned allocation inside a DeviceMemoryBlock.
+Parameters of planned allocation inside a NormalBlock.
 */
 struct AllocationRequest
 {
@@ -1428,14 +1792,13 @@ public:
     virtual void FreeAtOffset(UINT64 offset) = 0;
 
     virtual void CalcAllocationStatInfo(StatInfo& outInfo) const = 0;
+    virtual void WriteAllocationInfoToJson(JsonWriter& json) const = 0;
 
 protected:
     const ALLOCATION_CALLBACKS* GetAllocs() const { return m_pAllocationCallbacks; }
 
 private:
     UINT64 m_Size;
-
-private:
     const ALLOCATION_CALLBACKS* m_pAllocationCallbacks;
 
     D3D12MA_CLASS_NO_COPY(BlockMetadata);
@@ -1468,6 +1831,7 @@ public:
     virtual void FreeAtOffset(UINT64 offset);
 
     virtual void CalcAllocationStatInfo(StatInfo& outInfo) const;
+    virtual void WriteAllocationInfoToJson(JsonWriter& json) const;
 
 private:
     UINT m_FreeCount;
@@ -1505,59 +1869,85 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Private class DeviceMemoryBlock definition
+// Private class MemoryBlock definition
+
+/*
+Represents a single block of device memory (heap).
+Base class for inheritance.
+Thread-safety: This class must be externally synchronized.
+*/
+class MemoryBlock
+{
+public:
+    MemoryBlock(
+        AllocatorPimpl* allocator,
+        D3D12_HEAP_TYPE heapType,
+        D3D12_HEAP_FLAGS heapFlags,
+        UINT64 size,
+        UINT id);
+    virtual ~MemoryBlock();
+    // Creates the ID3D12Heap.
+
+    D3D12_HEAP_TYPE GetHeapType() const { return m_HeapType; }
+    D3D12_HEAP_FLAGS GetHeapFlags() const { return m_HeapFlags; }
+    UINT64 GetSize() const { return m_Size; }
+    UINT GetId() const { return m_Id; }
+    ID3D12Heap* GetHeap() const { return m_Heap; }
+
+protected:
+    AllocatorPimpl* const m_Allocator;
+    const D3D12_HEAP_TYPE m_HeapType;
+    const D3D12_HEAP_FLAGS m_HeapFlags;
+    const UINT64 m_Size;
+    const UINT m_Id;
+
+    HRESULT Init();
+
+private:
+    ID3D12Heap* m_Heap = NULL;
+
+    D3D12MA_CLASS_NO_COPY(MemoryBlock)
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class NormalBlock definition
 
 /*
 Represents a single block of device memory (heap) with all the data about its
 regions (aka suballocations, Allocation), assigned and free.
-
 Thread-safety: This class must be externally synchronized.
 */
-class DeviceMemoryBlock
+class NormalBlock : public MemoryBlock
 {
 public:
     BlockMetadata* m_pMetadata;
 
-    DeviceMemoryBlock();
-
-    ~DeviceMemoryBlock()
-    {
-        D3D12MA_ASSERT(m_Heap == NULL);
-    }
-
-    // Always call after construction.
-    void Init(
+    NormalBlock(
         AllocatorPimpl* allocator,
         BlockVector* blockVector,
-        D3D12_HEAP_TYPE newHeapType,
-        ID3D12Heap* newHeap,
-        UINT64 newSize,
+        D3D12_HEAP_TYPE heapType,
+        D3D12_HEAP_FLAGS heapFlags,
+        UINT64 size,
         UINT id);
-    // Always call before destruction.
-    void Destroy(AllocatorPimpl* allocator);
+    virtual ~NormalBlock();
+    HRESULT Init();
 
     BlockVector* GetBlockVector() const { return m_BlockVector; }
-    ID3D12Heap* GetHeap() const { return m_Heap; }
-    D3D12_HEAP_TYPE GetHeapType() const { return m_HeapType; }
-    UINT GetId() const { return m_Id; }
 
     // Validates all data structures inside this object. If not valid, returns false.
     bool Validate() const;
 
 private:
     BlockVector* m_BlockVector;
-    D3D12_HEAP_TYPE m_HeapType;
-    UINT m_Id;
-    ID3D12Heap* m_Heap;
 
-    D3D12MA_CLASS_NO_COPY(DeviceMemoryBlock)
+    D3D12MA_CLASS_NO_COPY(NormalBlock)
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Private class BlockVector definition
 
 /*
-Sequence of DeviceMemoryBlock. Represents memory blocks allocated for a specific
+Sequence of NormalBlock. Represents memory blocks allocated for a specific
 heap type and possibly resource type (if only Tier 1 is supported).
 
 Synchronized internally with a mutex.
@@ -1595,9 +1985,9 @@ public:
 
     void AddStats(Stats& outpStats);
 
-private:
-    static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags);
+    void WriteBlockInfoToJson(JsonWriter& json);
 
+private:
     AllocatorPimpl* const m_hAllocator;
     const D3D12_HEAP_TYPE m_HeapType;
     const D3D12_HEAP_FLAGS m_HeapFlags;
@@ -1611,13 +2001,13 @@ private:
     bool m_HasEmptyBlock;
     D3D12MA_RW_MUTEX m_Mutex;
     // Incrementally sorted by sumFreeSize, ascending.
-    Vector<DeviceMemoryBlock*> m_Blocks;
+    Vector<NormalBlock*> m_Blocks;
     UINT m_NextBlockId;
 
     UINT64 CalcMaxBlockSize() const;
 
     // Finds and removes given block from vector.
-    void Remove(DeviceMemoryBlock* pBlock);
+    void Remove(NormalBlock* pBlock);
 
     // Performs single step in sorting m_Blocks. They may not be fully sorted
     // after this call.
@@ -1630,14 +2020,13 @@ private:
         Allocation** pAllocation);
 
     HRESULT AllocateFromBlock(
-        DeviceMemoryBlock* pBlock,
+        NormalBlock* pBlock,
         UINT64 size,
         UINT64 alignment,
         ALLOCATION_FLAGS allocFlags,
         Allocation** pAllocation);
 
     HRESULT CreateBlock(UINT64 blockSize, size_t* pNewBlockIndex);
-    HRESULT CreateD3d12Heap(ID3D12Heap*& outHeap, UINT64 size) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1668,14 +2057,27 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
+    HRESULT AllocateMemory(
+        const ALLOCATION_DESC* pAllocDesc,
+        D3D12_HEAP_FLAGS heapFlags,
+        const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
+        Allocation** ppAllocation);
+
     // Unregisters allocation from the collection of dedicated allocations.
     // Allocation object must be deleted externally afterwards.
     void FreeCommittedMemory(Allocation* allocation);
     // Unregisters allocation from the collection of placed allocations.
     // Allocation object must be deleted externally afterwards.
     void FreePlacedMemory(Allocation* allocation);
+    // Unregisters allocation from the collection of dedicated allocations and destroys associated heap.
+    // Allocation object must be deleted externally afterwards.
+    void FreeHeapMemory(Allocation* allocation);
 
     void CalculateStats(Stats& outStats);
+
+    void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap);
+
+    void FreeStatsString(WCHAR* pStatsString);
 
 private:
     friend class Allocator;
@@ -1701,8 +2103,8 @@ private:
     BlockVector* m_BlockVectors[DEFAULT_POOL_MAX_COUNT];
 
     // Allocates and registers new committed resource with implicit heap, as dedicated allocation.
-    // Creates and returns Allocation objects.
-    HRESULT AllocateCommittedMemory(
+    // Creates and returns Allocation object.
+    HRESULT AllocateCommittedResource(
         const ALLOCATION_DESC* pAllocDesc,
         const D3D12_RESOURCE_DESC* pResourceDesc,
         const D3D12_RESOURCE_ALLOCATION_INFO& resAllocInfo,
@@ -1711,6 +2113,14 @@ private:
         Allocation** ppAllocation,
         REFIID riidResource,
         void** ppvResource);
+
+    // Allocates and registers new heap without any resources placed in it, as dedicated allocation.
+    // Creates and returns Allocation object.
+    HRESULT AllocateHeap(
+        const ALLOCATION_DESC* pAllocDesc,
+        D3D12_HEAP_FLAGS heapFlags,
+        const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
+        Allocation** ppAllocation);
 
     /*
     If SupportsResourceHeapTier2():
@@ -1730,7 +2140,14 @@ private:
     */
     UINT CalcDefaultPoolCount() const;
     UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC& resourceDesc) const;
+    // This one returns UINT32_MAX if nonstandard heap flags are used and index cannot be calculcated.
+    UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_HEAP_FLAGS heapFlags) const;
     void CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_HEAP_FLAGS& outHeapFlags, UINT index) const;
+
+    // Registers Allocation object in m_pCommittedAllocations.
+    void RegisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
+    // Unregisters Allocation object from m_pCommittedAllocations.
+    void UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2248,57 +2665,136 @@ void BlockMetadata_Generic::CalcAllocationStatInfo(StatInfo& outInfo) const
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Private class DeviceMemoryBlock implementation
-
-DeviceMemoryBlock::DeviceMemoryBlock() :
-    m_pMetadata(NULL),
-    m_BlockVector(NULL),
-    m_HeapType(D3D12_HEAP_TYPE_CUSTOM),
-    m_Id(0),
-    m_Heap(NULL)
+void BlockMetadata_Generic::WriteAllocationInfoToJson(JsonWriter& json) const
 {
+    json.BeginObject();
+    json.WriteString(L"TotalBytes");
+    json.WriteNumber(GetSize());
+    json.WriteString(L"UnusuedBytes");
+    json.WriteNumber(GetSumFreeSize());
+    json.WriteString(L"Allocations");
+    json.WriteNumber(GetAllocationCount());
+    json.WriteString(L"UnusedRanges");
+    json.WriteNumber(m_FreeCount);
+    json.WriteString(L"Suballocations");
+    json.BeginArray();
+    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
+        suballocItem != m_Suballocations.cend();
+        ++suballocItem)
+    {
+        const Suballocation& suballoc = *suballocItem;
+        json.BeginObject(true);
+        json.WriteString(L"Offset");
+        json.WriteNumber(suballoc.offset);
+        json.WriteString(L"Type");
+        if(suballoc.type == SUBALLOCATION_TYPE_FREE)
+        {
+            json.WriteString(L"FREE");
+        }
+        else
+        {
+            json.WriteString(L"ALLOCATION");
+            const Allocation* const alloc = suballoc.allocation;
+            D3D12MA_ASSERT(alloc);
+            const WCHAR* const name = alloc->GetName();
+            if(name != NULL)
+            {
+                json.WriteString(L"Name");
+                json.WriteString(name);
+            }
+        }
+        json.WriteString(L"Size");
+        json.WriteNumber(suballoc.size);
+        json.EndObject();
+    }
+    json.EndArray();
+    json.EndObject();
 }
 
-void DeviceMemoryBlock::Init(
+////////////////////////////////////////////////////////////////////////////////
+// Private class NormalBlock implementation
+
+NormalBlock::NormalBlock(
     AllocatorPimpl* allocator,
     BlockVector* blockVector,
-    D3D12_HEAP_TYPE newHeapType,
-    ID3D12Heap* newHeap,
-    UINT64 newSize,
-    UINT id)
+    D3D12_HEAP_TYPE heapType,
+    D3D12_HEAP_FLAGS heapFlags,
+    UINT64 size,
+    UINT id) :
+    MemoryBlock(allocator, heapType, heapFlags, size, id),
+    m_BlockVector(blockVector)
 {
-    D3D12MA_ASSERT(m_Heap == NULL);
-
-    m_BlockVector = blockVector;
-    m_HeapType = newHeapType;
-    m_Id = id;
-    m_Heap = newHeap;
-
-    const ALLOCATION_CALLBACKS& allocs = allocator->GetAllocs();
-
-    m_pMetadata = D3D12MA_NEW(allocs, BlockMetadata_Generic)(&allocs);
-    m_pMetadata->Init(newSize);
 }
 
-void DeviceMemoryBlock::Destroy(AllocatorPimpl* allocator)
+NormalBlock::~NormalBlock()
 {
     // THIS IS THE MOST IMPORTANT ASSERT IN THE ENTIRE LIBRARY!
     // Hitting it means you have some memory leak - unreleased Allocation objects.
     D3D12MA_ASSERT(m_pMetadata->IsEmpty() && "Some allocations were not freed before destruction of this memory block!");
 
-    D3D12MA_ASSERT(m_Heap != NULL);
-    m_Heap->Release();
-    m_Heap = NULL;
-
-    D3D12MA_DELETE(allocator->GetAllocs(), m_pMetadata);
+    D3D12MA_DELETE(m_Allocator->GetAllocs(), m_pMetadata);
     m_pMetadata = NULL;
 }
 
-bool DeviceMemoryBlock::Validate() const
+HRESULT NormalBlock::Init()
 {
-    D3D12MA_VALIDATE(m_Heap && m_pMetadata && m_pMetadata->GetSize() != 0);
+    HRESULT hr = MemoryBlock::Init();
+    if(FAILED(hr))
+    {
+        return hr;
+    }
+    
+    m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_Generic)(&m_Allocator->GetAllocs());
+    m_pMetadata->Init(m_Size);
+
+    return hr;
+}
+
+bool NormalBlock::Validate() const
+{
+    D3D12MA_VALIDATE(GetHeap() &&
+        m_pMetadata &&
+        m_pMetadata->GetSize() != 0 &&
+        m_pMetadata->GetSize() == GetSize());
     return m_pMetadata->Validate();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class MemoryBlock definition
+
+MemoryBlock::MemoryBlock(
+    AllocatorPimpl* allocator,
+    D3D12_HEAP_TYPE heapType,
+    D3D12_HEAP_FLAGS heapFlags,
+    UINT64 size,
+    UINT id) :
+    m_Allocator(allocator),
+    m_HeapType(heapType),
+    m_HeapFlags(heapFlags),
+    m_Size(size),
+    m_Id(id)
+{
+}
+
+MemoryBlock::~MemoryBlock()
+{
+    if(m_Heap)
+    {
+        m_Heap->Release();
+    }
+}
+
+HRESULT MemoryBlock::Init()
+{
+    D3D12MA_ASSERT(m_Heap == NULL && m_Size > 0);
+
+    D3D12_HEAP_DESC heapDesc = {};
+    heapDesc.SizeInBytes = m_Size;
+    heapDesc.Properties.Type = m_HeapType;
+    heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags);
+    heapDesc.Flags = m_HeapFlags;
+
+    return m_Allocator->GetDevice()->CreateHeap(&heapDesc, __uuidof(*m_Heap), (void**)&m_Heap);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2329,7 +2825,6 @@ BlockVector::~BlockVector()
 {
     for(size_t i = m_Blocks.size(); i--; )
     {
-        m_Blocks[i]->Destroy(m_hAllocator);
         D3D12MA_DELETE(m_hAllocator->GetAllocs(), m_Blocks[i]);
     }
 }
@@ -2412,7 +2907,7 @@ HRESULT BlockVector::AllocatePage(
                 // Forward order in m_Blocks - prefer blocks with smallest amount of free space.
                 for(size_t blockIndex = 0; blockIndex < m_Blocks.size(); ++blockIndex )
                 {
-                    DeviceMemoryBlock* const pCurrBlock = m_Blocks[blockIndex];
+                    NormalBlock* const pCurrBlock = m_Blocks[blockIndex];
                     D3D12MA_ASSERT(pCurrBlock);
                     HRESULT hr = AllocateFromBlock(
                         pCurrBlock,
@@ -2478,7 +2973,7 @@ HRESULT BlockVector::AllocatePage(
 
             if(SUCCEEDED(hr))
             {
-                DeviceMemoryBlock* const pBlock = m_Blocks[newBlockIndex];
+                NormalBlock* const pBlock = m_Blocks[newBlockIndex];
                 D3D12MA_ASSERT(pBlock->m_pMetadata->GetSize() >= size);
 
                 hr = AllocateFromBlock(
@@ -2505,13 +3000,13 @@ HRESULT BlockVector::AllocatePage(
 
 void BlockVector::Free(Allocation* hAllocation)
 {
-    DeviceMemoryBlock* pBlockToDelete = NULL;
+    NormalBlock* pBlockToDelete = NULL;
 
     // Scope for lock.
     {
         MutexLockWrite lock(m_Mutex, m_hAllocator->UseMutex());
 
-        DeviceMemoryBlock* pBlock = hAllocation->GetBlock();
+        NormalBlock* pBlock = hAllocation->m_Placed.block;
 
         pBlock->m_pMetadata->Free(hAllocation);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
@@ -2535,7 +3030,7 @@ void BlockVector::Free(Allocation* hAllocation)
         // (This is optional, heuristics.)
         else if(m_HasEmptyBlock)
         {
-            DeviceMemoryBlock* pLastBlock = m_Blocks.back();
+            NormalBlock* pLastBlock = m_Blocks.back();
             if(pLastBlock->m_pMetadata->IsEmpty() && m_Blocks.size() > m_MinBlockCount)
             {
                 pBlockToDelete = pLastBlock;
@@ -2551,30 +3046,8 @@ void BlockVector::Free(Allocation* hAllocation)
     // lock, for performance reason.
     if(pBlockToDelete != NULL)
     {
-        pBlockToDelete->Destroy(m_hAllocator);
         D3D12MA_DELETE(m_hAllocator->GetAllocs(), pBlockToDelete);
     }
-}
-
-UINT64 BlockVector::HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags)
-{
-    /*
-    Documentation of D3D12_HEAP_DESC structure says:
-
-    - D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT   defined as 64KB.
-    - D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT   defined as 4MB. An
-      application must decide whether the heap will contain multi-sample
-      anti-aliasing (MSAA), in which case, the application must choose [this flag].
-
-    https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/ns-d3d12-d3d12_heap_desc
-    */
-
-    const D3D12_HEAP_FLAGS denyAllTexturesFlags =
-        D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES;
-    const bool canContainAnyTextures =
-        (flags & denyAllTexturesFlags) != denyAllTexturesFlags;
-    return canContainAnyTextures ?
-        D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 }
 
 UINT64 BlockVector::CalcMaxBlockSize() const
@@ -2591,7 +3064,7 @@ UINT64 BlockVector::CalcMaxBlockSize() const
     return result;
 }
 
-void BlockVector::Remove(DeviceMemoryBlock* pBlock)
+void BlockVector::Remove(NormalBlock* pBlock)
 {
     for(UINT blockIndex = 0; blockIndex < m_Blocks.size(); ++blockIndex)
     {
@@ -2618,7 +3091,7 @@ void BlockVector::IncrementallySortBlocks()
 }
 
 HRESULT BlockVector::AllocateFromBlock(
-    DeviceMemoryBlock* pBlock,
+    NormalBlock* pBlock,
     UINT64 size,
     UINT64 alignment,
     ALLOCATION_FLAGS allocFlags,
@@ -2652,21 +3125,19 @@ HRESULT BlockVector::AllocateFromBlock(
 
 HRESULT BlockVector::CreateBlock(UINT64 blockSize, size_t* pNewBlockIndex)
 {
-    ID3D12Heap* heap = NULL;
-    HRESULT hr = CreateD3d12Heap(heap, blockSize);
-    if(FAILED(hr))
-    {
-        return hr;
-    }
-
-    DeviceMemoryBlock* const pBlock = D3D12MA_NEW(m_hAllocator->GetAllocs(), DeviceMemoryBlock)();
-    pBlock->Init(
+    NormalBlock* const pBlock = D3D12MA_NEW(m_hAllocator->GetAllocs(), NormalBlock)(
         m_hAllocator,
         this,
         m_HeapType,
-        heap,
+        m_HeapFlags,
         blockSize,
         m_NextBlockId++);
+    HRESULT hr = pBlock->Init();
+    if(FAILED(hr))
+    {
+        D3D12MA_DELETE(m_hAllocator->GetAllocs(), pBlock);
+        return hr;
+    }
 
     m_Blocks.push_back(pBlock);
     if(pNewBlockIndex != NULL)
@@ -2675,18 +3146,6 @@ HRESULT BlockVector::CreateBlock(UINT64 blockSize, size_t* pNewBlockIndex)
     }
 
     return hr;
-}
-
-HRESULT BlockVector::CreateD3d12Heap(ID3D12Heap*& outHeap, UINT64 size) const
-{
-    D3D12_HEAP_DESC heapDesc = {};
-    heapDesc.SizeInBytes = size;
-    heapDesc.Properties.Type = m_HeapType;
-    heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags);
-    heapDesc.Flags = m_HeapFlags;
-
-    ID3D12Heap* heap = NULL;
-    return m_hAllocator->GetDevice()->CreateHeap(&heapDesc, IID_PPV_ARGS(&outHeap));
 }
 
 void BlockVector::AddStats(Stats& outStats)
@@ -2698,7 +3157,7 @@ void BlockVector::AddStats(Stats& outStats)
 
     for(size_t i = 0; i < m_Blocks.size(); ++i)
     {
-        const DeviceMemoryBlock* const pBlock = m_Blocks[i];
+        const NormalBlock* const pBlock = m_Blocks[i];
         D3D12MA_ASSERT(pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
         StatInfo blockStatInfo;
@@ -2706,6 +3165,27 @@ void BlockVector::AddStats(Stats& outStats)
         AddStatInfo(outStats.Total, blockStatInfo);
         AddStatInfo(*pStatInfo, blockStatInfo);
     }
+}
+
+void BlockVector::WriteBlockInfoToJson(JsonWriter& json)
+{
+    MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
+
+    json.BeginObject();
+
+    for (size_t i = 0, count = m_Blocks.size(); i < count; ++i)
+    {
+        const NormalBlock* const pBlock = m_Blocks[i];
+        D3D12MA_ASSERT(pBlock);
+        D3D12MA_HEAVY_ASSERT(pBlock->Validate());
+        json.BeginString();
+        json.ContinueString(pBlock->GetId());
+        json.EndString();
+
+        pBlock->m_pMetadata->WriteAllocationInfoToJson(json);
+    }
+
+    json.EndObject();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2716,6 +3196,7 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     m_Device(desc.pDevice),
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
     m_AllocationCallbacks(allocationCallbacks)
+    // Below this line don't use allocationCallbacks but m_AllocationCallbacks!!!
 {
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
@@ -2769,7 +3250,7 @@ AllocatorPimpl::~AllocatorPimpl()
     {
         if(m_pCommittedAllocations[i] && !m_pCommittedAllocations[i]->empty())
         {
-            D3D12MA_ASSERT(0 && "Unfreed committed allocations found.");
+            D3D12MA_ASSERT(0 && "Unfreed committed allocations found!");
         }
 
         D3D12MA_DELETE(GetAllocs(), m_pCommittedAllocations[i]);
@@ -2794,7 +3275,10 @@ HRESULT AllocatorPimpl::CreateResource(
 
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
 
-    *ppvResource = NULL;
+    if(ppvResource)
+    {
+        *ppvResource = NULL;
+    }
 
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = m_Device->GetResourceAllocationInfo(0, 1, pResourceDesc);
     resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
@@ -2819,7 +3303,7 @@ HRESULT AllocatorPimpl::CreateResource(
 
     if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
     {
-        return AllocateCommittedMemory(
+        return AllocateCommittedResource(
             &finalAllocDesc,
             pResourceDesc,
             resAllocInfo,
@@ -2839,16 +3323,23 @@ HRESULT AllocatorPimpl::CreateResource(
             (Allocation**)ppAllocation);
         if(SUCCEEDED(hr))
         {
+            ID3D12Resource* res = NULL;
             hr = m_Device->CreatePlacedResource(
-                (*ppAllocation)->GetBlock()->GetHeap(),
+                (*ppAllocation)->m_Placed.block->GetHeap(),
                 (*ppAllocation)->GetOffset(),
                 pResourceDesc,
                 InitialResourceState,
                 pOptimizedClearValue,
                 riidResource,
-                ppvResource);
+                (void**)&res);
             if(SUCCEEDED(hr))
             {
+                (*ppAllocation)->SetResource(res);
+                if(ppvResource != NULL)
+                {
+                    res->AddRef();
+                    *ppvResource = res;
+                }
                 return hr;
             }
             else
@@ -2858,7 +3349,7 @@ HRESULT AllocatorPimpl::CreateResource(
             }
         }
 
-        return AllocateCommittedMemory(
+        return AllocateCommittedResource(
             &finalAllocDesc,
             pResourceDesc,
             resAllocInfo,
@@ -2870,13 +3361,68 @@ HRESULT AllocatorPimpl::CreateResource(
     }
 }
 
+HRESULT AllocatorPimpl::AllocateMemory(
+    const ALLOCATION_DESC* pAllocDesc,
+    D3D12_HEAP_FLAGS heapFlags,
+    const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
+    Allocation** ppAllocation)
+{
+    if(pAllocDesc->HeapType != D3D12_HEAP_TYPE_DEFAULT &&
+        pAllocDesc->HeapType != D3D12_HEAP_TYPE_UPLOAD &&
+        pAllocDesc->HeapType != D3D12_HEAP_TYPE_READBACK)
+    {
+        return E_INVALIDARG;
+    }
+
+    ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
+
+    const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, heapFlags);
+    if(defaultPoolIndex == UINT32_MAX)
+    {
+        return E_INVALIDARG;
+    }
+    BlockVector* blockVector = m_BlockVectors[defaultPoolIndex];
+    D3D12MA_ASSERT(blockVector);
+
+    const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
+    bool preferCommittedMemory =
+        D3D12MA_DEBUG_ALWAYS_COMMITTED ||
+        // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
+        pAllocInfo->SizeInBytes > preferredBlockSize / 2;
+    if(preferCommittedMemory &&
+        (finalAllocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
+    {
+        finalAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
+    }
+
+    if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
+    {
+        return AllocateHeap(&finalAllocDesc, heapFlags, *pAllocInfo, ppAllocation);
+    }
+    else
+    {
+        HRESULT hr = blockVector->Allocate(
+            pAllocInfo->SizeInBytes,
+            pAllocInfo->Alignment,
+            finalAllocDesc,
+            1,
+            (Allocation**)ppAllocation);
+        if(SUCCEEDED(hr))
+        {
+            return hr;
+        }
+
+        return AllocateHeap(&finalAllocDesc, heapFlags, *pAllocInfo, ppAllocation);
+    }
+}
+
 bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC& resourceDesc)
 {
     // Intentional. It may change in the future.
     return false;
 }
 
-HRESULT AllocatorPimpl::AllocateCommittedMemory(
+HRESULT AllocatorPimpl::AllocateCommittedResource(
     const ALLOCATION_DESC* pAllocDesc,
     const D3D12_RESOURCE_DESC* pResourceDesc,
     const D3D12_RESOURCE_ALLOCATION_INFO& resAllocInfo,
@@ -2893,23 +3439,54 @@ HRESULT AllocatorPimpl::AllocateCommittedMemory(
 
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = pAllocDesc->HeapType;
+    ID3D12Resource* res = NULL;
     HRESULT hr = m_Device->CreateCommittedResource(
         &heapProps, D3D12_HEAP_FLAG_NONE, pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, riidResource, ppvResource);
+        pOptimizedClearValue, riidResource, (void**)&res);
     if(SUCCEEDED(hr))
     {
         Allocation* alloc = D3D12MA_NEW(m_AllocationCallbacks, Allocation)();
         alloc->InitCommitted(this, resAllocInfo.SizeInBytes, pAllocDesc->HeapType);
+        alloc->SetResource(res);
+
         *ppAllocation = alloc;
-
-        const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
-
+        if(ppvResource != NULL)
         {
-            MutexLockWrite lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
-            AllocationVectorType* const committedAllocations = m_pCommittedAllocations[heapTypeIndex];
-            D3D12MA_ASSERT(committedAllocations);
-            committedAllocations->InsertSorted(alloc, PointerLess());
+            res->AddRef();
+            *ppvResource = res;
         }
+
+        RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
+    }
+    return hr;
+}
+
+HRESULT AllocatorPimpl::AllocateHeap(
+    const ALLOCATION_DESC* pAllocDesc,
+    D3D12_HEAP_FLAGS heapFlags,
+    const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
+    Allocation** ppAllocation)
+{
+    *ppAllocation = nullptr;
+
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) != 0)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    D3D12_HEAP_DESC heapDesc = {};
+    heapDesc.SizeInBytes = allocInfo.SizeInBytes;
+    heapDesc.Properties.Type = pAllocDesc->HeapType;
+    heapDesc.Alignment = allocInfo.Alignment;
+    heapDesc.Flags = heapFlags;
+
+    ID3D12Heap* heap = nullptr;
+    HRESULT hr = m_Device->CreateHeap(&heapDesc, __uuidof(*heap), (void**)&heap);
+    if(SUCCEEDED(hr))
+    {
+        (*ppAllocation) = D3D12MA_NEW(m_AllocationCallbacks, Allocation)();
+        (*ppAllocation)->InitHeap(this, allocInfo.SizeInBytes, pAllocDesc->HeapType, heap);
+        RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
     }
     return hr;
 }
@@ -2946,6 +3523,44 @@ UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, cons
             const bool isRenderTargetOrDepthStencil =
                 (resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0;
             if(isRenderTargetOrDepthStencil)
+            {
+                ++poolIndex;
+            }
+        }
+    }
+
+    return poolIndex;
+}
+
+UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_HEAP_FLAGS heapFlags) const
+{
+    UINT poolIndex = UINT_MAX;
+    switch(allocDesc.HeapType)
+    {
+    case D3D12_HEAP_TYPE_DEFAULT:  poolIndex = 0; break;
+    case D3D12_HEAP_TYPE_UPLOAD:   poolIndex = 1; break;
+    case D3D12_HEAP_TYPE_READBACK: poolIndex = 2; break;
+    default: D3D12MA_ASSERT(0);
+    }
+
+    if(!SupportsResourceHeapTier2())
+    {
+        poolIndex *= 3;
+
+        const bool allowBuffers = (heapFlags & D3D12_HEAP_FLAG_DENY_BUFFERS) == 0;
+        const bool allowRtDsTextures = (heapFlags & D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES) == 0;
+        const bool allowNonRtDsTextures = (heapFlags & D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES) == 0;
+
+        const uint8_t allowedGroupCount = (allowBuffers ? 1 : 0) + (allowRtDsTextures ? 1 : 0) + (allowNonRtDsTextures ? 1 : 0);
+        if(allowedGroupCount != 1)
+        {
+            return UINT32_MAX;
+        }
+
+        if(!allowBuffers)
+        {
+            ++poolIndex;
+            if(allowRtDsTextures)
             {
                 ++poolIndex;
             }
@@ -2994,29 +3609,49 @@ void AllocatorPimpl::CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_H
     }
 }
 
+void AllocatorPimpl::RegisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType)
+{
+    const UINT heapTypeIndex = HeapTypeToIndex(heapType);
+
+    MutexLockWrite lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
+    AllocationVectorType* const committedAllocations = m_pCommittedAllocations[heapTypeIndex];
+    D3D12MA_ASSERT(committedAllocations);
+    committedAllocations->InsertSorted(alloc, PointerLess());
+}
+
+void AllocatorPimpl::UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType)
+{
+    const UINT heapTypeIndex = HeapTypeToIndex(heapType);
+    
+    MutexLockWrite lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
+    AllocationVectorType* const committedAllocations = m_pCommittedAllocations[heapTypeIndex];
+    D3D12MA_ASSERT(committedAllocations);
+    bool success = committedAllocations->RemoveSorted(alloc, PointerLess());
+    D3D12MA_ASSERT(success);
+}
+
 void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
 {
     D3D12MA_ASSERT(allocation && allocation->m_Type == Allocation::TYPE_COMMITTED);
-    const UINT heapTypeIndex = HeapTypeToIndex(allocation->m_Committed.heapType);
-
-    {
-        MutexLockWrite lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
-        AllocationVectorType* const committedAllocations = m_pCommittedAllocations[heapTypeIndex];
-        D3D12MA_ASSERT(committedAllocations);
-        bool success = committedAllocations->RemoveSorted(allocation, PointerLess());
-        D3D12MA_ASSERT(success);
-    }
+    UnregisterCommittedAllocation(allocation, allocation->m_Committed.heapType);
 }
 
 void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
 {
     D3D12MA_ASSERT(allocation && allocation->m_Type == Allocation::TYPE_PLACED);
-    
-    DeviceMemoryBlock* const block = allocation->GetBlock();
+
+    NormalBlock* const block = allocation->m_Placed.block;
     D3D12MA_ASSERT(block);
     BlockVector* const blockVector = block->GetBlockVector();
     D3D12MA_ASSERT(blockVector);
     blockVector->Free(allocation);
+}
+
+void AllocatorPimpl::FreeHeapMemory(Allocation* allocation)
+{
+    D3D12MA_ASSERT(allocation && allocation->m_Type == Allocation::TYPE_HEAP);
+    UnregisterCommittedAllocation(allocation, allocation->m_Heap.heapType);
+    allocation->m_Heap.heap->Release();
 }
 
 void AllocatorPimpl::CalculateStats(Stats& outStats)
@@ -3070,6 +3705,167 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
         PostProcessStatInfo(outStats.HeapType[i]);
 }
 
+static void AddStatInfoToJson(JsonWriter& json, const StatInfo& statInfo)
+{
+    json.BeginObject();
+    json.WriteString(L"Blocks");
+    json.WriteNumber(statInfo.BlockCount);
+    json.WriteString(L"Allocations");
+    json.WriteNumber(statInfo.AllocationCount);
+    json.WriteString(L"UnusedRanges");
+    json.WriteNumber(statInfo.UnusedRangeCount);
+    json.WriteString(L"UsedBytes");
+    json.WriteNumber(statInfo.UsedBytes);
+    json.WriteString(L"UnusedBytes");
+    json.WriteNumber(statInfo.UnusedBytes);
+
+    json.WriteString(L"AllocationSize");
+    json.BeginObject(true);
+    json.WriteString(L"Min");
+    json.WriteNumber(statInfo.AllocationSizeMin);
+    json.WriteString(L"Avg");
+    json.WriteNumber(statInfo.AllocationSizeAvg);
+    json.WriteString(L"Max");
+    json.WriteNumber(statInfo.AllocationSizeMax);
+    json.EndObject();
+
+    json.WriteString(L"UnusedRangeSize");
+    json.BeginObject(true);
+    json.WriteString(L"Min");
+    json.WriteNumber(statInfo.UnusedRangeSizeMin);
+    json.WriteString(L"Avg");
+    json.WriteNumber(statInfo.UnusedRangeSizeAvg);
+    json.WriteString(L"Max");
+    json.WriteNumber(statInfo.UnusedRangeSizeMax);
+    json.EndObject();
+
+    json.EndObject();
+}
+
+void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
+{
+    StringBuilder sb(GetAllocs());
+    {
+        JsonWriter json(GetAllocs(), sb);
+
+        Stats stats;
+        CalculateStats(stats);
+
+        json.BeginObject();
+        json.WriteString(L"Total");
+        AddStatInfoToJson(json, stats.Total);
+        for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
+        {
+            json.WriteString(HeapTypeNames[heapType]);
+            AddStatInfoToJson(json, stats.HeapType[heapType]);
+        }
+
+        if (DetailedMap)
+        {
+            json.WriteString(L"DetailedMap");
+            json.BeginObject();
+
+            json.WriteString(L"DefaultPools");
+            json.BeginObject();
+
+            D3D12MA_ASSERT(SupportsResourceHeapTier2());
+            if (SupportsResourceHeapTier2())
+            {
+                for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
+                {
+                    json.WriteString(HeapTypeNames[heapType]);
+                    json.BeginObject();
+
+                    json.WriteString(L"Blocks");
+
+                    BlockVector* blockVector = m_BlockVectors[heapType];
+                    D3D12MA_ASSERT(blockVector);
+                    blockVector->WriteBlockInfoToJson(json);
+
+                    json.EndObject(); // heap name
+                }
+            }
+            else
+            {
+                for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
+                {
+                    for (size_t heapSubType = 0; heapSubType < 3; ++heapSubType)
+                    {
+                        static const WCHAR* const heapSubTypeName[] = {
+                            L" + buffer",
+                            L" + texture",
+                            L" + texture RT or DS",
+                        };
+                        json.BeginString();
+                        json.ContinueString(HeapTypeNames[heapType]);
+                        json.ContinueString(heapSubTypeName[heapSubType]);
+                        json.EndString();
+                        json.BeginObject();
+
+                        json.WriteString(L"Blocks");
+
+                        BlockVector* blockVector = m_BlockVectors[heapType * 3 + heapSubType];
+                        D3D12MA_ASSERT(blockVector);
+                        blockVector->WriteBlockInfoToJson(json);
+
+                        json.EndObject(); // heap name
+                    }
+                }
+            }
+
+            json.EndObject(); // DefaultPools
+
+            json.WriteString(L"CommittedAllocations");
+            json.BeginObject();
+
+            for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
+            {
+                json.WriteString(HeapTypeNames[heapType]);
+                MutexLockRead lock(m_CommittedAllocationsMutex[heapType], m_UseMutex);
+
+                json.BeginArray();
+                const AllocationVectorType* const allocationVector = m_pCommittedAllocations[heapType];
+                D3D12MA_ASSERT(allocationVector);
+                for (size_t i = 0, count = allocationVector->size(); i < count; ++i)
+                {
+                    Allocation* alloc = (*allocationVector)[i];
+                    D3D12MA_ASSERT(alloc);
+
+                    json.BeginObject(true);
+                    json.WriteString(L"Type");
+                    json.WriteString(L"ALLOCATION");
+                    json.WriteString(L"Size");
+                    json.WriteNumber(alloc->GetSize());
+                    LPCWSTR name = alloc->GetName();
+                    if(name != NULL)
+                    {
+                        json.WriteString(L"Name");
+                        json.WriteString(name);
+                    }
+                    json.EndObject();
+                }
+                json.EndArray();
+            }
+
+            json.EndObject(); // CommittedAllocations
+
+            json.EndObject(); // DetailedMap
+        }
+        json.EndObject();
+    }
+
+    const size_t length = sb.GetLength();
+    WCHAR* result = AllocateArray<WCHAR>(GetAllocs(), length + 1);
+    memcpy(result, sb.GetData(), length * sizeof(WCHAR));
+    result[length] = L'\0';
+    *ppStatsString = result;
+}
+
+void AllocatorPimpl::FreeStatsString(WCHAR* pStatsString)
+{
+    D3D12MA_ASSERT(pStatsString);
+    Free(GetAllocs(), pStatsString);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Public class Allocation implementation
@@ -3083,6 +3879,11 @@ void Allocation::Release()
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
+    if(m_Resource)
+    {
+        m_Resource->Release();
+    }
+
     switch(m_Type)
     {
     case TYPE_COMMITTED:
@@ -3090,6 +3891,9 @@ void Allocation::Release()
         break;
     case TYPE_PLACED:
         m_Allocator->FreePlacedMemory(this);
+        break;
+    case TYPE_HEAP:
+        m_Allocator->FreeHeapMemory(this);
         break;
     }
 
@@ -3103,6 +3907,7 @@ UINT64 Allocation::GetOffset() const
     switch(m_Type)
     {
     case TYPE_COMMITTED:
+    case TYPE_HEAP:
         return 0;
     case TYPE_PLACED:
         return m_Placed.offset;
@@ -3120,6 +3925,8 @@ ID3D12Heap* Allocation::GetHeap() const
         return NULL;
     case TYPE_PLACED:
         return m_Placed.block->GetHeap();
+    case TYPE_HEAP:
+        return m_Heap.heap;
     default:
         D3D12MA_ASSERT(0);
         return 0;
@@ -3133,8 +3940,8 @@ void Allocation::SetName(LPCWSTR Name)
     if(Name)
     {
         const size_t nameCharCount = wcslen(Name) + 1;
-        m_Name = D3D12MA_NEW_ARRAY(m_Allocator->GetAllocs(), wchar_t, nameCharCount);
-        memcpy(m_Name, Name, nameCharCount * sizeof(wchar_t));
+        m_Name = D3D12MA_NEW_ARRAY(m_Allocator->GetAllocs(), WCHAR, nameCharCount);
+        memcpy(m_Name, Name, nameCharCount * sizeof(WCHAR));
     }
 }
 
@@ -3157,24 +3964,36 @@ void Allocation::InitCommitted(AllocatorPimpl* allocator, UINT64 size, D3D12_HEA
     m_Allocator = allocator;
     m_Type = TYPE_COMMITTED;
     m_Size = size;
+    m_Resource = NULL;
     m_Name = NULL;
     m_Committed.heapType = heapType;
 }
 
-void Allocation::InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offset, UINT64 alignment, DeviceMemoryBlock* block)
+void Allocation::InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offset, UINT64 alignment, NormalBlock* block)
 {
     m_Allocator = allocator;
     m_Type = TYPE_PLACED;
     m_Size = size;
+    m_Resource = NULL;
     m_Name = NULL;
     m_Placed.offset = offset;
     m_Placed.block = block;
 }
 
-DeviceMemoryBlock* Allocation::GetBlock()
+void Allocation::InitHeap(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
 {
-    D3D12MA_ASSERT(m_Type == TYPE_PLACED);
-    return m_Placed.block;
+    m_Allocator = allocator;
+    m_Type = TYPE_HEAP;
+    m_Size = size;
+    m_Name = NULL;
+    m_Heap.heapType = heapType;
+    m_Heap.heap = heap;
+}
+
+void Allocation::SetResource(ID3D12Resource* resource)
+{
+    D3D12MA_ASSERT(m_Resource == NULL);
+    m_Resource = resource;
 }
 
 void Allocation::FreeName()
@@ -3225,9 +4044,36 @@ HRESULT Allocator::CreateResource(
     REFIID riidResource,
     void** ppvResource)
 {
-    D3D12MA_ASSERT(pAllocDesc && pResourceDesc && ppAllocation && riidResource != IID_NULL && ppvResource);
+    if(!pAllocDesc || !pResourceDesc || !ppAllocation || riidResource == IID_NULL)
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreateResource.");
+        return E_INVALIDARG;
+    }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     return m_Pimpl->CreateResource(pAllocDesc, pResourceDesc, InitialResourceState, pOptimizedClearValue, ppAllocation, riidResource, ppvResource);
+}
+
+HRESULT Allocator::AllocateMemory(
+    const ALLOCATION_DESC* pAllocDesc,
+    D3D12_HEAP_FLAGS heapFlags,
+    const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
+    Allocation** ppAllocation)
+{
+    if(!pAllocDesc ||
+        !pAllocInfo ||
+        !ppAllocation ||
+        !(pAllocInfo->Alignment == 0 ||
+            pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
+            pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) ||
+        pAllocInfo->SizeInBytes == 0 ||
+        pAllocInfo->SizeInBytes % (64ull * 1024) != 0 ||
+        (heapFlags & ~(D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES)) != 0)
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::AllocateMemory.");
+        return E_INVALIDARG;
+    }
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    return m_Pimpl->AllocateMemory(pAllocDesc, heapFlags, pAllocInfo, ppAllocation);
 }
 
 void Allocator::CalculateStats(Stats* pStats)
@@ -3237,14 +4083,33 @@ void Allocator::CalculateStats(Stats* pStats)
     m_Pimpl->CalculateStats(*pStats);
 }
 
+void Allocator::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
+{
+    D3D12MA_ASSERT(ppStatsString);
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    m_Pimpl->BuildStatsString(ppStatsString, DetailedMap);
+}
+
+void Allocator::FreeStatsString(WCHAR* pStatsString)
+{
+    if (pStatsString != NULL)
+    {
+        D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+        m_Pimpl->FreeStatsString(pStatsString);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Public global functions
 
 HRESULT CreateAllocator(const ALLOCATOR_DESC* pDesc, Allocator** ppAllocator)
 {
-    D3D12MA_ASSERT(pDesc && ppAllocator);
-    D3D12MA_ASSERT(pDesc->pDevice);
-    D3D12MA_ASSERT(pDesc->PreferredBlockSize == 0 || (pDesc->PreferredBlockSize >= 16 && pDesc->PreferredBlockSize < 0x10000000000ull));
+    if(!pDesc || !ppAllocator || !pDesc->pDevice ||
+        !(pDesc->PreferredBlockSize == 0 || (pDesc->PreferredBlockSize >= 16 && pDesc->PreferredBlockSize < 0x10000000000ull)))
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to CreateAllocator.");
+        return E_INVALIDARG;
+    }
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
