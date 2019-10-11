@@ -22,11 +22,12 @@
 
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <dxgi1_4.h>
 #include <d3d12.h>
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <Windows.h>
 #include <atlbase.h> // For CComPtr
 

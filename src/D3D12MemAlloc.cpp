@@ -842,6 +842,7 @@ public:
     void ContinueString(LPCWSTR pStr);
     void ContinueString(UINT num);
     void ContinueString(UINT64 num);
+    void AddAllocationToObject(const Allocation& alloc);
     // void ContinueString_Pointer(const void* ptr);
     void EndString(LPCWSTR pStr = NULL);
 
@@ -1102,6 +1103,52 @@ void JsonWriter::WriteIndent(bool oneLess)
         {
             m_SB.Add(INDENT);
         }
+    }
+}
+
+void JsonWriter::AddAllocationToObject(const Allocation& alloc)
+{
+    WriteString(L"Type");
+    switch (alloc.m_ResourceDimension) {
+    case D3D12_RESOURCE_DIMENSION_UNKNOWN:
+        WriteString(L"UNKNOWN");
+        break;
+    case D3D12_RESOURCE_DIMENSION_BUFFER:
+        WriteString(L"BUFFER");
+        break;
+    case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+        WriteString(L"TEXTURE1D");
+        break;
+    case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+        WriteString(L"TEXTURE2D");
+        break;
+    case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+        WriteString(L"TEXTURE3D");
+        break;
+    default: D3D12MA_ASSERT(0); break;
+    }
+    WriteString(L"Size");
+    WriteNumber(alloc.GetSize());
+    LPCWSTR name = alloc.GetName();
+    if(name != NULL)
+    {
+        WriteString(L"Name");
+        WriteString(name);
+    }
+    if(alloc.m_ResourceFlags)
+    {
+        WriteString(L"Flags");
+        WriteNumber((UINT)alloc.m_ResourceFlags);
+    }
+    if(alloc.m_TextureLayout)
+    {
+        WriteString(L"Layout");
+        WriteNumber((UINT)alloc.m_TextureLayout);
+    }
+    if(alloc.m_CreationFrameIndex)
+    {
+        WriteString(L"CreationFrameIndex");
+        WriteNumber(alloc.m_CreationFrameIndex);
     }
 }
 
@@ -2073,6 +2120,10 @@ public:
     // Allocation object must be deleted externally afterwards.
     void FreeHeapMemory(Allocation* allocation);
 
+    void SetCurrentFrameIndex(UINT frameIndex);
+
+    UINT GetCurrentFrameIndex() const { return m_CurrentFrameIndex.load(); }
+
     void CalculateStats(Stats& outStats);
 
     void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap);
@@ -2092,6 +2143,7 @@ private:
     ID3D12Device* m_Device;
     UINT64 m_PreferredBlockSize;
     ALLOCATION_CALLBACKS m_AllocationCallbacks;
+    D3D12MA_ATOMIC_UINT32 m_CurrentFrameIndex;
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
 
@@ -2686,25 +2738,19 @@ void BlockMetadata_Generic::WriteAllocationInfoToJson(JsonWriter& json) const
         json.BeginObject(true);
         json.WriteString(L"Offset");
         json.WriteNumber(suballoc.offset);
-        json.WriteString(L"Type");
         if(suballoc.type == SUBALLOCATION_TYPE_FREE)
         {
+            json.WriteString(L"Type");
             json.WriteString(L"FREE");
+            json.WriteString(L"Size");
+            json.WriteNumber(suballoc.size);
         }
         else
         {
-            json.WriteString(L"ALLOCATION");
             const Allocation* const alloc = suballoc.allocation;
             D3D12MA_ASSERT(alloc);
-            const WCHAR* const name = alloc->GetName();
-            if(name != NULL)
-            {
-                json.WriteString(L"Name");
-                json.WriteString(name);
-            }
+            json.AddAllocationToObject(*alloc);
         }
-        json.WriteString(L"Size");
-        json.WriteNumber(suballoc.size);
         json.EndObject();
     }
     json.EndArray();
@@ -3195,7 +3241,8 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     m_UseMutex((desc.Flags & ALLOCATOR_FLAG_SINGLETHREADED) == 0),
     m_Device(desc.pDevice),
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
-    m_AllocationCallbacks(allocationCallbacks)
+    m_AllocationCallbacks(allocationCallbacks),
+    m_CurrentFrameIndex(0)
     // Below this line don't use allocationCallbacks but m_AllocationCallbacks!!!
 {
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
@@ -3334,7 +3381,7 @@ HRESULT AllocatorPimpl::CreateResource(
                 (void**)&res);
             if(SUCCEEDED(hr))
             {
-                (*ppAllocation)->SetResource(res);
+                (*ppAllocation)->SetResource(res, pResourceDesc);
                 if(ppvResource != NULL)
                 {
                     res->AddRef();
@@ -3447,7 +3494,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     {
         Allocation* alloc = D3D12MA_NEW(m_AllocationCallbacks, Allocation)();
         alloc->InitCommitted(this, resAllocInfo.SizeInBytes, pAllocDesc->HeapType);
-        alloc->SetResource(res);
+        alloc->SetResource(res, pResourceDesc);
 
         *ppAllocation = alloc;
         if(ppvResource != NULL)
@@ -3654,6 +3701,11 @@ void AllocatorPimpl::FreeHeapMemory(Allocation* allocation)
     allocation->m_Heap.heap->Release();
 }
 
+void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
+{
+    m_CurrentFrameIndex.store(frameIndex);
+}
+
 void AllocatorPimpl::CalculateStats(Stats& outStats)
 {
     // Init stats
@@ -3832,16 +3884,7 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
                     D3D12MA_ASSERT(alloc);
 
                     json.BeginObject(true);
-                    json.WriteString(L"Type");
-                    json.WriteString(L"ALLOCATION");
-                    json.WriteString(L"Size");
-                    json.WriteNumber(alloc->GetSize());
-                    LPCWSTR name = alloc->GetName();
-                    if(name != NULL)
-                    {
-                        json.WriteString(L"Name");
-                        json.WriteString(name);
-                    }
+                    json.AddAllocationToObject(*alloc);
                     json.EndObject();
                 }
                 json.EndArray();
@@ -3961,16 +4004,22 @@ Allocation::~Allocation()
 
 void Allocation::InitCommitted(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType)
 {
+    D3D12MA_ASSERT(allocator);
     m_Allocator = allocator;
     m_Type = TYPE_COMMITTED;
     m_Size = size;
     m_Resource = NULL;
     m_Name = NULL;
     m_Committed.heapType = heapType;
+    m_CreationFrameIndex = allocator->GetCurrentFrameIndex();
+    m_ResourceDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
+    m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
+    m_TextureLayout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 }
 
 void Allocation::InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offset, UINT64 alignment, NormalBlock* block)
 {
+    D3D12MA_ASSERT(allocator);
     m_Allocator = allocator;
     m_Type = TYPE_PLACED;
     m_Size = size;
@@ -3978,22 +4027,35 @@ void Allocation::InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offse
     m_Name = NULL;
     m_Placed.offset = offset;
     m_Placed.block = block;
+    m_CreationFrameIndex = allocator->GetCurrentFrameIndex();
+    m_ResourceDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
+    m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
+    m_TextureLayout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 }
 
 void Allocation::InitHeap(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
 {
+    D3D12MA_ASSERT(allocator);
     m_Allocator = allocator;
     m_Type = TYPE_HEAP;
     m_Size = size;
     m_Name = NULL;
     m_Heap.heapType = heapType;
     m_Heap.heap = heap;
+    m_CreationFrameIndex = allocator->GetCurrentFrameIndex();
+    m_ResourceDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
+    m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
+    m_TextureLayout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 }
 
-void Allocation::SetResource(ID3D12Resource* resource)
+void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc)
 {
     D3D12MA_ASSERT(m_Resource == NULL);
+    D3D12MA_ASSERT(pResourceDesc);
     m_Resource = resource;
+    m_ResourceDimension = pResourceDesc->Dimension;
+    m_ResourceFlags = pResourceDesc->Flags;
+    m_TextureLayout = pResourceDesc->Layout;
 }
 
 void Allocation::FreeName()
@@ -4074,6 +4136,12 @@ HRESULT Allocator::AllocateMemory(
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     return m_Pimpl->AllocateMemory(pAllocDesc, heapFlags, pAllocInfo, ppAllocation);
+}
+
+void Allocator::SetCurrentFrameIndex(UINT frameIndex)
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    m_Pimpl->SetCurrentFrameIndex(frameIndex);
 }
 
 void Allocator::CalculateStats(Stats* pStats)

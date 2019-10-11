@@ -1392,6 +1392,15 @@ static void OnKeyDown(WPARAM key)
         ExecuteTests();
         break;
 
+    case 'J':
+        {
+            WCHAR* statsString = NULL;
+            g_Allocator->BuildStatsString(&statsString, TRUE);
+            wprintf(L"%s\n", statsString);
+            g_Allocator->FreeStatsString(statsString);
+        }
+        break;
+
     case VK_ESCAPE:
         PostMessage(g_Wnd, WM_CLOSE, 0, 0);
         break;

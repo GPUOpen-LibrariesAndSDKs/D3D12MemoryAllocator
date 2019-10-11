@@ -347,6 +347,7 @@ namespace D3D12MA
 class AllocatorPimpl;
 class NormalBlock;
 class BlockVector;
+class JsonWriter;
 /// \endcond
 
 /// Pointer to custom callback function that allocates CPU memory.
@@ -474,6 +475,7 @@ public:
 private:
     friend class AllocatorPimpl;
     friend class BlockVector;
+    friend class JsonWriter;
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
 
     AllocatorPimpl* m_Allocator;
@@ -486,6 +488,10 @@ private:
     } m_Type;
     UINT64 m_Size;
     ID3D12Resource* m_Resource;
+    D3D12_RESOURCE_DIMENSION m_ResourceDimension;
+    D3D12_RESOURCE_FLAGS m_ResourceFlags;
+    D3D12_TEXTURE_LAYOUT m_TextureLayout;
+    UINT m_CreationFrameIndex;
     wchar_t* m_Name;
 
     union
@@ -513,7 +519,7 @@ private:
     void InitCommitted(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType);
     void InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offset, UINT64 alignment, NormalBlock* block);
     void InitHeap(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType, ID3D12Heap* heap);
-    void SetResource(ID3D12Resource* resource);
+    void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc);
     void FreeName();
 
     D3D12MA_CLASS_NO_COPY(Allocation)
@@ -674,6 +680,12 @@ public:
         D3D12_HEAP_FLAGS heapFlags,
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
+
+    /** \brief Sets the index of the current frame.
+
+    This function is used to set the frame index in the allocator when a new game frame begins.
+    */
+    void SetCurrentFrameIndex(UINT frameIndex);
 
     /** \brief Retrieves statistics from the current state of the allocator.
     */
