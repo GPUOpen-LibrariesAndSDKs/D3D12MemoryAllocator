@@ -217,6 +217,8 @@ static void TestPlacedResources(const TestContext& ctx)
 {
     wprintf(L"Test placed resources\n");
 
+    const bool alwaysCommitted = (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED) != 0;
+
     const UINT count = 4;
     const UINT64 bufSize = 32ull * 1024;
     ResourceWithAllocation resources[count];
@@ -240,7 +242,10 @@ static void TestPlacedResources(const TestContext& ctx)
         resources[i].allocation.reset(alloc);
 
         // Make sure it doesn't have implicit heap.
-        CHECK_BOOL( resources[i].allocation->GetHeap() != NULL );
+        if(!alwaysCommitted)
+        {
+            CHECK_BOOL( resources[i].allocation->GetHeap() != NULL );
+        }
     }
 
     // Make sure at least some of the resources belong to the same heap, but their memory ranges don't overlap.
@@ -260,7 +265,10 @@ static void TestPlacedResources(const TestContext& ctx)
             }
         }
     }
-    CHECK_BOOL(sameHeapFound);
+    if(!alwaysCommitted)
+    {
+        CHECK_BOOL(sameHeapFound);
+    }
 
     // Additionally create a texture to see if no error occurs due to bad handling of Resource Tier.
     resourceDesc = {};
@@ -347,7 +355,7 @@ static void TestAliasingMemory(const TestContext& ctx)
 
     D3D12_RESOURCE_ALLOCATION_INFO allocInfo = {};
     allocInfo.Alignment = std::max(allocInfo1.Alignment, allocInfo2.Alignment);
-    allocInfo.SizeInBytes = std::max(allocInfo1.SizeInBytes, allocInfo2.SizeInBytes);
+    allocInfo.SizeInBytes = AlignUp(std::max(allocInfo1.SizeInBytes, allocInfo2.SizeInBytes), 64ull * 1024);
 
     D3D12MA::Allocation* allocPtr = NULL;
     CHECK_HR( ctx.allocator->AllocateMemory(

@@ -539,6 +539,12 @@ typedef enum ALLOCATOR_FLAGS
     Using this flag may increase performance because internal mutexes are not used.
     */
     ALLOCATOR_FLAG_SINGLETHREADED = 0x1,
+
+    /**
+    Every allocation will have its own memory block.
+    To be used for debugging purposes.
+   */
+    ALLOCATOR_FLAG_ALWAYS_COMMITTED = 0x2,
 } ALLOCATOR_FLAGS;
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().

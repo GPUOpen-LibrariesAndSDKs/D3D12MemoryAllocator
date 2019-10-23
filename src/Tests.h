@@ -28,6 +28,7 @@ struct TestContext
 {
     ID3D12Device* device;
     D3D12MA::Allocator* allocator;
+    D3D12MA::ALLOCATOR_FLAGS allocatorFlags;
 };
 
 void Test(const TestContext& ctx);

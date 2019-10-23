@@ -51,14 +51,6 @@
     #endif
 #endif
 
-#ifndef D3D12MA_DEBUG_ALWAYS_COMMITTED
-    /*
-    Every allocation will have its own memory block.
-    Define to 1 for debugging purposes only.
-    */
-    #define D3D12MA_DEBUG_ALWAYS_COMMITTED (0)
-#endif
-
 #ifndef D3D12MA_DEBUG_ALIGNMENT
     /*
     Minimum alignment of all allocations, in bytes.
@@ -2139,7 +2131,8 @@ private:
     */
     static bool PrefersCommittedAllocation(const D3D12_RESOURCE_DESC& resourceDesc);
 
-    bool m_UseMutex;
+    const bool m_UseMutex;
+    const bool m_AlwaysCommitted;
     ID3D12Device* m_Device;
     UINT64 m_PreferredBlockSize;
     ALLOCATION_CALLBACKS m_AllocationCallbacks;
@@ -3239,6 +3232,7 @@ void BlockVector::WriteBlockInfoToJson(JsonWriter& json)
 
 AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, const ALLOCATOR_DESC& desc) :
     m_UseMutex((desc.Flags & ALLOCATOR_FLAG_SINGLETHREADED) == 0),
+    m_AlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_ALWAYS_COMMITTED) != 0),
     m_Device(desc.pDevice),
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
     m_AllocationCallbacks(allocationCallbacks),
@@ -3338,7 +3332,7 @@ HRESULT AllocatorPimpl::CreateResource(
 
     const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
     bool preferCommittedMemory =
-        D3D12MA_DEBUG_ALWAYS_COMMITTED ||
+        m_AlwaysCommitted ||
         PrefersCommittedAllocation(*pResourceDesc) ||
         // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
         resAllocInfo.SizeInBytes > preferredBlockSize / 2;
@@ -3433,7 +3427,7 @@ HRESULT AllocatorPimpl::AllocateMemory(
 
     const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
     bool preferCommittedMemory =
-        D3D12MA_DEBUG_ALWAYS_COMMITTED ||
+        m_AlwaysCommitted ||
         // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
         pAllocInfo->SizeInBytes > preferredBlockSize / 2;
     if(preferCommittedMemory &&
@@ -4039,6 +4033,7 @@ void Allocation::InitHeap(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYP
     m_Allocator = allocator;
     m_Type = TYPE_HEAP;
     m_Size = size;
+    m_Resource = NULL;
     m_Name = NULL;
     m_Heap.heapType = heapType;
     m_Heap.heap = heap;

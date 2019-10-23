@@ -48,6 +48,7 @@ static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const bool ENABLE_DEBUG_LAYER = true;
 static const bool ENABLE_CPU_ALLOCATION_CALLBACKS = true;
 static const bool ENABLE_CPU_ALLOCATION_CALLBACKS_PRINT = false;
+static constexpr D3D12MA::ALLOCATOR_FLAGS g_AllocatorFlags = D3D12MA::ALLOCATOR_FLAG_NONE;
 
 static HINSTANCE g_Instance;
 static HWND g_Wnd;
@@ -417,7 +418,7 @@ void InitD3D() // initializes direct3d 12
 
     {
         D3D12MA::ALLOCATOR_DESC desc = {};
-        desc.Flags = D3D12MA::ALLOCATOR_FLAG_NONE;
+        desc.Flags = g_AllocatorFlags;
         desc.pDevice = device;
 
         D3D12MA::ALLOCATION_CALLBACKS allocationCallbacks = {};
@@ -1376,6 +1377,7 @@ static void ExecuteTests()
         TestContext ctx = {};
         ctx.device = g_Device;
         ctx.allocator = g_Allocator;
+        ctx.allocatorFlags = g_AllocatorFlags;
         Test(ctx);
     }
     catch(const std::exception& ex)
