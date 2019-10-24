@@ -21,7 +21,7 @@ Memory allocation and resource (buffer and texture) creation in new, explicit gr
 This library can help developers to manage memory allocations and resource creation by offering function `Allocator::CreateResource` similar to the standard `ID3D12Device::CreateCommittedResource`. It internally:
 
 - Allocates and keeps track of bigger memory heaps, used and unused ranges inside them, finds best matching unused ranges to create new resources there as placed resources.
-- Automatically respects alignment requirements for created resources.
+- Automatically respects size and alignment requirements for created resources.
 - Automatically handles resource heap tier - whether it's `D3D12_RESOURCE_HEAP_TIER_1` that requires to keep certain classes of resources separate or `D3D12_RESOURCE_HEAP_TIER_2` that allows to keep them all together.
 
 Additional features:
@@ -32,6 +32,7 @@ Additional features:
 - Customization: Predefine appropriate macros to provide your own implementation of external facilities used by the library, like assert, mutex, and atomic.
 - Statistics: Obtain detailed statistics about the amount of memory used, unused, number of allocated blocks, number of allocations etc. - globally and per memory heap type.
 - Debug annotations: Associate string name with every allocation.
+- JSON dump: Obtain a string in JSON format with detailed map of internal state, including list of allocations and gaps between them.
 
 # Prerequisites
 
