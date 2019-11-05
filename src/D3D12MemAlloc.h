@@ -116,7 +116,7 @@ including choice of `D3D12_HEAP_TYPE`.
 
 The function also returns a new object of type D3D12MA::Allocation, created along
 with usual `ID3D12Resource`. It represents allocated memory and can be queried
-for size, offset, and `ID3D12Heap` if needed.
+for size, offset, `ID3D12Resource`, and `ID3D12Heap` if needed.
 
 \code
 D3D12_RESOURCE_DESC resourceDesc = {};
@@ -160,6 +160,11 @@ heap internally using `ID3D12Device::CreateHeap` and place multiple resources in
 it, at different offsets, using `ID3D12Device::CreatePlacedResource`. The library
 manages its own collection of allocated memory blocks (heaps) and remembers which
 parts of them are occupied and which parts are free to be used for new resources.
+
+It is important to remember that resources created as placed don't have their memory
+initialized to zeros, but may contain garbage data, so they need to be fully initialized
+before usage, e.g. using Clear (`ClearRenderTargetView`), Discard (`DiscardResource`),
+or copy (`CopyResource`).
 
 The library also automatically handles resource heap tier.
 When `D3D12_FEATURE_DATA_D3D12_OPTIONS::ResourceHeapTier` equals `D3D12_RESOURCE_HEAP_TIER_1`,
