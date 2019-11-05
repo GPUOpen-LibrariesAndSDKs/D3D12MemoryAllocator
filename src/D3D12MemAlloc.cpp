@@ -3386,6 +3386,7 @@ HRESULT AllocatorPimpl::CreateResource(
             else
             {
                 (*ppAllocation)->Release();
+                *ppAllocation = NULL;
                 return hr;
             }
         }
