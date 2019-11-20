@@ -420,6 +420,7 @@ void InitD3D() // initializes direct3d 12
         D3D12MA::ALLOCATOR_DESC desc = {};
         desc.Flags = g_AllocatorFlags;
         desc.pDevice = device;
+        desc.pAdapter = adapter;
 
         D3D12MA::ALLOCATION_CALLBACKS allocationCallbacks = {};
         if(ENABLE_CPU_ALLOCATION_CALLBACKS)

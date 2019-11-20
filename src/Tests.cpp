@@ -481,6 +481,8 @@ static void TestStats(const TestContext& ctx)
 
     for(UINT i = 0; i < count; ++i)
     {
+        if(i == count / 2)
+            allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_COMMITTED;
         D3D12MA::Allocation* alloc = nullptr;
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDesc,
@@ -514,6 +516,18 @@ static void TestStats(const TestContext& ctx)
     CheckStatInfo(endStats.HeapType[0]);
     CheckStatInfo(endStats.HeapType[1]);
     CheckStatInfo(endStats.HeapType[2]);
+
+    D3D12MA::Budget gpuBudget = {}, cpuBudget = {};
+    ctx.allocator->GetBudget(&gpuBudget, &cpuBudget);
+    
+    CHECK_BOOL(gpuBudget.AllocationBytes <= gpuBudget.BlockBytes);
+    CHECK_BOOL(gpuBudget.AllocationBytes == endStats.HeapType[0].UsedBytes);
+    CHECK_BOOL(gpuBudget.BlockBytes == endStats.HeapType[0].UsedBytes + endStats.HeapType[0].UnusedBytes);
+    
+    CHECK_BOOL(cpuBudget.AllocationBytes <= cpuBudget.BlockBytes);
+    CHECK_BOOL(cpuBudget.AllocationBytes == endStats.HeapType[1].UsedBytes + endStats.HeapType[2].UsedBytes);
+    CHECK_BOOL(cpuBudget.BlockBytes == endStats.HeapType[1].UsedBytes + endStats.HeapType[1].UnusedBytes +
+        endStats.HeapType[2].UsedBytes + endStats.HeapType[2].UnusedBytes);
 }
 
 static void TestTransfer(const TestContext& ctx)
