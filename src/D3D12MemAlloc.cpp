@@ -2023,7 +2023,7 @@ public:
     UINT GetHeapType() const { return m_HeapType; }
     UINT64 GetPreferredBlockSize() const { return m_PreferredBlockSize; }
 
-    bool IsEmpty() const { return m_Blocks.empty(); }
+    bool IsEmpty();
 
     HRESULT Allocate(
         UINT64 size,
@@ -2955,6 +2955,12 @@ HRESULT BlockVector::CreateMinBlocks()
         }
     }
     return S_OK;
+}
+
+bool BlockVector::IsEmpty()
+{
+    MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
+    return m_Blocks.empty();
 }
 
 HRESULT BlockVector::Allocate(
