@@ -1183,7 +1183,7 @@ private:
     union Item
     {
         UINT NextFreeIndex; // UINT32_MAX means end of list.
-        T Value;
+        alignas(T) char Value[sizeof(T)];
     };
 
     struct ItemBlock
@@ -1230,7 +1230,9 @@ T* PoolAllocator<T>::Alloc()
         {
             Item* const pItem = &block.pItems[block.FirstFreeIndex];
             block.FirstFreeIndex = pItem->NextFreeIndex;
-            return &pItem->Value;
+            T* result = (T*)&pItem->Value;
+            new(result)T(); // Explicit constructor call.
+            return result;
         }
     }
 
@@ -1238,7 +1240,9 @@ T* PoolAllocator<T>::Alloc()
     ItemBlock& newBlock = CreateNewBlock();
     Item* const pItem = &newBlock.pItems[0];
     newBlock.FirstFreeIndex = pItem->NextFreeIndex;
-    return &pItem->Value;
+    T* result = (T*)pItem->Value;
+    new(result)T(); // Explicit constructor call.
+    return result;
 }
 
 template<typename T>
@@ -1255,6 +1259,7 @@ void PoolAllocator<T>::Free(T* ptr)
         // Check if pItemPtr is in address range of this block.
         if((pItemPtr >= block.pItems) && (pItemPtr < block.pItems + block.Capacity))
         {
+            ptr->~T(); // Explicit destructor call.
             const UINT index = static_cast<UINT>(pItemPtr - block.pItems);
             pItemPtr->NextFreeIndex = block.FirstFreeIndex;
             block.FirstFreeIndex = index;
@@ -1744,6 +1749,26 @@ typename List<T>::Item* List<T>::InsertAfter(List<T>::Item* pItem, const T& valu
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Private class AllocationObjectAllocator definition
+
+/*
+Thread-safe wrapper over PoolAllocator free list, for allocation of Allocation objects.
+*/
+class AllocationObjectAllocator
+{
+    D3D12MA_CLASS_NO_COPY(AllocationObjectAllocator);
+public:
+    AllocationObjectAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks);
+
+    Allocation* Allocate();
+    void Free(Allocation* alloc);
+
+private:
+    D3D12MA_MUTEX m_Mutex;
+    PoolAllocator<Allocation> m_Allocator;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Private class BlockMetadata and derived classes - declarations
 
 enum SuballocationType
@@ -2141,6 +2166,7 @@ public:
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const { return m_D3D12Options; }
     bool SupportsResourceHeapTier2() const { return m_D3D12Options.ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2; }
     bool UseMutex() const { return m_UseMutex; }
+    AllocationObjectAllocator& GetAllocationObjectAllocator() { return m_AllocationObjectAllocator; }
 
     HRESULT CreateResource(
         const ALLOCATION_DESC* pAllocDesc,
@@ -2201,6 +2227,7 @@ private:
     D3D12MA_ATOMIC_UINT32 m_CurrentFrameIndex;
     DXGI_ADAPTER_DESC m_AdapterDesc;
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
+    AllocationObjectAllocator m_AllocationObjectAllocator;
 
     typedef Vector<Allocation*> AllocationVectorType;
     AllocationVectorType* m_pCommittedAllocations[HEAP_TYPE_COUNT];
@@ -3248,7 +3275,7 @@ HRESULT BlockVector::AllocateFromBlock(
             m_HasEmptyBlock = false;
         }
 
-        *pAllocation = D3D12MA_NEW(m_hAllocator->GetAllocs(), Allocation)();
+        *pAllocation = m_hAllocator->GetAllocationObjectAllocator().Allocate();
         pBlock->m_pMetadata->Alloc(currRequest, size, *pAllocation);
         (*pAllocation)->InitPlaced(
             m_hAllocator,
@@ -3341,8 +3368,9 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
 #endif
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
     m_AllocationCallbacks(allocationCallbacks),
-    m_CurrentFrameIndex(0)
+    m_CurrentFrameIndex(0),
     // Below this line don't use allocationCallbacks but m_AllocationCallbacks!!!
+    m_AllocationObjectAllocator(m_AllocationCallbacks)
 {
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
@@ -3627,7 +3655,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         pOptimizedClearValue, riidResource, (void**)&res);
     if(SUCCEEDED(hr))
     {
-        Allocation* alloc = D3D12MA_NEW(m_AllocationCallbacks, Allocation)();
+        Allocation* alloc = m_AllocationObjectAllocator.Allocate();
         alloc->InitCommitted(this, resAllocInfo.SizeInBytes, pAllocDesc->HeapType);
         alloc->SetResource(res, pResourceDesc);
 
@@ -3680,7 +3708,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
     HRESULT hr = m_Device->CreateHeap(&heapDesc, __uuidof(*heap), (void**)&heap);
     if(SUCCEEDED(hr))
     {
-        (*ppAllocation) = D3D12MA_NEW(m_AllocationCallbacks, Allocation)();
+        (*ppAllocation) = m_AllocationObjectAllocator.Allocate();
         (*ppAllocation)->InitHeap(this, allocInfo.SizeInBytes, pAllocDesc->HeapType, heap);
         RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
 
@@ -4266,7 +4294,7 @@ void Allocation::Release()
 
     FreeName();
 
-    D3D12MA_DELETE(m_Allocator->GetAllocs(), this);
+    m_Allocator->GetAllocationObjectAllocator().Free(this);
 }
 
 UINT64 Allocation::GetOffset() const
@@ -4314,14 +4342,14 @@ void Allocation::SetName(LPCWSTR Name)
 
 Allocation::Allocation()
 {
-    // Must be empty because Allocation objects will be allocated out of PoolAllocator
+    // Must be empty because Allocation objects are allocated out of PoolAllocator
     // and may not call constructor and destructor at the right time.
     // Use Init* methods instead.
 }
 
 Allocation::~Allocation()
 {
-    // Must be empty because Allocation objects will be allocated out of PoolAllocator
+    // Must be empty because Allocation objects are allocated out of PoolAllocator
     // and may not call constructor and destructor at the right time.
     // Use Release method instead.
 }
@@ -4391,6 +4419,26 @@ void Allocation::FreeName()
         D3D12MA_DELETE_ARRAY(m_Allocator->GetAllocs(), m_Name, nameCharCount);
         m_Name = NULL;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class AllocationObjectAllocator implementation
+
+AllocationObjectAllocator::AllocationObjectAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks) :
+    m_Allocator(allocationCallbacks, 1024)
+{
+}
+
+Allocation* AllocationObjectAllocator::Allocate()
+{
+    MutexLock mutexLock(m_Mutex);
+    return m_Allocator.Alloc();
+}
+
+void AllocationObjectAllocator::Free(Allocation* alloc)
+{
+    MutexLock mutexLock(m_Mutex);
+    m_Allocator.Free(alloc);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2019-11-20)
+<b>Version 2.0.0-development</b> (2020-01-22)
 
 Copyright (c) 2019 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -490,6 +490,7 @@ private:
     friend class BlockVector;
     friend class JsonWriter;
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
+    template<typename T> friend class PoolAllocator;
 
     AllocatorPimpl* m_Allocator;
     enum Type
