@@ -727,7 +727,7 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
-    /* \brief Allocates memory without creating any resource placed in it.
+    /** \brief Allocates memory without creating any resource placed in it.
 
     This function is similar to `ID3D12Device::CreateHeap`, but it may really assign
     part of a larger, existing heap to the allocation.
@@ -741,6 +741,9 @@ public:
 
     `pAllocInfo->SizeInBytes` must be multiply of 64KB.
     `pAllocInfo->Alignment` must be one of the legal values as described in documentation of `D3D12_HEAP_DESC`.
+
+    If you use #ALLOCATION_FLAG_COMMITTED you will get a separate memory block -
+    a heap that always has offset 0.
     */
     HRESULT AllocateMemory(
         const ALLOCATION_DESC* pAllocDesc,
