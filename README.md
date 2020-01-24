@@ -78,6 +78,10 @@ With this one function call:
 
 `Allocation` is an object that represents memory assigned to this texture. It can be queried for parameters like offset and size.
 
+# Binariers
+
+The release comes with precompiled binary executable for "D3D12Sample" application which contains test suite. It is compiled using Visual Studio 2017, so it requires appropriate libraries to work, including "vcruntime140.dll" and "msvcp140.dll". If its launch fails with error message telling about those files missing, please download and install [Microsoft Visual C++ Redistributable for Visual Studio 2015, 2017 and 2019](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads), "x64" version.
+
 # Documentation
 
 Documentation is provided together with the library in form of Doxygen-style comments inside the code, in file "src/D3D12MemAlloc.h". They can be read directly or turned into HTML and other convenient to read formats. Unfortunately we can't provide pregenerated version browseable online. You can generate it on your own by following these steps:
