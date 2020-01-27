@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-01-22)
+<b>Version 2.0.0-development</b> (2020-01-27)
 
 Copyright (c) 2019 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -83,10 +83,12 @@ D3D12MA::Allocator object.
 Please note that all symbols of the library are declared inside #D3D12MA namespace.
 
 \code
+IDXGIAdapter* adapter = (...)
 ID3D12Device* device = (...)
 
 D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
 allocatorDesc.pDevice = device;
+allocatorDesc.pAdapter = adapter;
 
 D3D12MA::Allocator* allocator;
 HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
@@ -99,7 +101,6 @@ method (despite they are not COM interfaces and no reference counting is involve
 
 \code
 allocator->Release();
-device->Release();
 \endcode
 
 
@@ -273,6 +274,7 @@ allocationCallbacks.pFree = &CustomFree;
 
 D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
 allocatorDesc.pDevice = device;
+allocatorDesc.pAdapter = adapter;
 allocatorDesc.pAllocationCallbacks = &allocationCallbacks;
 
 D3D12MA::Allocator* allocator;
@@ -302,12 +304,10 @@ Near future: feature parity with [Vulkan Memory Allocator](https://github.com/GP
 - Alternative allocation algorithms: linear allocator, buddy allocator
 - JSON dump that can be visualized on a picture
 - Support for priorities using `ID3D12Device1::SetResidencyPriority`
-- Support for "lost" allocations
 
 Later:
 
 - Memory defragmentation
-- Support for resource aliasing (overlap)
 - Support for multi-GPU (multi-adapter)
 
 \section general_considerations_features_not_supported Features not supported
@@ -317,7 +317,7 @@ Features deliberately excluded from the scope of this library:
 - Descriptor allocation. Although also called "heaps", objects that represent
   descriptors are separate part of the D3D12 API from buffers and textures.
 - Support for `D3D12_HEAP_TYPE_CUSTOM`. Only the default heap types are supported:
-  `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_READBACK`.
+  `UPLOAD`, `DEFAULT`, `READBACK`.
 - Support for reserved (tiled) resources. We don't recommend using them.
 - Support for `ID3D12Device::Evict` and `MakeResident`. We don't recommend using them.
 
@@ -403,7 +403,8 @@ typedef enum ALLOCATION_FLAGS
     */
     ALLOCATION_FLAG_NEVER_ALLOCATE = 0x2,
 
-    /** TODO
+    /** Create allocation only if additional memory required for it, if any, won't exceed
+    memory budget. Otherwise return `E_OUTOFMEMORY`.
     */
     ALLOCATION_FLAG_WITHIN_BUDGET = 0x4,
 } ALLOCATION_FLAGS;
@@ -569,7 +570,7 @@ struct ALLOCATOR_DESC
     
     /** Direct3D device object that the allocator should be attached to.
 
-    Allocator is doing AddRef/Release on this object.
+    Allocator is doing `AddRef`/`Release` on this object.
     */
     ID3D12Device* pDevice;
     
@@ -585,9 +586,9 @@ struct ALLOCATOR_DESC
     */
     const ALLOCATION_CALLBACKS* pAllocationCallbacks;
 
-    /** TODO
+    /** DXGI Adapter object that you use for D3D12 and this allocator.
 
-    Allocator is doing AddRef/Release on this object.
+    Allocator is doing `AddRef`/`Release` on this object.
     */
     IDXGIAdapter* pAdapter;
 };
@@ -652,7 +653,7 @@ struct Budget
 
     /** \brief Estimated current memory usage of the program, in bytes.
 
-    Fetched from system using TODO if enabled.
+    Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if enabled.
 
     It might be different than `BlockBytes` (usually higher) due to additional implicit objects
     also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or
@@ -662,9 +663,9 @@ struct Budget
 
     /** \brief Estimated amount of memory available to the program, in bytes.
 
-    Fetched from system using TODO if enabled.
+    Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if enabled.
 
-    It might be different (most probably smaller) than TODO due to factors
+    It might be different (most probably smaller) than memory sizes reported in `DXGI_ADAPTER_DESC` due to factors
     external to the program, like other programs also consuming system resources.
     Difference `Budget - Usage` is the amount of additional memory that can probably
     be allocated without problems. Exceeding the budget may result in various problems.
