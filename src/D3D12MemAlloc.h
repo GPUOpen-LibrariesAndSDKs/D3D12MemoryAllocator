@@ -529,11 +529,11 @@ private:
         } m_Heap;
     };
 
-    Allocation();
+    Allocation(AllocatorPimpl* allocator, UINT64 size);
     ~Allocation();
-    void InitCommitted(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType);
-    void InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offset, UINT64 alignment, NormalBlock* block);
-    void InitHeap(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType, ID3D12Heap* heap);
+    void InitCommitted(D3D12_HEAP_TYPE heapType);
+    void InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block);
+    void InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap);
     void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc);
     void FreeName();
 

@@ -32,6 +32,7 @@
 #include <mutex>
 #include <atomic>
 #include <algorithm>
+#include <utility>
 #include <cstdlib>
 #include <malloc.h> // for _aligned_malloc, _aligned_free
 
@@ -1176,7 +1177,7 @@ public:
     PoolAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks, UINT firstBlockCapacity);
     ~PoolAllocator() { Clear(); }
     void Clear();
-    T* Alloc();
+    template<typename... Types> T* Alloc(Types... args);
     void Free(T* ptr);
 
 private:
@@ -1220,7 +1221,7 @@ void PoolAllocator<T>::Clear()
 }
 
 template<typename T>
-T* PoolAllocator<T>::Alloc()
+template<typename... Types> T* PoolAllocator<T>::Alloc(Types... args)
 {
     for(size_t i = m_ItemBlocks.size(); i--; )
     {
@@ -1231,7 +1232,7 @@ T* PoolAllocator<T>::Alloc()
             Item* const pItem = &block.pItems[block.FirstFreeIndex];
             block.FirstFreeIndex = pItem->NextFreeIndex;
             T* result = (T*)&pItem->Value;
-            new(result)T(); // Explicit constructor call.
+            new(result)T(std::forward<Types>(args)...); // Explicit constructor call.
             return result;
         }
     }
@@ -1241,7 +1242,7 @@ T* PoolAllocator<T>::Alloc()
     Item* const pItem = &newBlock.pItems[0];
     newBlock.FirstFreeIndex = pItem->NextFreeIndex;
     T* result = (T*)pItem->Value;
-    new(result)T(); // Explicit constructor call.
+    new(result)T(std::forward<Types>(args)...); // Explicit constructor call.
     return result;
 }
 
@@ -1760,7 +1761,7 @@ class AllocationObjectAllocator
 public:
     AllocationObjectAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks);
 
-    Allocation* Allocate();
+    template<typename... Types> Allocation* Allocate(Types... args);
     void Free(Allocation* alloc);
 
 private:
@@ -3275,14 +3276,9 @@ HRESULT BlockVector::AllocateFromBlock(
             m_HasEmptyBlock = false;
         }
 
-        *pAllocation = m_hAllocator->GetAllocationObjectAllocator().Allocate();
+        *pAllocation = m_hAllocator->GetAllocationObjectAllocator().Allocate(m_hAllocator, size);
         pBlock->m_pMetadata->Alloc(currRequest, size, *pAllocation);
-        (*pAllocation)->InitPlaced(
-            m_hAllocator,
-            size,
-            currRequest.offset,
-            alignment,
-            pBlock);
+        (*pAllocation)->InitPlaced(currRequest.offset, alignment, pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
         m_hAllocator->m_Budget.AddAllocation(HeapTypeToIndex(m_HeapType), size);
         return S_OK;
@@ -3655,8 +3651,8 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         pOptimizedClearValue, riidResource, (void**)&res);
     if(SUCCEEDED(hr))
     {
-        Allocation* alloc = m_AllocationObjectAllocator.Allocate();
-        alloc->InitCommitted(this, resAllocInfo.SizeInBytes, pAllocDesc->HeapType);
+        Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resAllocInfo.SizeInBytes);
+        alloc->InitCommitted(pAllocDesc->HeapType);
         alloc->SetResource(res, pResourceDesc);
 
         *ppAllocation = alloc;
@@ -3708,8 +3704,8 @@ HRESULT AllocatorPimpl::AllocateHeap(
     HRESULT hr = m_Device->CreateHeap(&heapDesc, __uuidof(*heap), (void**)&heap);
     if(SUCCEEDED(hr))
     {
-        (*ppAllocation) = m_AllocationObjectAllocator.Allocate();
-        (*ppAllocation)->InitHeap(this, allocInfo.SizeInBytes, pAllocDesc->HeapType, heap);
+        (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes);
+        (*ppAllocation)->InitHeap(pAllocDesc->HeapType, heap);
         RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
 
         const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
@@ -4340,65 +4336,43 @@ void Allocation::SetName(LPCWSTR Name)
     }
 }
 
-Allocation::Allocation()
+Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size) :
+    m_Allocator{allocator},
+    m_Type{TYPE_COUNT},
+    m_Size{size},
+    m_Resource{NULL},
+    m_ResourceDimension{D3D12_RESOURCE_DIMENSION_UNKNOWN},
+    m_ResourceFlags{D3D12_RESOURCE_FLAG_NONE},
+    m_TextureLayout{D3D12_TEXTURE_LAYOUT_UNKNOWN},
+    m_CreationFrameIndex{allocator->GetCurrentFrameIndex()},
+    m_Name{NULL}
 {
-    // Must be empty because Allocation objects are allocated out of PoolAllocator
-    // and may not call constructor and destructor at the right time.
-    // Use Init* methods instead.
+    D3D12MA_ASSERT(allocator);
 }
 
 Allocation::~Allocation()
 {
-    // Must be empty because Allocation objects are allocated out of PoolAllocator
-    // and may not call constructor and destructor at the right time.
-    // Use Release method instead.
+    // Nothing here, everything already done in Release.
 }
 
-void Allocation::InitCommitted(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType)
+void Allocation::InitCommitted(D3D12_HEAP_TYPE heapType)
 {
-    D3D12MA_ASSERT(allocator);
-    m_Allocator = allocator;
     m_Type = TYPE_COMMITTED;
-    m_Size = size;
-    m_Resource = NULL;
-    m_Name = NULL;
     m_Committed.heapType = heapType;
-    m_CreationFrameIndex = allocator->GetCurrentFrameIndex();
-    m_ResourceDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
-    m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
-    m_TextureLayout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 }
 
-void Allocation::InitPlaced(AllocatorPimpl* allocator, UINT64 size, UINT64 offset, UINT64 alignment, NormalBlock* block)
+void Allocation::InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block)
 {
-    D3D12MA_ASSERT(allocator);
-    m_Allocator = allocator;
     m_Type = TYPE_PLACED;
-    m_Size = size;
-    m_Resource = NULL;
-    m_Name = NULL;
     m_Placed.offset = offset;
     m_Placed.block = block;
-    m_CreationFrameIndex = allocator->GetCurrentFrameIndex();
-    m_ResourceDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
-    m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
-    m_TextureLayout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 }
 
-void Allocation::InitHeap(AllocatorPimpl* allocator, UINT64 size, D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
+void Allocation::InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
 {
-    D3D12MA_ASSERT(allocator);
-    m_Allocator = allocator;
     m_Type = TYPE_HEAP;
-    m_Size = size;
-    m_Resource = NULL;
-    m_Name = NULL;
     m_Heap.heapType = heapType;
     m_Heap.heap = heap;
-    m_CreationFrameIndex = allocator->GetCurrentFrameIndex();
-    m_ResourceDimension = D3D12_RESOURCE_DIMENSION_UNKNOWN;
-    m_ResourceFlags = D3D12_RESOURCE_FLAG_NONE;
-    m_TextureLayout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 }
 
 void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc)
@@ -4429,10 +4403,10 @@ AllocationObjectAllocator::AllocationObjectAllocator(const ALLOCATION_CALLBACKS&
 {
 }
 
-Allocation* AllocationObjectAllocator::Allocate()
+template<typename... Types> Allocation* AllocationObjectAllocator::Allocate(Types... args)
 {
     MutexLock mutexLock(m_Mutex);
-    return m_Allocator.Alloc();
+    return m_Allocator.Alloc(std::forward<Types>(args)...);
 }
 
 void AllocationObjectAllocator::Free(Allocation* alloc)
