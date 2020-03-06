@@ -106,7 +106,9 @@ For more information see [NOTICES.txt](NOTICES.txt).
 
 # Software using this library
 
-Place for the link to your project :)
+- **[The Forge](https://github.com/ConfettiFX/The-Forge)** - cross-platform rendering framework. Apache License 2.0.
+
+[Some other projects on GitHub](https://github.com/search?q=D3D12MemAlloc.h&type=Code) and some game development studios that use DX12 in their games.
 
 # See also
 
