@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-01-27)
+<b>Version 2.0.0-development</b> (2020-03-11)
 
 Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -333,6 +333,27 @@ Features deliberately excluded from the scope of this library:
 #ifndef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
     #include <d3d12.h>
     #include <dxgi.h>
+#endif
+
+/*
+When defined to value other than 0, the library will try to use
+D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT or D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT
+for created textures when possible, which can save memory because some small textures
+may get their alignment 4K and their size a multiply of 4K instead of 64K.
+
+#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 0
+    Disables small texture alignment.
+#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 1
+    Enables conservative algorithm that will use small alignment only for some textures
+    that are surely known to support it.
+#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 2
+    Enables query for small alignment to D3D12 (based on Microsoft sample) which will
+    enable small alignment for more textures, but will also generate D3D Debug Layer
+    error #721 on call to ID3D12Device::GetResourceAllocationInfo, which you should just
+    ignore.
+*/
+#ifndef D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
+    #define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 1
 #endif
 
 /// \cond INTERNAL

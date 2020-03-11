@@ -260,6 +260,11 @@ static inline T RoundDiv(T x, T y)
 {
 	return (x + (y / (T)2)) / y;
 }
+template <typename T>
+static inline T DivideRoudingUp(T x, T y)
+{
+    return (x + y - 1) / y;
+}
 
 /*
 Returns true if given number is a power of two.
@@ -526,6 +531,193 @@ static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags)
         (flags & denyAllTexturesFlags) != denyAllTexturesFlags;
     return canContainAnyTextures ?
         D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+}
+
+static bool IsFormatCompressed(DXGI_FORMAT format)
+{
+    switch(format)
+    {
+    case DXGI_FORMAT_BC1_TYPELESS:
+    case DXGI_FORMAT_BC1_UNORM:
+    case DXGI_FORMAT_BC1_UNORM_SRGB:
+    case DXGI_FORMAT_BC2_TYPELESS:
+    case DXGI_FORMAT_BC2_UNORM:
+    case DXGI_FORMAT_BC2_UNORM_SRGB:
+    case DXGI_FORMAT_BC3_TYPELESS:
+    case DXGI_FORMAT_BC3_UNORM:
+    case DXGI_FORMAT_BC3_UNORM_SRGB:
+    case DXGI_FORMAT_BC4_TYPELESS:
+    case DXGI_FORMAT_BC4_UNORM:
+    case DXGI_FORMAT_BC4_SNORM:
+    case DXGI_FORMAT_BC5_TYPELESS:
+    case DXGI_FORMAT_BC5_UNORM:
+    case DXGI_FORMAT_BC5_SNORM:
+    case DXGI_FORMAT_BC6H_TYPELESS:
+    case DXGI_FORMAT_BC6H_UF16:
+    case DXGI_FORMAT_BC6H_SF16:
+    case DXGI_FORMAT_BC7_TYPELESS:
+    case DXGI_FORMAT_BC7_UNORM:
+    case DXGI_FORMAT_BC7_UNORM_SRGB:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Only some formats are supported. For others it returns 0.
+static UINT GetBitsPerPixel(DXGI_FORMAT format)
+{
+    switch(format)
+    {
+    case DXGI_FORMAT_R32G32B32A32_TYPELESS:
+    case DXGI_FORMAT_R32G32B32A32_FLOAT:
+    case DXGI_FORMAT_R32G32B32A32_UINT:
+    case DXGI_FORMAT_R32G32B32A32_SINT:
+        return 128;
+    case DXGI_FORMAT_R32G32B32_TYPELESS:
+    case DXGI_FORMAT_R32G32B32_FLOAT:
+    case DXGI_FORMAT_R32G32B32_UINT:
+    case DXGI_FORMAT_R32G32B32_SINT:
+        return 96;
+    case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+    case DXGI_FORMAT_R16G16B16A16_FLOAT:
+    case DXGI_FORMAT_R16G16B16A16_UNORM:
+    case DXGI_FORMAT_R16G16B16A16_UINT:
+    case DXGI_FORMAT_R16G16B16A16_SNORM:
+    case DXGI_FORMAT_R16G16B16A16_SINT:
+        return 64;
+    case DXGI_FORMAT_R32G32_TYPELESS:
+    case DXGI_FORMAT_R32G32_FLOAT:
+    case DXGI_FORMAT_R32G32_UINT:
+    case DXGI_FORMAT_R32G32_SINT:
+        return 64;
+    case DXGI_FORMAT_R32G8X24_TYPELESS:
+    case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+    case DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+    case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+        return 64;
+    case DXGI_FORMAT_R10G10B10A2_TYPELESS:
+    case DXGI_FORMAT_R10G10B10A2_UNORM:
+    case DXGI_FORMAT_R10G10B10A2_UINT:
+    case DXGI_FORMAT_R11G11B10_FLOAT:
+        return 32;
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+    case DXGI_FORMAT_R8G8B8A8_UNORM:
+    case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+    case DXGI_FORMAT_R8G8B8A8_UINT:
+    case DXGI_FORMAT_R8G8B8A8_SNORM:
+    case DXGI_FORMAT_R8G8B8A8_SINT:
+        return 32;
+    case DXGI_FORMAT_R16G16_TYPELESS:
+    case DXGI_FORMAT_R16G16_FLOAT:
+    case DXGI_FORMAT_R16G16_UNORM:
+    case DXGI_FORMAT_R16G16_UINT:
+    case DXGI_FORMAT_R16G16_SNORM:
+    case DXGI_FORMAT_R16G16_SINT:
+        return 32;
+    case DXGI_FORMAT_R32_TYPELESS:
+    case DXGI_FORMAT_D32_FLOAT:
+    case DXGI_FORMAT_R32_FLOAT:
+    case DXGI_FORMAT_R32_UINT:
+    case DXGI_FORMAT_R32_SINT:
+        return 32;
+    case DXGI_FORMAT_R24G8_TYPELESS:
+    case DXGI_FORMAT_D24_UNORM_S8_UINT:
+    case DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+    case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+        return 32;
+    case DXGI_FORMAT_R8G8_TYPELESS:
+    case DXGI_FORMAT_R8G8_UNORM:
+    case DXGI_FORMAT_R8G8_UINT:
+    case DXGI_FORMAT_R8G8_SNORM:
+    case DXGI_FORMAT_R8G8_SINT:
+        return 16;
+    case DXGI_FORMAT_R16_TYPELESS:
+    case DXGI_FORMAT_R16_FLOAT:
+    case DXGI_FORMAT_D16_UNORM:
+    case DXGI_FORMAT_R16_UNORM:
+    case DXGI_FORMAT_R16_UINT:
+    case DXGI_FORMAT_R16_SNORM:
+    case DXGI_FORMAT_R16_SINT:
+        return 16;
+    case DXGI_FORMAT_R8_TYPELESS:
+    case DXGI_FORMAT_R8_UNORM:
+    case DXGI_FORMAT_R8_UINT:
+    case DXGI_FORMAT_R8_SNORM:
+    case DXGI_FORMAT_R8_SINT:
+    case DXGI_FORMAT_A8_UNORM:
+        return 8;
+    case DXGI_FORMAT_BC1_TYPELESS:
+    case DXGI_FORMAT_BC1_UNORM:
+    case DXGI_FORMAT_BC1_UNORM_SRGB:
+        return 4;
+    case DXGI_FORMAT_BC2_TYPELESS:
+    case DXGI_FORMAT_BC2_UNORM:
+    case DXGI_FORMAT_BC2_UNORM_SRGB:
+        return 8;
+    case DXGI_FORMAT_BC3_TYPELESS:
+    case DXGI_FORMAT_BC3_UNORM:
+    case DXGI_FORMAT_BC3_UNORM_SRGB:
+        return 8;
+    case DXGI_FORMAT_BC4_TYPELESS:
+    case DXGI_FORMAT_BC4_UNORM:
+    case DXGI_FORMAT_BC4_SNORM:
+        return 4;
+    case DXGI_FORMAT_BC5_TYPELESS:
+    case DXGI_FORMAT_BC5_UNORM:
+    case DXGI_FORMAT_BC5_SNORM:
+        return 8;
+    case DXGI_FORMAT_BC6H_TYPELESS:
+    case DXGI_FORMAT_BC6H_UF16:
+    case DXGI_FORMAT_BC6H_SF16:
+        return 8;
+    case DXGI_FORMAT_BC7_TYPELESS:
+    case DXGI_FORMAT_BC7_UNORM:
+    case DXGI_FORMAT_BC7_UNORM_SRGB:
+        return 8;
+    default:
+        return 0;
+    }
+}
+
+// This algorithm is overly conservative.
+static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC& resourceDesc)
+{
+    if(resourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+        return false;
+    if((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0)
+        return false;
+    if(resourceDesc.SampleDesc.Count > 1)
+        return false;
+    if(resourceDesc.DepthOrArraySize != 1)
+        return false;
+
+    UINT sizeX = (UINT)resourceDesc.Width;
+    UINT sizeY = resourceDesc.Height;
+    UINT bitsPerPixel = GetBitsPerPixel(resourceDesc.Format);
+    if(GetBitsPerPixel == 0)
+        return false;
+
+    if(IsFormatCompressed(resourceDesc.Format))
+    {
+        sizeX = DivideRoudingUp(sizeX / 4, 1u);
+        sizeY = DivideRoudingUp(sizeY / 4, 1u);
+        bitsPerPixel *= 16;
+    }
+
+    UINT tileSizeX = 0, tileSizeY = 0;
+    switch(bitsPerPixel)
+    {
+    case   8: tileSizeX = 64; tileSizeY = 64; break;
+    case  16: tileSizeX = 64; tileSizeY = 32; break;
+    case  32: tileSizeX = 32; tileSizeY = 32; break;
+    case  64: tileSizeX = 32; tileSizeY = 16; break;
+    case 128: tileSizeX = 16; tileSizeY = 16; break;
+    default: return false;
+    }
+
+    const UINT tileCount = DivideRoudingUp(sizeX, tileSizeX) * DivideRoudingUp(sizeY, tileSizeY);
+    return tileCount <= 16;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2285,6 +2477,8 @@ private:
     void UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
 
     HRESULT UpdateD3D12Budget();
+    
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo(D3D12_RESOURCE_DESC& inOutResourceDesc) const;
 
     // Writes object { } with data of given budget.
     static void WriteBudgetToJson(JsonWriter& json, const Budget& budget);
@@ -3476,19 +3670,20 @@ HRESULT AllocatorPimpl::CreateResource(
         *ppvResource = NULL;
     }
 
-    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = m_Device->GetResourceAllocationInfo(0, 1, pResourceDesc);
+    D3D12_RESOURCE_DESC resourceDesc2 = *pResourceDesc;
+    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(resourceDesc2);
     resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
-    const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, *pResourceDesc);
+    const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, resourceDesc2);
     BlockVector* blockVector = m_BlockVectors[defaultPoolIndex];
     D3D12MA_ASSERT(blockVector);
 
     const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
     bool preferCommittedMemory =
         m_AlwaysCommitted ||
-        PrefersCommittedAllocation(*pResourceDesc) ||
+        PrefersCommittedAllocation(resourceDesc2) ||
         // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
         resAllocInfo.SizeInBytes > preferredBlockSize / 2;
     if(preferCommittedMemory &&
@@ -3501,7 +3696,7 @@ HRESULT AllocatorPimpl::CreateResource(
     {
         return AllocateCommittedResource(
             &finalAllocDesc,
-            pResourceDesc,
+            &resourceDesc2,
             resAllocInfo,
             InitialResourceState,
             pOptimizedClearValue,
@@ -3523,14 +3718,14 @@ HRESULT AllocatorPimpl::CreateResource(
             hr = m_Device->CreatePlacedResource(
                 (*ppAllocation)->m_Placed.block->GetHeap(),
                 (*ppAllocation)->GetOffset(),
-                pResourceDesc,
+                &resourceDesc2,
                 InitialResourceState,
                 pOptimizedClearValue,
                 riidResource,
                 (void**)&res);
             if(SUCCEEDED(hr))
             {
-                (*ppAllocation)->SetResource(res, pResourceDesc);
+                (*ppAllocation)->SetResource(res, &resourceDesc2);
                 if(ppvResource != NULL)
                 {
                     res->AddRef();
@@ -3547,7 +3742,7 @@ HRESULT AllocatorPimpl::CreateResource(
 
         return AllocateCommittedResource(
             &finalAllocDesc,
-            pResourceDesc,
+            &resourceDesc2,
             resAllocInfo,
             InitialResourceState,
             pOptimizedClearValue,
@@ -4243,6 +4438,38 @@ HRESULT AllocatorPimpl::UpdateD3D12Budget()
 #else
     return S_OK;
 #endif
+}
+
+D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC& inOutResourceDesc) const
+{
+#if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
+    if(inOutResourceDesc.Alignment == 0 &&
+        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        (inOutResourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0
+#if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT == 1
+        && CanUseSmallAlignment(inOutResourceDesc)
+#endif
+        )
+    {
+        /*
+        The algorithm here is based on Microsoft sample: "Small Resources Sample"
+        https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12SmallResources
+        */
+        const UINT64 smallAlignmentToTry = inOutResourceDesc.SampleDesc.Count > 1 ?
+            D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT :
+            D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
+        inOutResourceDesc.Alignment = smallAlignmentToTry;
+        const D3D12_RESOURCE_ALLOCATION_INFO smallAllocInfo = m_Device->GetResourceAllocationInfo(0, 1, &inOutResourceDesc);
+        // Check if alignment requested has been granted.
+        if(smallAllocInfo.Alignment == smallAlignmentToTry)
+        {
+            return smallAllocInfo;
+        }
+        inOutResourceDesc.Alignment = 0; // Restore original
+    }
+#endif // #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
+
+    return m_Device->GetResourceAllocationInfo(0, 1, &inOutResourceDesc);
 }
 
 void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
