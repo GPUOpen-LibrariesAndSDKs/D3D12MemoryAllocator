@@ -561,10 +561,10 @@ private:
         D3D12_RESOURCE_FLAGS GetResourceFlags() const { return (D3D12_RESOURCE_FLAGS)m_ResourceFlags; }
         D3D12_TEXTURE_LAYOUT GetTextureLayout() const { return (D3D12_TEXTURE_LAYOUT)m_TextureLayout; }
 
-        void SetType(Type type) { m_Type = (UINT)type; }
-        void SetResourceDimension(D3D12_RESOURCE_DIMENSION resourceDimension) { m_ResourceDimension = (UINT)resourceDimension; }
-        void SetResourceFlags(D3D12_RESOURCE_FLAGS resourceFlags) { m_ResourceFlags = (UINT)resourceFlags; }
-        void SetTextureLayout(D3D12_TEXTURE_LAYOUT textureLayout) { m_TextureLayout = (UINT)textureLayout; }
+        void SetType(Type type);
+        void SetResourceDimension(D3D12_RESOURCE_DIMENSION resourceDimension);
+        void SetResourceFlags(D3D12_RESOURCE_FLAGS resourceFlags);
+        void SetTextureLayout(D3D12_TEXTURE_LAYOUT textureLayout);
 
     private:
         UINT m_Type : 2;               // enum Type
