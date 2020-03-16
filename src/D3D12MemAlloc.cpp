@@ -86,6 +86,15 @@
    #define D3D12MA_DEFAULT_BLOCK_SIZE (256ull * 1024 * 1024)
 #endif
 
+#ifndef D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS
+    /*
+    Here you can control additional heap flags added to heaps/resources created in DEFAULT heap type.
+    It's mostly for automatic usage of the cryptic, undocumented flag D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS.
+    Its absence doesn't seem to change anything but better to use it always, just in case.
+    */
+    #define D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS (D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS)
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -3840,9 +3849,13 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
 
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = pAllocDesc->HeapType;
+
+    const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->HeapType == D3D12_HEAP_TYPE_DEFAULT ?
+        D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS : D3D12_HEAP_FLAG_NONE;
+
     ID3D12Resource* res = NULL;
     HRESULT hr = m_Device->CreateCommittedResource(
-        &heapProps, D3D12_HEAP_FLAG_NONE, pResourceDesc, InitialResourceState,
+        &heapProps, heapFlags, pResourceDesc, InitialResourceState,
         pOptimizedClearValue, riidResource, (void**)&res);
     if(SUCCEEDED(hr))
     {
@@ -3887,6 +3900,11 @@ HRESULT AllocatorPimpl::AllocateHeap(
         {
             return E_OUTOFMEMORY;
         }
+    }
+
+    if(pAllocDesc->HeapType == D3D12_HEAP_TYPE_DEFAULT)
+    {
+        heapFlags |= D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS;
     }
 
     D3D12_HEAP_DESC heapDesc = {};
@@ -4025,6 +4043,11 @@ void AllocatorPimpl::CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_H
         break;
     default:
         D3D12MA_ASSERT(0);
+    }
+
+    if(outHeapType == D3D12_HEAP_TYPE_DEFAULT)
+    {
+        outHeapFlags |= D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS;
     }
 }
 
