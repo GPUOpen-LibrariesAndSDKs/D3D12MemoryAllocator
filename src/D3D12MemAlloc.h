@@ -514,19 +514,17 @@ private:
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
     template<typename T> friend class PoolAllocator;
 
-    AllocatorPimpl* m_Allocator;
     enum Type
     {
         TYPE_COMMITTED,
         TYPE_PLACED,
         TYPE_HEAP,
         TYPE_COUNT
-    } m_Type;
+    };
+
+    AllocatorPimpl* m_Allocator;
     UINT64 m_Size;
     ID3D12Resource* m_Resource;
-    D3D12_RESOURCE_DIMENSION m_ResourceDimension;
-    D3D12_RESOURCE_FLAGS m_ResourceFlags;
-    D3D12_TEXTURE_LAYOUT m_TextureLayout;
     UINT m_CreationFrameIndex;
     wchar_t* m_Name;
 
@@ -549,6 +547,31 @@ private:
             ID3D12Heap* heap;
         } m_Heap;
     };
+
+    struct PackedData
+    {
+    public:
+        PackedData() :
+            m_Type(0), m_ResourceDimension(0), m_ResourceFlags(0), m_TextureLayout(0) { }
+        PackedData(Type type, D3D12_RESOURCE_DIMENSION resourceDimension, D3D12_RESOURCE_FLAGS resourceFlags, D3D12_TEXTURE_LAYOUT textureLayout) :
+            m_Type(type), m_ResourceDimension(resourceDimension), m_ResourceFlags(resourceFlags), m_TextureLayout(textureLayout) { }
+
+        Type GetType() const { return (Type)m_Type; }
+        D3D12_RESOURCE_DIMENSION GetResourceDimension() const { return (D3D12_RESOURCE_DIMENSION)m_ResourceDimension; }
+        D3D12_RESOURCE_FLAGS GetResourceFlags() const { return (D3D12_RESOURCE_FLAGS)m_ResourceFlags; }
+        D3D12_TEXTURE_LAYOUT GetTextureLayout() const { return (D3D12_TEXTURE_LAYOUT)m_TextureLayout; }
+
+        void SetType(Type type) { m_Type = (UINT)type; }
+        void SetResourceDimension(D3D12_RESOURCE_DIMENSION resourceDimension) { m_ResourceDimension = (UINT)resourceDimension; }
+        void SetResourceFlags(D3D12_RESOURCE_FLAGS resourceFlags) { m_ResourceFlags = (UINT)resourceFlags; }
+        void SetTextureLayout(D3D12_TEXTURE_LAYOUT textureLayout) { m_TextureLayout = (UINT)textureLayout; }
+
+    private:
+        UINT m_Type : 2;               // enum Type
+        UINT m_ResourceDimension : 3;  // enum D3D12_RESOURCE_DIMENSION
+        UINT m_ResourceFlags : 7;      // flags D3D12_RESOURCE_FLAGS
+        UINT m_TextureLayout : 2;      // enum D3D12_TEXTURE_LAYOUT
+    } m_PackedData;
 
     Allocation(AllocatorPimpl* allocator, UINT64 size);
     ~Allocation();

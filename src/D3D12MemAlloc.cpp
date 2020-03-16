@@ -1316,7 +1316,7 @@ void JsonWriter::WriteIndent(bool oneLess)
 void JsonWriter::AddAllocationToObject(const Allocation& alloc)
 {
     WriteString(L"Type");
-    switch (alloc.m_ResourceDimension) {
+    switch (alloc.m_PackedData.GetResourceDimension()) {
     case D3D12_RESOURCE_DIMENSION_UNKNOWN:
         WriteString(L"UNKNOWN");
         break;
@@ -1342,15 +1342,15 @@ void JsonWriter::AddAllocationToObject(const Allocation& alloc)
         WriteString(L"Name");
         WriteString(name);
     }
-    if(alloc.m_ResourceFlags)
+    if(alloc.m_PackedData.GetResourceFlags())
     {
         WriteString(L"Flags");
-        WriteNumber((UINT)alloc.m_ResourceFlags);
+        WriteNumber((UINT)alloc.m_PackedData.GetResourceFlags());
     }
-    if(alloc.m_TextureLayout)
+    if(alloc.m_PackedData.GetTextureLayout())
     {
         WriteString(L"Layout");
-        WriteNumber((UINT)alloc.m_TextureLayout);
+        WriteNumber((UINT)alloc.m_PackedData.GetTextureLayout());
     }
     if(alloc.m_CreationFrameIndex)
     {
@@ -4074,7 +4074,7 @@ void AllocatorPimpl::UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP
 
 void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
 {
-    D3D12MA_ASSERT(allocation && allocation->m_Type == Allocation::TYPE_COMMITTED);
+    D3D12MA_ASSERT(allocation && allocation->m_PackedData.GetType() == Allocation::TYPE_COMMITTED);
     UnregisterCommittedAllocation(allocation, allocation->m_Committed.heapType);
 
     const UINT64 allocationSize = allocation->GetSize();
@@ -4085,7 +4085,7 @@ void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
 
 void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
 {
-    D3D12MA_ASSERT(allocation && allocation->m_Type == Allocation::TYPE_PLACED);
+    D3D12MA_ASSERT(allocation && allocation->m_PackedData.GetType() == Allocation::TYPE_PLACED);
 
     NormalBlock* const block = allocation->m_Placed.block;
     D3D12MA_ASSERT(block);
@@ -4097,7 +4097,7 @@ void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
 
 void AllocatorPimpl::FreeHeapMemory(Allocation* allocation)
 {
-    D3D12MA_ASSERT(allocation && allocation->m_Type == Allocation::TYPE_HEAP);
+    D3D12MA_ASSERT(allocation && allocation->m_PackedData.GetType() == Allocation::TYPE_HEAP);
     UnregisterCommittedAllocation(allocation, allocation->m_Heap.heapType);
     SAFE_RELEASE(allocation->m_Heap.heap);
 
@@ -4525,7 +4525,7 @@ void Allocation::Release()
 
     SAFE_RELEASE(m_Resource);
 
-    switch(m_Type)
+    switch(m_PackedData.GetType())
     {
     case TYPE_COMMITTED:
         m_Allocator->FreeCommittedMemory(this);
@@ -4545,7 +4545,7 @@ void Allocation::Release()
 
 UINT64 Allocation::GetOffset() const
 {
-    switch(m_Type)
+    switch(m_PackedData.GetType())
     {
     case TYPE_COMMITTED:
     case TYPE_HEAP:
@@ -4560,7 +4560,7 @@ UINT64 Allocation::GetOffset() const
 
 ID3D12Heap* Allocation::GetHeap() const
 {
-    switch(m_Type)
+    switch(m_PackedData.GetType())
     {
     case TYPE_COMMITTED:
         return NULL;
@@ -4588,14 +4588,11 @@ void Allocation::SetName(LPCWSTR Name)
 
 Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size) :
     m_Allocator{allocator},
-    m_Type{TYPE_COUNT},
     m_Size{size},
     m_Resource{NULL},
-    m_ResourceDimension{D3D12_RESOURCE_DIMENSION_UNKNOWN},
-    m_ResourceFlags{D3D12_RESOURCE_FLAG_NONE},
-    m_TextureLayout{D3D12_TEXTURE_LAYOUT_UNKNOWN},
     m_CreationFrameIndex{allocator->GetCurrentFrameIndex()},
-    m_Name{NULL}
+    m_Name{NULL},
+    m_PackedData{TYPE_COUNT, D3D12_RESOURCE_DIMENSION_UNKNOWN, D3D12_RESOURCE_FLAG_NONE, D3D12_TEXTURE_LAYOUT_UNKNOWN}
 {
     D3D12MA_ASSERT(allocator);
 }
@@ -4607,20 +4604,20 @@ Allocation::~Allocation()
 
 void Allocation::InitCommitted(D3D12_HEAP_TYPE heapType)
 {
-    m_Type = TYPE_COMMITTED;
+    m_PackedData.SetType(TYPE_COMMITTED);
     m_Committed.heapType = heapType;
 }
 
 void Allocation::InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block)
 {
-    m_Type = TYPE_PLACED;
+    m_PackedData.SetType(TYPE_PLACED);
     m_Placed.offset = offset;
     m_Placed.block = block;
 }
 
 void Allocation::InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
 {
-    m_Type = TYPE_HEAP;
+    m_PackedData.SetType(TYPE_HEAP);
     m_Heap.heapType = heapType;
     m_Heap.heap = heap;
 }
@@ -4630,9 +4627,9 @@ void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC
     D3D12MA_ASSERT(m_Resource == NULL);
     D3D12MA_ASSERT(pResourceDesc);
     m_Resource = resource;
-    m_ResourceDimension = pResourceDesc->Dimension;
-    m_ResourceFlags = pResourceDesc->Flags;
-    m_TextureLayout = pResourceDesc->Layout;
+    m_PackedData.SetResourceDimension(pResourceDesc->Dimension);
+    m_PackedData.SetResourceFlags(pResourceDesc->Flags);
+    m_PackedData.SetTextureLayout(pResourceDesc->Layout);
 }
 
 void Allocation::FreeName()
