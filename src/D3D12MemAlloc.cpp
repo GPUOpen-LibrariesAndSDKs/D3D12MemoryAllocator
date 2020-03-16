@@ -92,7 +92,8 @@
     It's mostly for automatic usage of the cryptic, undocumented flag D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS.
     Its absence doesn't seem to change anything but better to use it always, just in case.
     */
-    #define D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS (D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS)
+    //#define D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS (D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS)
+    #define D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS (D3D12_HEAP_FLAG_NONE)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2030,6 +2031,64 @@ struct AllocationRequest
     UINT64 sumFreeSize; // Sum size of free items that overlap with proposed allocation.
     UINT64 sumItemSize; // Sum size of items to make lost that overlap with proposed allocation.
     SuballocationList::iterator item;
+    BOOL zeroInitialized;
+};
+
+/*
+Keeps track of the range of bytes that are surely initialized with zeros.
+Everything outside of it is considered uninitialized memory that may contain
+garbage data.
+
+The range is left-inclusive.
+*/
+class ZeroInitializedRange
+{
+public:
+    void Reset(UINT64 size)
+    {
+        D3D12MA_ASSERT(size > 0);
+        m_ZeroBeg = 0;
+        m_ZeroEnd = size;
+    }
+
+    BOOL IsRangeZeroInitialized(UINT64 beg, UINT64 end) const
+    {
+        D3D12MA_ASSERT(beg < end);
+        return m_ZeroBeg <= beg && end <= m_ZeroEnd;
+    }
+
+    void MarkRangeAsUsed(UINT64 usedBeg, UINT64 usedEnd)
+    {
+        D3D12MA_ASSERT(usedBeg < usedEnd);
+        // No new bytes marked.
+        if(usedEnd <= m_ZeroBeg || m_ZeroEnd <= usedBeg)
+        {
+            return;
+        }
+        // All bytes marked.
+        if(usedBeg <= m_ZeroBeg && m_ZeroEnd <= usedEnd)
+        {
+            m_ZeroBeg = m_ZeroEnd = 0;
+        }
+        // Some bytes marked.
+        else
+        {
+            const UINT64 remainingZeroBefore = usedBeg > m_ZeroBeg ? usedBeg - m_ZeroBeg : 0;
+            const UINT64 remainingZeroAfter  = usedEnd < m_ZeroEnd ? m_ZeroEnd - usedEnd : 0;
+            D3D12MA_ASSERT(remainingZeroBefore > 0 || remainingZeroAfter > 0);
+            if(remainingZeroBefore > remainingZeroAfter)
+            {
+                m_ZeroEnd = usedBeg;
+            }
+            else
+            {
+                m_ZeroBeg = usedEnd;
+            }
+        }
+    }
+
+private:
+    UINT64 m_ZeroBeg = 0, m_ZeroEnd = 0;
 };
 
 /*
@@ -2119,6 +2178,7 @@ private:
     // Suballocations that are free and have size greater than certain threshold.
     // Sorted by size, ascending.
     Vector<SuballocationList::iterator> m_FreeSuballocationsBySize;
+    ZeroInitializedRange m_ZeroInitializedRange;
 
     bool ValidateFreeSuballocationList() const;
 
@@ -2130,7 +2190,8 @@ private:
         SuballocationList::const_iterator suballocItem,
         UINT64* pOffset,
         UINT64* pSumFreeSize,
-        UINT64* pSumItemSize) const;
+        UINT64* pSumItemSize,
+        BOOL *pZeroInitialized) const;
     // Given free suballocation, it merges it with following one, which must also be free.
     void MergeFreeWithNext(SuballocationList::iterator item);
     // Releases given suballocation, making it free.
@@ -2523,6 +2584,7 @@ BlockMetadata_Generic::~BlockMetadata_Generic()
 void BlockMetadata_Generic::Init(UINT64 size)
 {
     BlockMetadata::Init(size);
+    m_ZeroInitializedRange.Reset(size);
 
     m_FreeCount = 1;
     m_SumFreeSize = size;
@@ -2673,7 +2735,8 @@ bool BlockMetadata_Generic::CreateAllocationRequest(
                 m_FreeSuballocationsBySize[index],
                 &pAllocationRequest->offset,
                 &pAllocationRequest->sumFreeSize,
-                &pAllocationRequest->sumItemSize))
+                &pAllocationRequest->sumItemSize,
+                &pAllocationRequest->zeroInitialized))
             {
                 pAllocationRequest->item = m_FreeSuballocationsBySize[index];
                 return true;
@@ -2745,6 +2808,8 @@ void BlockMetadata_Generic::Alloc(
         ++m_FreeCount;
     }
     m_SumFreeSize -= allocSize;
+
+    m_ZeroInitializedRange.MarkRangeAsUsed(request.offset, request.offset + allocSize);
 }
 
 void BlockMetadata_Generic::Free(const Allocation* allocation)
@@ -2801,14 +2866,16 @@ bool BlockMetadata_Generic::CheckAllocation(
     SuballocationList::const_iterator suballocItem,
     UINT64* pOffset,
     UINT64* pSumFreeSize,
-    UINT64* pSumItemSize) const
+    UINT64* pSumItemSize,
+    BOOL *pZeroInitialized) const
 {
     D3D12MA_ASSERT(allocSize > 0);
     D3D12MA_ASSERT(suballocItem != m_Suballocations.cend());
-    D3D12MA_ASSERT(pOffset != NULL);
+    D3D12MA_ASSERT(pOffset != NULL && pZeroInitialized != NULL);
 
     *pSumFreeSize = 0;
     *pSumItemSize = 0;
+    *pZeroInitialized = FALSE;
 
     const Suballocation& suballoc = *suballocItem;
     D3D12MA_ASSERT(suballoc.type == SUBALLOCATION_TYPE_FREE);
@@ -2846,6 +2913,7 @@ bool BlockMetadata_Generic::CheckAllocation(
     }
 
     // All tests passed: Success. pOffset is already filled.
+    *pZeroInitialized = m_ZeroInitializedRange.IsRangeZeroInitialized(*pOffset, *pOffset + allocSize);
     return true;
 }
 
@@ -3479,7 +3547,7 @@ HRESULT BlockVector::AllocateFromBlock(
             m_HasEmptyBlock = false;
         }
 
-        *pAllocation = m_hAllocator->GetAllocationObjectAllocator().Allocate(m_hAllocator, size);
+        *pAllocation = m_hAllocator->GetAllocationObjectAllocator().Allocate(m_hAllocator, size, currRequest.zeroInitialized);
         pBlock->m_pMetadata->Alloc(currRequest, size, *pAllocation);
         (*pAllocation)->InitPlaced(currRequest.offset, alignment, pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
@@ -3859,7 +3927,8 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         pOptimizedClearValue, riidResource, (void**)&res);
     if(SUCCEEDED(hr))
     {
-        Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resAllocInfo.SizeInBytes);
+        const BOOL wasZeroInitialized = TRUE;
+        Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resAllocInfo.SizeInBytes, wasZeroInitialized);
         alloc->InitCommitted(pAllocDesc->HeapType);
         alloc->SetResource(res, pResourceDesc);
 
@@ -3917,7 +3986,8 @@ HRESULT AllocatorPimpl::AllocateHeap(
     HRESULT hr = m_Device->CreateHeap(&heapDesc, __uuidof(*heap), (void**)&heap);
     if(SUCCEEDED(hr))
     {
-        (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes);
+        const BOOL wasZeroInitialized = TRUE;
+        (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes, wasZeroInitialized);
         (*ppAllocation)->InitHeap(pAllocDesc->HeapType, heap);
         RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
 
@@ -4614,15 +4684,20 @@ void Allocation::SetName(LPCWSTR Name)
     }
 }
 
-Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size) :
+Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size, BOOL wasZeroInitialized) :
     m_Allocator{allocator},
     m_Size{size},
     m_Resource{NULL},
     m_CreationFrameIndex{allocator->GetCurrentFrameIndex()},
-    m_Name{NULL},
-    m_PackedData{TYPE_COUNT, D3D12_RESOURCE_DIMENSION_UNKNOWN, D3D12_RESOURCE_FLAG_NONE, D3D12_TEXTURE_LAYOUT_UNKNOWN}
+    m_Name{NULL}
 {
     D3D12MA_ASSERT(allocator);
+
+    m_PackedData.SetType(TYPE_COUNT);
+    m_PackedData.SetResourceDimension(D3D12_RESOURCE_DIMENSION_UNKNOWN);
+    m_PackedData.SetResourceFlags(D3D12_RESOURCE_FLAG_NONE);
+    m_PackedData.SetTextureLayout(D3D12_TEXTURE_LAYOUT_UNKNOWN);
+    m_PackedData.SetWasZeroInitialized(wasZeroInitialized);
 }
 
 Allocation::~Allocation()

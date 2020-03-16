@@ -46,6 +46,14 @@ struct ResourceWithAllocation
     AllocationUniquePtr allocation;
     UINT64 size = UINT64_MAX;
     UINT dataSeed = 0;
+
+    void Reset()
+    {
+        resource.Release();
+        allocation.reset();
+        size = UINT64_MAX;
+        dataSeed = 0;
+    }
 };
 
 static void FillResourceDescForBuffer(D3D12_RESOURCE_DESC& outResourceDesc, UINT64 size)
@@ -83,6 +91,21 @@ static bool ValidateData(const void* ptr, const UINT64 sizeInBytes, UINT seed)
     for(UINT i = 0; i < sizeInValues; ++i)
     {
         if(values[i] != value++)
+        {
+            //FAIL("ValidateData failed.");
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool ValidateDataZero(const void* ptr, const UINT64 sizeInBytes)
+{
+    const UINT* values = (const UINT*)ptr;
+    const UINT64 sizeInValues = sizeInBytes / sizeof(UINT);
+    for(UINT i = 0; i < sizeInValues; ++i)
+    {
+        if(values[i] != 0)
         {
             //FAIL("ValidateData failed.");
             return false;
@@ -638,6 +661,149 @@ static void TestTransfer(const TestContext& ctx)
     }
 }
 
+static void TestZeroInitialized(const TestContext& ctx)
+{
+    wprintf(L"Test zero initialized\n");
+
+    const UINT64 bufSize = 128ull * 1024;
+    D3D12MA::Allocation* alloc = nullptr;
+
+    D3D12_RESOURCE_DESC resourceDesc;
+    FillResourceDescForBuffer(resourceDesc, bufSize);
+
+    // # Create upload buffer and fill it with data.
+
+    D3D12MA::ALLOCATION_DESC allocDescUpload = {};
+    allocDescUpload.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+
+    ResourceWithAllocation bufUpload;
+    CHECK_HR( ctx.allocator->CreateResource(
+        &allocDescUpload,
+        &resourceDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        NULL,
+        &alloc,
+        IID_PPV_ARGS(&bufUpload.resource)) );
+    bufUpload.allocation.reset(alloc);
+
+    {
+        void* mappedPtr = nullptr;
+        CHECK_HR( bufUpload.resource->Map(0, NULL, &mappedPtr) );
+        FillData(mappedPtr, bufSize, 5236245);
+        bufUpload.resource->Unmap(0, NULL);
+    }
+
+    // # Create readback buffer
+    
+    D3D12MA::ALLOCATION_DESC allocDescReadback = {};
+    allocDescReadback.HeapType = D3D12_HEAP_TYPE_READBACK;
+
+    ResourceWithAllocation bufReadback;
+    CHECK_HR( ctx.allocator->CreateResource(
+        &allocDescReadback,
+        &resourceDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        NULL,
+        &alloc,
+        IID_PPV_ARGS(&bufReadback.resource)) );
+    bufReadback.allocation.reset(alloc);
+
+    auto CheckBufferData = [&](const ResourceWithAllocation& buf)
+    {
+        const bool shouldBeZero = buf.allocation->WasZeroInitialized() != FALSE;
+
+        {
+            ID3D12GraphicsCommandList* cmdList = BeginCommandList();
+            cmdList->CopyBufferRegion(bufReadback.resource, 0, buf.resource, 0, bufSize);
+            EndCommandList(cmdList);
+        }
+
+        bool isZero = false;
+        {
+            void* mappedPtr = nullptr;
+            CHECK_HR( bufReadback.resource->Map(0, NULL, &mappedPtr) );
+            isZero = ValidateDataZero(mappedPtr, bufSize);
+            bufReadback.resource->Unmap(0, NULL);
+        }
+
+        wprintf(L"Should be zero: %u, is zero: %u\n", shouldBeZero ? 1 : 0, isZero ? 1 : 0);
+
+        if(shouldBeZero)
+        {
+            CHECK_BOOL(isZero);
+        }
+    };
+
+    // # Test 1: Committed resource. Should always be zero initialized.
+
+    {
+        D3D12MA::ALLOCATION_DESC allocDescDefault = {};
+        allocDescDefault.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        allocDescDefault.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+        ResourceWithAllocation bufDefault;
+        CHECK_HR( ctx.allocator->CreateResource(
+            &allocDescDefault,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_COPY_SOURCE,
+            NULL,
+            &alloc,
+            IID_PPV_ARGS(&bufDefault.resource)) );
+        bufDefault.allocation.reset(alloc);
+
+        wprintf(L"  Committed: ");
+        CheckBufferData(bufDefault);
+        CHECK_BOOL( bufDefault.allocation->WasZeroInitialized() );
+    }
+
+    // # Test 2: (Probably) placed resource.
+
+    ResourceWithAllocation bufDefault;
+    for(uint32_t i = 0; i < 2; ++i)
+    {
+        // 1. Create buffer
+
+        D3D12MA::ALLOCATION_DESC allocDescDefault = {};
+        allocDescDefault.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+        CHECK_HR( ctx.allocator->CreateResource(
+            &allocDescDefault,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_COPY_SOURCE,
+            NULL,
+            &alloc,
+            IID_PPV_ARGS(&bufDefault.resource)) );
+        bufDefault.allocation.reset(alloc);
+
+        // 2. Check it
+
+        wprintf(L"  Normal #%u: ", i);
+        CheckBufferData(bufDefault);
+
+        // 3. Upload some data to it
+
+        {
+            ID3D12GraphicsCommandList* cmdList = BeginCommandList();
+
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Transition.pResource = bufDefault.resource;
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            cmdList->ResourceBarrier(1, &barrier);
+
+            cmdList->CopyBufferRegion(bufDefault.resource, 0, bufUpload.resource, 0, bufSize);
+            
+            EndCommandList(cmdList);
+        }
+
+        // 4. Delete it
+
+        bufDefault.Reset();
+    }
+}
+
 static void TestMultithreading(const TestContext& ctx)
 {
     wprintf(L"Test multithreading\n");
@@ -780,6 +946,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestMapping(ctx);
     TestStats(ctx);
     TestTransfer(ctx);
+    TestZeroInitialized(ctx);
     TestMultithreading(ctx);
 }
 
