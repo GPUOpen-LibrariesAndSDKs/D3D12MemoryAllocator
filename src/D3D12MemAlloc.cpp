@@ -3249,7 +3249,7 @@ HRESULT BlockVector::AllocatePage(
     {
         Budget budget = {};
         m_hAllocator->GetBudgetForHeapType(budget, m_HeapType);
-        freeMemory = (budget.Usage < budget.MemoryBudget) ? (budget.MemoryBudget - budget.Usage) : 0;
+        freeMemory = (budget.UsageBytes < budget.BudgetBytes) ? (budget.BudgetBytes - budget.UsageBytes) : 0;
     }
 
     const bool canCreateNewBlock =
@@ -3368,7 +3368,7 @@ void BlockVector::Free(Allocation* hAllocation)
     {
         Budget budget = {};
         m_hAllocator->GetBudgetForHeapType(budget, m_HeapType);
-        budgetExceeded = budget.Usage >= budget.MemoryBudget;
+        budgetExceeded = budget.UsageBytes >= budget.BudgetBytes;
     }
 
     // Scope for lock.
@@ -3841,7 +3841,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     {
         Budget budget = {};
         GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.Usage + resAllocInfo.SizeInBytes > budget.MemoryBudget)
+        if(budget.UsageBytes + resAllocInfo.SizeInBytes > budget.BudgetBytes)
         {
             return E_OUTOFMEMORY;
         }
@@ -3896,7 +3896,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
     {
         Budget budget = {};
         GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.Usage + allocInfo.SizeInBytes > budget.MemoryBudget)
+        if(budget.UsageBytes + allocInfo.SizeInBytes > budget.BudgetBytes)
         {
             return E_OUTOFMEMORY;
         }
@@ -4196,27 +4196,27 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
 
                 if(m_Budget.m_D3D12UsageLocal + outGpuBudget->BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[0])
                 {
-                    outGpuBudget->Usage = m_Budget.m_D3D12UsageLocal +
+                    outGpuBudget->UsageBytes = m_Budget.m_D3D12UsageLocal +
                         outGpuBudget->BlockBytes - m_Budget.m_BlockBytesAtBudgetFetch[0];
                 }
                 else
                 {
-                    outGpuBudget->Usage = 0;
+                    outGpuBudget->UsageBytes = 0;
                 }
-                outGpuBudget->MemoryBudget = m_Budget.m_D3D12BudgetLocal;
+                outGpuBudget->BudgetBytes = m_Budget.m_D3D12BudgetLocal;
             }
             if(outCpuBudget)
             {
                 if(m_Budget.m_D3D12UsageNonLocal + outCpuBudget->BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2])
                 {
-                    outCpuBudget->Usage = m_Budget.m_D3D12UsageNonLocal +
+                    outCpuBudget->UsageBytes = m_Budget.m_D3D12UsageNonLocal +
                         outCpuBudget->BlockBytes - (m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2]);
                 }
                 else
                 {
-                    outCpuBudget->Usage = 0;
+                    outCpuBudget->UsageBytes = 0;
                 }
-                outCpuBudget->MemoryBudget = m_Budget.m_D3D12BudgetNonLocal;
+                outCpuBudget->BudgetBytes = m_Budget.m_D3D12BudgetNonLocal;
             }
         }
         else
@@ -4231,14 +4231,14 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
         if(outGpuBudget)
         {
             const UINT64 gpuMemorySize = m_AdapterDesc.DedicatedVideoMemory + m_AdapterDesc.DedicatedSystemMemory; // TODO: Is this right?
-            outGpuBudget->Usage = outGpuBudget->BlockBytes;
-            outGpuBudget->MemoryBudget = gpuMemorySize * 8 / 10; // 80% heuristics.
+            outGpuBudget->UsageBytes = outGpuBudget->BlockBytes;
+            outGpuBudget->BudgetBytes = gpuMemorySize * 8 / 10; // 80% heuristics.
         }
         if(outCpuBudget)
         {
             const UINT64 cpuMemorySize = m_AdapterDesc.SharedSystemMemory; // TODO: Is this right?
-            outCpuBudget->Usage = outCpuBudget->BlockBytes;
-            outCpuBudget->MemoryBudget = cpuMemorySize * 8 / 10; // 80% heuristics.
+            outCpuBudget->UsageBytes = outCpuBudget->BlockBytes;
+            outCpuBudget->BudgetBytes = cpuMemorySize * 8 / 10; // 80% heuristics.
         }
     }
 }
@@ -4503,10 +4503,10 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
         json.WriteNumber(budget.BlockBytes);
         json.WriteString(L"AllocationBytes");
         json.WriteNumber(budget.AllocationBytes);
-        json.WriteString(L"Usage");
-        json.WriteNumber(budget.Usage);
-        json.WriteString(L"Budget");
-        json.WriteNumber(budget.MemoryBudget);
+        json.WriteString(L"UsageBytes");
+        json.WriteNumber(budget.UsageBytes);
+        json.WriteString(L"BudgetBytes");
+        json.WriteNumber(budget.BudgetBytes);
     }
     json.EndObject();
 }

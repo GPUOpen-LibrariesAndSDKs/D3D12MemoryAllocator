@@ -703,7 +703,7 @@ struct Budget
     also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or
     memory blocks allocated outside of this library, if any.
     */
-    UINT64 Usage;
+    UINT64 UsageBytes;
 
     /** \brief Estimated amount of memory available to the program, in bytes.
 
@@ -711,10 +711,10 @@ struct Budget
 
     It might be different (most probably smaller) than memory sizes reported in `DXGI_ADAPTER_DESC` due to factors
     external to the program, like other programs also consuming system resources.
-    Difference `Budget - Usage` is the amount of additional memory that can probably
+    Difference `BudgetBytes - UsageBytes` is the amount of additional memory that can probably
     be allocated without problems. Exceeding the budget may result in various problems.
     */
-    UINT64 MemoryBudget;
+    UINT64 BudgetBytes;
 };
 
 /**
