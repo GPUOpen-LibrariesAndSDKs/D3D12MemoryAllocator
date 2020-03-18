@@ -714,7 +714,7 @@ struct Budget
     Difference `Budget - Usage` is the amount of additional memory that can probably
     be allocated without problems. Exceeding the budget may result in various problems.
     */
-    UINT64 Budget;
+    UINT64 MemoryBudget;
 };
 
 /**
