@@ -1609,9 +1609,9 @@ public:
 
     private:
         List<T>* m_pList;
-        List<T>::Item* m_pItem;
+        Item* m_pItem;
 
-        iterator(List<T>* pList, List<T>::Item* pItem) :
+        iterator(List<T>* pList, Item* pItem) :
             m_pList(pList),
             m_pItem(pItem)
         {
@@ -1691,14 +1691,14 @@ public:
         }
 
     private:
-        const_iterator(const List<T>* pList, const List<T>::Item* pItem) :
+        const_iterator(const List<T>* pList, const Item* pItem) :
             m_pList(pList),
             m_pItem(pItem)
         {
         }
 
         const List<T>* m_pList;
-        const List<T>::Item* m_pItem;
+        const Item* m_pItem;
 
         friend class List<T>;
     };
@@ -1935,7 +1935,7 @@ typename List<T>::Item* List<T>::InsertAfter(Item* pItem)
 }
 
 template<typename T>
-typename List<T>::Item* List<T>::InsertBefore(List<T>::Item* pItem, const T& value)
+typename List<T>::Item* List<T>::InsertBefore(Item* pItem, const T& value)
 {
     Item* const newItem = InsertBefore(pItem);
     newItem->Value = value;
@@ -1943,7 +1943,7 @@ typename List<T>::Item* List<T>::InsertBefore(List<T>::Item* pItem, const T& val
 }
 
 template<typename T>
-typename List<T>::Item* List<T>::InsertAfter(List<T>::Item* pItem, const T& value)
+typename List<T>::Item* List<T>::InsertAfter(Item* pItem, const T& value)
 {
     Item* const newItem = InsertAfter(pItem);
     newItem->Value = value;
@@ -3249,7 +3249,7 @@ HRESULT BlockVector::AllocatePage(
     {
         Budget budget = {};
         m_hAllocator->GetBudgetForHeapType(budget, m_HeapType);
-        freeMemory = (budget.Usage < budget.Budget) ? (budget.Budget - budget.Usage) : 0;
+        freeMemory = (budget.Usage < budget.MemoryBudget) ? (budget.MemoryBudget - budget.Usage) : 0;
     }
 
     const bool canCreateNewBlock =
@@ -3368,7 +3368,7 @@ void BlockVector::Free(Allocation* hAllocation)
     {
         Budget budget = {};
         m_hAllocator->GetBudgetForHeapType(budget, m_HeapType);
-        budgetExceeded = budget.Usage >= budget.Budget;
+        budgetExceeded = budget.Usage >= budget.MemoryBudget;
     }
 
     // Scope for lock.
@@ -3841,7 +3841,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     {
         Budget budget = {};
         GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.Usage + resAllocInfo.SizeInBytes > budget.Budget)
+        if(budget.Usage + resAllocInfo.SizeInBytes > budget.MemoryBudget)
         {
             return E_OUTOFMEMORY;
         }
@@ -3896,7 +3896,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
     {
         Budget budget = {};
         GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.Usage + allocInfo.SizeInBytes > budget.Budget)
+        if(budget.Usage + allocInfo.SizeInBytes > budget.MemoryBudget)
         {
             return E_OUTOFMEMORY;
         }
@@ -4203,7 +4203,7 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
                 {
                     outGpuBudget->Usage = 0;
                 }
-                outGpuBudget->Budget = m_Budget.m_D3D12BudgetLocal;
+                outGpuBudget->MemoryBudget = m_Budget.m_D3D12BudgetLocal;
             }
             if(outCpuBudget)
             {
@@ -4216,7 +4216,7 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
                 {
                     outCpuBudget->Usage = 0;
                 }
-                outCpuBudget->Budget = m_Budget.m_D3D12BudgetNonLocal;
+                outCpuBudget->MemoryBudget = m_Budget.m_D3D12BudgetNonLocal;
             }
         }
         else
@@ -4232,13 +4232,13 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
         {
             const UINT64 gpuMemorySize = m_AdapterDesc.DedicatedVideoMemory + m_AdapterDesc.DedicatedSystemMemory; // TODO: Is this right?
             outGpuBudget->Usage = outGpuBudget->BlockBytes;
-            outGpuBudget->Budget = gpuMemorySize * 8 / 10; // 80% heuristics.
+            outGpuBudget->MemoryBudget = gpuMemorySize * 8 / 10; // 80% heuristics.
         }
         if(outCpuBudget)
         {
             const UINT64 cpuMemorySize = m_AdapterDesc.SharedSystemMemory; // TODO: Is this right?
             outCpuBudget->Usage = outCpuBudget->BlockBytes;
-            outCpuBudget->Budget = cpuMemorySize * 8 / 10; // 80% heuristics.
+            outCpuBudget->MemoryBudget = cpuMemorySize * 8 / 10; // 80% heuristics.
         }
     }
 }
@@ -4506,7 +4506,7 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
         json.WriteString(L"Usage");
         json.WriteNumber(budget.Usage);
         json.WriteString(L"Budget");
-        json.WriteNumber(budget.Budget);
+        json.WriteNumber(budget.MemoryBudget);
     }
     json.EndObject();
 }
