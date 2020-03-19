@@ -155,7 +155,7 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
     ResourceWithAllocation resources[count];
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
 
     D3D12_RESOURCE_DESC resourceDesc;
@@ -169,7 +169,7 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDesc,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COPY_DEST,
             NULL,
             &alloc,
             __uuidof(ID3D12Resource),
@@ -211,6 +211,29 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
     CHECK_BOOL(wcsstr(jsonString, L"\"Resource \\\"'&<>?#@!&-=_+[]{};:,.\\/\\\\\"") != NULL);
     CHECK_BOOL(wcsstr(jsonString, L"\"\"") != NULL);
     ctx.allocator->FreeStatsString(jsonString);
+}
+
+static void TestCustomHeapFlags(const TestContext& ctx)
+{
+    wprintf(L"Test custom heap flags\n");
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+    const D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES |
+        D3D12_HEAP_FLAG_SHARED; // Extra flag.
+
+    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = {};
+    resAllocInfo.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    resAllocInfo.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+
+    D3D12MA::Allocation* alloc = nullptr;
+    CHECK_HR( ctx.allocator->AllocateMemory(&allocDesc, heapFlags, &resAllocInfo, &alloc) );
+    ResourceWithAllocation res;
+    res.allocation.reset(alloc);
+
+    // Must be created as separate allocation.
+    CHECK_BOOL( res.allocation->GetOffset() == 0 );
 }
 
 static void TestPlacedResources(const TestContext& ctx)
@@ -775,6 +798,7 @@ static void TestGroupBasics(const TestContext& ctx)
 {
     TestFrameIndexAndJson(ctx);
     TestCommittedResourcesAndJson(ctx);
+    TestCustomHeapFlags(ctx);
     TestPlacedResources(ctx);
     TestAliasingMemory(ctx);
     TestMapping(ctx);

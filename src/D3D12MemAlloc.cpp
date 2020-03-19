@@ -86,13 +86,15 @@
    #define D3D12MA_DEFAULT_BLOCK_SIZE (256ull * 1024 * 1024)
 #endif
 
-#ifndef D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS
+#ifndef D3D12MA_ALLOW_SHADER_ATOMICS
     /*
-    Here you can control additional heap flags added to heaps/resources created in DEFAULT heap type.
-    It's mostly for automatic usage of the cryptic, undocumented flag D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS.
-    Its absence doesn't seem to change anything but better to use it always, just in case.
+    Set this to 1 to make the library automatically adding flag
+    D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS to any allocated heap that might contain a
+    buffer or a texture used as a UAV. You can change it to 0 if you are sure your
+    program doesn't use atomic functions in its shaders. In practice this flag
+    doesn't seem to change anything.
     */
-    #define D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS (D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS)
+    #define D3D12MA_ALLOW_SHADER_ATOMICS (1)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3686,6 +3688,7 @@ HRESULT AllocatorPimpl::CreateResource(
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
     const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, resourceDesc2);
+    D3D12MA_ASSERT(defaultPoolIndex != UINT32_MAX);
     BlockVector* blockVector = m_BlockVectors[defaultPoolIndex];
     D3D12MA_ASSERT(blockVector);
 
@@ -3777,15 +3780,17 @@ HRESULT AllocatorPimpl::AllocateMemory(
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
 
     const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, heapFlags);
-    if(defaultPoolIndex == UINT32_MAX)
+    bool requireCommittedMemory = (defaultPoolIndex == UINT32_MAX);
+    if(requireCommittedMemory)
     {
-        return E_INVALIDARG;
+        return AllocateHeap(&finalAllocDesc, heapFlags, *pAllocInfo, ppAllocation);
     }
+
     BlockVector* blockVector = m_BlockVectors[defaultPoolIndex];
     D3D12MA_ASSERT(blockVector);
 
     const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
-    bool preferCommittedMemory =
+    const bool preferCommittedMemory =
         m_AlwaysCommitted ||
         // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
         pAllocInfo->SizeInBytes > preferredBlockSize / 2;
@@ -3850,8 +3855,14 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = pAllocDesc->HeapType;
 
-    const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->HeapType == D3D12_HEAP_TYPE_DEFAULT ?
-        D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS : D3D12_HEAP_FLAG_NONE;
+    D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_NONE;
+#if D3D12MA_ALLOW_SHADER_ATOMICS
+    if((pResourceDesc->Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0)
+    {
+        D3D12MA_ASSERT(pAllocDesc->HeapType == D3D12_HEAP_TYPE_DEFAULT);
+        heapFlags = D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS;
+    }
+#endif
 
     ID3D12Resource* res = NULL;
     HRESULT hr = m_Device->CreateCommittedResource(
@@ -3902,10 +3913,12 @@ HRESULT AllocatorPimpl::AllocateHeap(
         }
     }
 
+#if D3D12MA_ALLOW_SHADER_ATOMICS
     if(pAllocDesc->HeapType == D3D12_HEAP_TYPE_DEFAULT)
     {
-        heapFlags |= D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS;
+        heapFlags |= D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS;
     }
+#endif
 
     D3D12_HEAP_DESC heapDesc = {};
     heapDesc.SizeInBytes = allocInfo.SizeInBytes;
@@ -3971,6 +3984,17 @@ UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, cons
 
 UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_HEAP_FLAGS heapFlags) const
 {
+    D3D12_HEAP_FLAGS heapFlagsToIgnore =
+        D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES;
+#if D3D12MA_ALLOW_SHADER_ATOMICS
+    heapFlagsToIgnore |= D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS;
+#endif
+    const D3D12_HEAP_FLAGS additionalHeapFlags = heapFlags & ~heapFlagsToIgnore;
+    if(additionalHeapFlags != 0)
+    {
+        return UINT32_MAX;
+    }
+
     UINT poolIndex = UINT_MAX;
     switch(allocDesc.HeapType)
     {
@@ -4045,10 +4069,12 @@ void AllocatorPimpl::CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_H
         D3D12MA_ASSERT(0);
     }
 
+#if D3D12MA_ALLOW_SHADER_ATOMICS
     if(outHeapType == D3D12_HEAP_TYPE_DEFAULT)
     {
-        outHeapFlags |= D3D12MA_EXTRA_DEFAULT_TYPE_HEAP_FLAGS;
+        outHeapFlags |= D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS;
     }
+#endif
 }
 
 void AllocatorPimpl::RegisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType)
@@ -4750,8 +4776,7 @@ HRESULT Allocator::AllocateMemory(
             pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
             pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) ||
         pAllocInfo->SizeInBytes == 0 ||
-        pAllocInfo->SizeInBytes % (64ull * 1024) != 0 ||
-        (heapFlags & ~(D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES)) != 0)
+        pAllocInfo->SizeInBytes % (64ull * 1024) != 0)
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::AllocateMemory.");
         return E_INVALIDARG;
