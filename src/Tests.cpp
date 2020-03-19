@@ -217,23 +217,59 @@ static void TestCustomHeapFlags(const TestContext& ctx)
 {
     wprintf(L"Test custom heap flags\n");
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    // 1. Just memory heap with custom flags
+    {
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES |
+            D3D12_HEAP_FLAG_SHARED; // Extra flag.
 
-    const D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES |
-        D3D12_HEAP_FLAG_SHARED; // Extra flag.
+        D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = {};
+        resAllocInfo.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+        resAllocInfo.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 
-    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = {};
-    resAllocInfo.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-    resAllocInfo.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+        D3D12MA::Allocation* alloc = nullptr;
+        CHECK_HR( ctx.allocator->AllocateMemory(&allocDesc, &resAllocInfo, &alloc) );
+        ResourceWithAllocation res;
+        res.allocation.reset(alloc);
 
-    D3D12MA::Allocation* alloc = nullptr;
-    CHECK_HR( ctx.allocator->AllocateMemory(&allocDesc, heapFlags, &resAllocInfo, &alloc) );
-    ResourceWithAllocation res;
-    res.allocation.reset(alloc);
+        // Must be created as separate allocation.
+        CHECK_BOOL( res.allocation->GetOffset() == 0 );
+    }
 
-    // Must be created as separate allocation.
-    CHECK_BOOL( res.allocation->GetOffset() == 0 );
+    // 2. Committed resource with custom flags
+    {
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = 1920;
+        resourceDesc.Height = 1080;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        resourceDesc.SampleDesc.Count = 1;
+        resourceDesc.SampleDesc.Quality = 0;
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER;
+
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_SHARED | D3D12_HEAP_FLAG_SHARED_CROSS_ADAPTER; // Extra flags.
+
+        ResourceWithAllocation res;
+        D3D12MA::Allocation* alloc = nullptr;
+        CHECK_HR( ctx.allocator->CreateResource(
+            &allocDesc,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_COMMON,
+            NULL,
+            &alloc,
+            IID_PPV_ARGS(&res.resource)) );
+        res.allocation.reset(alloc);
+
+        // Must be created as committed.
+        CHECK_BOOL( res.allocation->GetHeap() == NULL );
+    }
 }
 
 static void TestPlacedResources(const TestContext& ctx)
@@ -346,6 +382,7 @@ static void TestAliasingMemory(const TestContext& ctx)
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
 
     D3D12_RESOURCE_DESC resourceDesc1 = {};
     resourceDesc1.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -383,7 +420,6 @@ static void TestAliasingMemory(const TestContext& ctx)
     D3D12MA::Allocation* allocPtr = NULL;
     CHECK_HR( ctx.allocator->AllocateMemory(
         &allocDesc,
-        D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES,
         &allocInfo,
         &allocPtr) );
     AllocationUniquePtr alloc(allocPtr);

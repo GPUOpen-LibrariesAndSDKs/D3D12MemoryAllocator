@@ -440,6 +440,23 @@ struct ALLOCATION_DESC
     It must be one of: `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`.
     */
     D3D12_HEAP_TYPE HeapType;
+    /** \brief Additional heap flags to be used when allocating memory.
+
+    In most cases it can be 0.
+    
+    - If you use D3D12MA::Allocator::CreateResource(), you don't need to care.
+      In case of D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
+      necessary flag `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`, `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
+      or `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES` is added automatically.
+    - If you use D3D12MA::Allocator::AllocateMemory() and
+      D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
+      you must specify one of those `ALLOW_ONLY` flags. When it's `TIER_2`, you can leave it 0.
+    - If configuration macro `D3D12MA_ALLOW_SHADER_ATOMICS` is set to 1 (which is the default),
+      `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS` is added automatically wherever it might be needed.
+    - You can specify additional flags if needed. Then the memory will always be allocated as
+      separate block using `D3D12Device::CreateCommittedResource` or `CreateHeap`, not as part of an existing larget block.
+    */
+    D3D12_HEAP_FLAGS ExtraHeapFlags;
 };
 
 /** \brief Represents single memory allocation.
@@ -793,7 +810,6 @@ public:
     */
     HRESULT AllocateMemory(
         const ALLOCATION_DESC* pAllocDesc,
-        D3D12_HEAP_FLAGS heapFlags,
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
 
