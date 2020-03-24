@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-03-11)
+<b>Version 2.0.0-development</b> (2020-03-24)
 
 Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -537,8 +537,9 @@ public:
     Please note that rendering a fullscreen triangle or quad to the texture as
     a render target is not a proper way of initialization!
 
-    See also article:
-    [Coming to DirectX 12: More control over memory allocation](https://devblogs.microsoft.com/directx/coming-to-directx-12-more-control-over-memory-allocation/).
+    See also articles:
+    ["Coming to DirectX 12: More control over memory allocation"](https://devblogs.microsoft.com/directx/coming-to-directx-12-more-control-over-memory-allocation/),
+    ["Initializing DX12 Textures After Allocation and Aliasing"](https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing).
     */
     BOOL WasZeroInitialized() const { return m_PackedData.WasZeroInitialized(); }
 
