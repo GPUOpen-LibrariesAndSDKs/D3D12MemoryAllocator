@@ -440,6 +440,23 @@ struct ALLOCATION_DESC
     It must be one of: `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`.
     */
     D3D12_HEAP_TYPE HeapType;
+    /** \brief Additional heap flags to be used when allocating memory.
+
+    In most cases it can be 0.
+    
+    - If you use D3D12MA::Allocator::CreateResource(), you don't need to care.
+      In case of D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
+      necessary flag `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`, `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
+      or `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES` is added automatically.
+    - If you use D3D12MA::Allocator::AllocateMemory() and
+      D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
+      you must specify one of those `ALLOW_ONLY` flags. When it's `TIER_2`, you can leave it 0.
+    - If configuration macro `D3D12MA_ALLOW_SHADER_ATOMICS` is set to 1 (which is the default),
+      `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS` is added automatically wherever it might be needed.
+    - You can specify additional flags if needed. Then the memory will always be allocated as
+      separate block using `D3D12Device::CreateCommittedResource` or `CreateHeap`, not as part of an existing larget block.
+    */
+    D3D12_HEAP_FLAGS ExtraHeapFlags;
 };
 
 /** \brief Represents single memory allocation.
@@ -722,7 +739,7 @@ struct Budget
     also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or
     memory blocks allocated outside of this library, if any.
     */
-    UINT64 Usage;
+    UINT64 UsageBytes;
 
     /** \brief Estimated amount of memory available to the program, in bytes.
 
@@ -730,10 +747,10 @@ struct Budget
 
     It might be different (most probably smaller) than memory sizes reported in `DXGI_ADAPTER_DESC` due to factors
     external to the program, like other programs also consuming system resources.
-    Difference `Budget - Usage` is the amount of additional memory that can probably
+    Difference `BudgetBytes - UsageBytes` is the amount of additional memory that can probably
     be allocated without problems. Exceeding the budget may result in various problems.
     */
-    UINT64 Budget;
+    UINT64 BudgetBytes;
 };
 
 /**
@@ -796,12 +813,13 @@ public:
     This function is similar to `ID3D12Device::CreateHeap`, but it may really assign
     part of a larger, existing heap to the allocation.
 
-    If ResourceHeapTier = 1, `heapFlags` must be one of these values, depending on type
+    If ResourceHeapTier = 1, `heapFlags` must contain one of these values, depending on type
     of resources you are going to create in this memory:
     `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`.
-    If ResourceHeapTier = 2, `heapFlags` may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES`.
+    If ResourceHeapTier = 2, `heapFlags` may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0.
+    Additional flags in `heapFlags` are allowed as well.
 
     `pAllocInfo->SizeInBytes` must be multiply of 64KB.
     `pAllocInfo->Alignment` must be one of the legal values as described in documentation of `D3D12_HEAP_DESC`.
@@ -811,7 +829,6 @@ public:
     */
     HRESULT AllocateMemory(
         const ALLOCATION_DESC* pAllocDesc,
-        D3D12_HEAP_FLAGS heapFlags,
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
 
