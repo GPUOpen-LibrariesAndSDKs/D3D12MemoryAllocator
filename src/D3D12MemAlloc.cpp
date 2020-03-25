@@ -2456,6 +2456,15 @@ public:
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
 
+    HRESULT CreateAliasingResource(
+        Allocation* pAllocation,
+        UINT64 AllocationLocalOffset,
+        const D3D12_RESOURCE_DESC* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        REFIID riidResource,
+        void** ppvResource);
+
     // Unregisters allocation from the collection of dedicated allocations.
     // Allocation object must be deleted externally afterwards.
     void FreeCommittedMemory(Allocation* allocation);
@@ -3742,6 +3751,12 @@ HRESULT AllocatorPimpl::CreateResource(
     REFIID riidResource,
     void** ppvResource)
 {
+    *ppAllocation = NULL;
+    if(ppvResource)
+    {
+        *ppvResource = NULL;
+    }
+
     if(pAllocDesc->HeapType != D3D12_HEAP_TYPE_DEFAULT &&
         pAllocDesc->HeapType != D3D12_HEAP_TYPE_UPLOAD &&
         pAllocDesc->HeapType != D3D12_HEAP_TYPE_READBACK)
@@ -3750,11 +3765,6 @@ HRESULT AllocatorPimpl::CreateResource(
     }
 
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
-
-    if(ppvResource)
-    {
-        *ppvResource = NULL;
-    }
 
     D3D12_RESOURCE_DESC resourceDesc2 = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(resourceDesc2);
@@ -3857,6 +3867,8 @@ HRESULT AllocatorPimpl::AllocateMemory(
     const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
     Allocation** ppAllocation)
 {
+    *ppAllocation = NULL;
+
     if(pAllocDesc->HeapType != D3D12_HEAP_TYPE_DEFAULT &&
         pAllocDesc->HeapType != D3D12_HEAP_TYPE_UPLOAD &&
         pAllocDesc->HeapType != D3D12_HEAP_TYPE_READBACK)
@@ -3906,6 +3918,44 @@ HRESULT AllocatorPimpl::AllocateMemory(
 
         return AllocateHeap(&finalAllocDesc, *pAllocInfo, ppAllocation);
     }
+}
+
+HRESULT AllocatorPimpl::CreateAliasingResource(
+    Allocation* pAllocation,
+    UINT64 AllocationLocalOffset,
+    const D3D12_RESOURCE_DESC* pResourceDesc,
+    D3D12_RESOURCE_STATES InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+    REFIID riidResource,
+    void** ppvResource)
+{
+    *ppvResource = NULL;
+
+    D3D12_RESOURCE_DESC resourceDesc2 = *pResourceDesc;
+    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(resourceDesc2);
+    resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
+    D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
+    D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
+
+    ID3D12Heap* const existingHeap = pAllocation->GetHeap();
+    const UINT64 existingOffset = pAllocation->GetOffset();
+    const UINT64 existingSize = pAllocation->GetSize();
+    const UINT64 newOffset = existingOffset + AllocationLocalOffset;
+
+    if(AllocationLocalOffset + resAllocInfo.SizeInBytes > existingSize ||
+        newOffset % resAllocInfo.Alignment != 0)
+    {
+        return E_INVALIDARG;
+    }
+
+    return m_Device->CreatePlacedResource(
+        existingHeap,
+        newOffset,
+        &resourceDesc2,
+        InitialResourceState,
+        pOptimizedClearValue,
+        riidResource,
+        ppvResource);
 }
 
 bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC& resourceDesc)
@@ -4877,6 +4927,24 @@ HRESULT Allocator::AllocateMemory(
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     return m_Pimpl->AllocateMemory(pAllocDesc, pAllocInfo, ppAllocation);
+}
+
+HRESULT Allocator::CreateAliasingResource(
+    Allocation* pAllocation,
+    UINT64 AllocationLocalOffset,
+    const D3D12_RESOURCE_DESC* pResourceDesc,
+    D3D12_RESOURCE_STATES InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+    REFIID riidResource,
+    void** ppvResource)
+{
+    if(!pAllocation || !pResourceDesc || riidResource == IID_NULL || !ppvResource)
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreateAliasingResource.");
+        return E_INVALIDARG;
+    }
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    return m_Pimpl->CreateAliasingResource(pAllocation, AllocationLocalOffset, pResourceDesc, InitialResourceState, pOptimizedClearValue, riidResource, ppvResource);
 }
 
 void Allocator::SetCurrentFrameIndex(UINT frameIndex)

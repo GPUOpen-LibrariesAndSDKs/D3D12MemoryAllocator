@@ -833,6 +833,37 @@ public:
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
 
+    /** \brief Creates a new resource in place of an existing allocation. This is useful for memory aliasing.
+
+    \param pAllocation Existing allocation indicating the memory where the new resource should be created.
+        It can be created using D3D12MA::Allocator::CreateResource and already have a resource bound to it,
+        or can be a raw memory allocated with D3D12MA::Allocator::AllocateMemory.
+        It must not be created as committed so that `ID3D12Heap` is available and not implicit.
+    \param AllocationLocalOffset Additional offset in bytes to be applied when allocating the resource.
+        Local from the start of `pAllocation`, not the beginning of the whole `ID3D12Heap`!
+        If the new resource should start from the beginning of the `pAllocation` it should be 0.
+    \param pResourceDesc Description of the new resource to be created.
+    \param InitialResourceState
+    \param pOptimizedClearValue
+    \param riidResource
+    \param[out] ppvResource Returns pointer to the new resource.
+        The resource is not bound with `pAllocation`.
+        This pointer must not be null - you must get the resource pointer and `Release` it when no longer needed.
+
+    Memory requirements of the new resource are checked for validation.
+    If its size exceeds the end of `pAllocation` or required alignment is not fulfilled
+    considering `pAllocation->GetOffset() + AllocationLocalOffset`, the function
+    returns `E_INVALIDARG`.
+    */
+    HRESULT CreateAliasingResource(
+        Allocation* pAllocation,
+        UINT64 AllocationLocalOffset,
+        const D3D12_RESOURCE_DESC* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        REFIID riidResource,
+        void** ppvResource);
+
     /** \brief Sets the index of the current frame.
 
     This function is used to set the frame index in the allocator when a new game frame begins.
@@ -858,6 +889,7 @@ public:
 
     /// Builds and returns statistics as a string in JSON format.
     /** @param[out] ppStatsString Must be freed using Allocator::FreeStatsString.
+    @param DetailedMap `TRUE` to include full list of allocations (can make the string quite long), `FALSE` to only return statistics.
     */
     void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap);
 

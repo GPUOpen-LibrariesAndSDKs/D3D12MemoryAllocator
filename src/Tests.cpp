@@ -449,9 +449,9 @@ static void TestAliasingMemory(const TestContext& ctx)
     CHECK_BOOL(allocPtr != NULL && allocPtr->GetHeap() != NULL);
 
     ID3D12Resource* resPtr = NULL;
-    CHECK_HR( ctx.device->CreatePlacedResource(
-        alloc->GetHeap(),
-        alloc->GetOffset(),
+    CHECK_HR( ctx.allocator->CreateAliasingResource(
+        alloc.get(),
+        0, // AllocationLocalOffset
         &resourceDesc1,
         D3D12_RESOURCE_STATE_COMMON,
         NULL, // pOptimizedClearValue
@@ -459,9 +459,9 @@ static void TestAliasingMemory(const TestContext& ctx)
     CComPtr<ID3D12Resource> res1(resPtr);
     CHECK_BOOL(resPtr != NULL);
 
-    CHECK_HR( ctx.device->CreatePlacedResource(
-        alloc->GetHeap(),
-        alloc->GetOffset(),
+    CHECK_HR( ctx.allocator->CreateAliasingResource(
+        alloc.get(),
+        0, // AllocationLocalOffset
         &resourceDesc2,
         D3D12_RESOURCE_STATE_COMMON,
         NULL, // pOptimizedClearValue
