@@ -451,12 +451,11 @@ struct ALLOCATION_DESC
     In most cases it can be 0.
     
     - If you use D3D12MA::Allocator::CreateResource(), you don't need to care.
-      In case of D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
-      necessary flag `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`, `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
+      Necessary flag `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`, `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
       or `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES` is added automatically.
-    - If you use D3D12MA::Allocator::AllocateMemory() and
-      D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
-      you must specify one of those `ALLOW_ONLY` flags. When it's `TIER_2`, you can leave it 0.
+    - If you use D3D12MA::Allocator::AllocateMemory(), you should specify one of those `ALLOW_ONLY` flags.
+      Except when you validate that D3D12MA::Allocator::GetD3D12Options()`.ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1` -
+      then you can leave it 0.
     - If configuration macro `D3D12MA_ALLOW_SHADER_ATOMICS` is set to 1 (which is the default),
       `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS` is added automatically wherever it might be needed.
     - You can specify additional flags if needed. Then the memory will always be allocated as
@@ -645,12 +644,11 @@ struct POOL_DESC
     D3D12_HEAP_TYPE HeapType;
     /** \brief Heap flags to be used when allocating heaps of this pool.
 
-    If ResourceHeapTier = 1, it must contain one of these values, depending on type
-    of resources you are going to create in this heap:
+    It should contain one of these values, depending on type of resources you are going to create in this heap:
     `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`.
-    If ResourceHeapTier = 2, it may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0.
+    Except if ResourceHeapTier = 2, then it may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0.
     
     If configuration macro `D3D12MA_ALLOW_SHADER_ATOMICS` is set to 1 (which is the default),
     `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS` is added automatically wherever it might be needed.
@@ -930,12 +928,12 @@ public:
     This function is similar to `ID3D12Device::CreateHeap`, but it may really assign
     part of a larger, existing heap to the allocation.
 
-    If ResourceHeapTier = 1, `heapFlags` must contain one of these values, depending on type
-    of resources you are going to create in this memory:
+    `pAllocDesc->heapFlags` should contain one of these values, depending on type of resources you are going to create in this memory:
     `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`.
-    If ResourceHeapTier = 2, `heapFlags` may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0.
+    Except if you validate that ResourceHeapTier = 2 - then `heapFlags`
+    may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0.
     Additional flags in `heapFlags` are allowed as well.
 
     `pAllocInfo->SizeInBytes` must be multiply of 64KB.
