@@ -2352,7 +2352,8 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
-    void AddStats(Stats& outpStats);
+    void AddStats(StatInfo& outStats);
+    void AddStats(Stats& outStats);
 
     void WriteBlockInfoToJson(JsonWriter& json);
 
@@ -3655,6 +3656,21 @@ HRESULT BlockVector::CreateBlock(UINT64 blockSize, size_t* pNewBlockIndex)
     return hr;
 }
 
+void BlockVector::AddStats(StatInfo& outStats)
+{
+    MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
+
+    for(size_t i = 0; i < m_Blocks.size(); ++i)
+    {
+        const NormalBlock* const pBlock = m_Blocks[i];
+        D3D12MA_ASSERT(pBlock);
+        D3D12MA_HEAVY_ASSERT(pBlock->Validate());
+        StatInfo blockStatInfo;
+        pBlock->m_pMetadata->CalcAllocationStatInfo(blockStatInfo);
+        AddStatInfo(outStats, blockStatInfo);
+    }
+}
+
 void BlockVector::AddStats(Stats& outStats)
 {
     const UINT heapTypeIndex = HeapTypeToIndex(m_HeapType);
@@ -3711,6 +3727,8 @@ public:
     AllocatorPimpl* GetAllocator() const { return m_Allocator; }
     const POOL_DESC& GetDesc() const { return m_Desc; }
     BlockVector* GetBlockVector() { return m_BlockVector; }
+    
+    void CalculateStats(StatInfo& outStats);
 
 private:
     friend class Allocator;
@@ -3723,6 +3741,17 @@ private:
 HRESULT PoolPimpl::Init()
 {
     return m_BlockVector->CreateMinBlocks();
+}
+
+void PoolPimpl::CalculateStats(StatInfo& outStats)
+{
+    memset(&outStats, 0, sizeof(outStats));
+    outStats.AllocationSizeMin = UINT64_MAX;
+    outStats.UnusedRangeSizeMin = UINT64_MAX;
+
+    m_BlockVector->AddStats(outStats);
+
+    PostProcessStatInfo(outStats);
 }
 
 PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
@@ -3764,9 +3793,16 @@ void Pool::Release()
     D3D12MA_DELETE(m_Pimpl->GetAllocator()->GetAllocs(), this);
 }
 
-POOL_DESC Pool::GetDesc()
+POOL_DESC Pool::GetDesc() const
 {
     return m_Pimpl->GetDesc();
+}
+
+void Pool::CalculateStats(StatInfo* pStats)
+{
+    D3D12MA_ASSERT(pStats);
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    m_Pimpl->CalculateStats(*pStats);
 }
 
 Pool::Pool(Allocator* allocator, const POOL_DESC &desc) :

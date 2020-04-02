@@ -422,6 +422,13 @@ static void TestCustomPools(const TestContext& ctx)
 
     D3D12MA::Allocation* allocPtr;
 
+    D3D12MA::StatInfo stats = {};
+    pool->CalculateStats(&stats);
+    CHECK_BOOL( stats.BlockCount == 1 );
+    CHECK_BOOL( stats.AllocationCount == 0 );
+    CHECK_BOOL( stats.UsedBytes == 0 );
+    CHECK_BOOL( stats.UnusedBytes == poolDesc.BlockSize );
+
     // # Create buffers 2x 5 MB
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -429,8 +436,9 @@ static void TestCustomPools(const TestContext& ctx)
     allocDesc.ExtraHeapFlags = (D3D12_HEAP_FLAGS)0xCDCDCDCD; // Should be ignored.
     allocDesc.HeapType = (D3D12_HEAP_TYPE)0xCDCDCDCD; // Should be ignored.
 
+    const UINT64 BUFFER_SIZE = 5 * MEGABYTE;
     D3D12_RESOURCE_DESC resDesc;
-    FillResourceDescForBuffer(resDesc, 5 * MEGABYTE);
+    FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
 
     AllocationUniquePtr allocs[4];
     for(uint32_t i = 0; i < 2; ++i)
@@ -442,6 +450,12 @@ static void TestCustomPools(const TestContext& ctx)
             __uuidof(ID3D12Resource), NULL) ); // riidResource, ppvResource
         allocs[i].reset(allocPtr);
     }
+
+    pool->CalculateStats(&stats);
+    CHECK_BOOL( stats.BlockCount == 1 );
+    CHECK_BOOL( stats.AllocationCount == 2 );
+    CHECK_BOOL( stats.UsedBytes == 2 * BUFFER_SIZE );
+    CHECK_BOOL( stats.UnusedBytes == poolDesc.BlockSize - stats.UsedBytes );
 
     // # NEVER_ALLOCATE and COMMITTED should fail
 
@@ -478,6 +492,12 @@ static void TestCustomPools(const TestContext& ctx)
             CHECK_BOOL( FAILED(hr) );
         }
     }
+
+    pool->CalculateStats(&stats);
+    CHECK_BOOL( stats.BlockCount == 2 );
+    CHECK_BOOL( stats.AllocationCount == 4 );
+    CHECK_BOOL( stats.UsedBytes == 4 * BUFFER_SIZE );
+    CHECK_BOOL( stats.UnusedBytes == stats.BlockCount * poolDesc.BlockSize - stats.UsedBytes );
 
     // # Make room, AllocateMemory, CreateAliasingResource
 

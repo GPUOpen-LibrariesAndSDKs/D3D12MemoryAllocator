@@ -382,6 +382,7 @@ class JsonWriter;
 
 class Pool;
 class Allocator;
+struct StatInfo;
 
 /// Pointer to custom callback function that allocates CPU memory.
 typedef void* (*ALLOCATE_FUNC_PTR)(size_t Size, size_t Alignment, void* pUserData);
@@ -700,7 +701,11 @@ public:
 
     These are the same parameters as passed to D3D12MA::Allocator::CreatePool.
     */
-    POOL_DESC GetDesc();
+    POOL_DESC GetDesc() const;
+
+    /** \brief Retrieves statistics from the current state of this pool.
+    */
+    void CalculateStats(StatInfo* pStats);
 
 private:
     friend class Allocator;
