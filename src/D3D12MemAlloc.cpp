@@ -3728,11 +3728,8 @@ class PoolPimpl
 {
 public:
     PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc);
-    ~PoolPimpl()
-    {
-        D3D12MA_DELETE(m_Allocator->GetAllocs(), m_BlockVector);
-    }
     HRESULT Init();
+    ~PoolPimpl();
 
     AllocatorPimpl* GetAllocator() const { return m_Allocator; }
     const POOL_DESC& GetDesc() const { return m_Desc; }
@@ -3740,34 +3737,25 @@ public:
     
     void CalculateStats(StatInfo& outStats);
 
+    void SetName(LPCWSTR Name);
+    LPCWSTR GetName() const { return m_Name; }
+
 private:
     friend class Allocator;
 
     AllocatorPimpl* m_Allocator; // Externally owned object.
     POOL_DESC m_Desc;
     BlockVector* m_BlockVector; // Owned object.
+    wchar_t* m_Name;
+
+    void FreeName();
 };
-
-HRESULT PoolPimpl::Init()
-{
-    return m_BlockVector->CreateMinBlocks();
-}
-
-void PoolPimpl::CalculateStats(StatInfo& outStats)
-{
-    ZeroMemory(&outStats, sizeof(outStats));
-    outStats.AllocationSizeMin = UINT64_MAX;
-    outStats.UnusedRangeSizeMin = UINT64_MAX;
-
-    m_BlockVector->AddStats(outStats);
-
-    PostProcessStatInfo(outStats);
-}
 
 PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
     m_Allocator(allocator),
     m_Desc(desc),
-    m_BlockVector(NULL)
+    m_BlockVector(NULL),
+    m_Name(NULL)
 {
     const bool explicitBlockSize = desc.BlockSize != 0;
     const UINT64 preferredBlockSize = explicitBlockSize ? desc.BlockSize : D3D12MA_DEFAULT_BLOCK_SIZE;
@@ -3787,6 +3775,49 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
         explicitBlockSize);
 }
 
+HRESULT PoolPimpl::Init()
+{
+    return m_BlockVector->CreateMinBlocks();
+}
+
+PoolPimpl::~PoolPimpl()
+{
+    FreeName();
+    D3D12MA_DELETE(m_Allocator->GetAllocs(), m_BlockVector);
+}
+
+void PoolPimpl::CalculateStats(StatInfo& outStats)
+{
+    ZeroMemory(&outStats, sizeof(outStats));
+    outStats.AllocationSizeMin = UINT64_MAX;
+    outStats.UnusedRangeSizeMin = UINT64_MAX;
+
+    m_BlockVector->AddStats(outStats);
+
+    PostProcessStatInfo(outStats);
+}
+
+void PoolPimpl::SetName(LPCWSTR Name)
+{
+    FreeName();
+
+    if(Name)
+    {
+        const size_t nameCharCount = wcslen(Name) + 1;
+        m_Name = D3D12MA_NEW_ARRAY(m_Allocator->GetAllocs(), WCHAR, nameCharCount);
+        memcpy(m_Name, Name, nameCharCount * sizeof(WCHAR));
+    }
+}
+
+void PoolPimpl::FreeName()
+{
+    if(m_Name)
+    {
+        const size_t nameCharCount = wcslen(m_Name) + 1;
+        D3D12MA_DELETE_ARRAY(m_Allocator->GetAllocs(), m_Name, nameCharCount);
+        m_Name = NULL;
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Public class Pool implementation
@@ -3813,6 +3844,17 @@ void Pool::CalculateStats(StatInfo* pStats)
     D3D12MA_ASSERT(pStats);
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     m_Pimpl->CalculateStats(*pStats);
+}
+
+void Pool::SetName(LPCWSTR Name)
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    m_Pimpl->SetName(Name);
+}
+
+LPCWSTR Pool::GetName() const
+{
+    return m_Pimpl->GetName();
 }
 
 Pool::Pool(Allocator* allocator, const POOL_DESC &desc) :

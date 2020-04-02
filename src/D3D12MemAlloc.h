@@ -707,6 +707,23 @@ public:
     */
     void CalculateStats(StatInfo* pStats);
 
+    /** \brief Associates a name with the pool. This name is for use in debug diagnostics and tools.
+
+    Internal copy of the string is made, so the memory pointed by the argument can be
+    changed of freed immediately after this call.
+
+    `Name` can be NULL.
+    */
+    void SetName(LPCWSTR Name);
+
+    /** \brief Returns the name associated with the pool object.
+
+    Returned string points to an internal copy.
+
+    If no name was associated with the allocation, returns NULL.
+    */
+    LPCWSTR GetName() const;
+
 private:
     friend class Allocator;
     friend class AllocatorPimpl;

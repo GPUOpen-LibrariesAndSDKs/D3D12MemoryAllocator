@@ -436,6 +436,11 @@ static void TestCustomPools(const TestContext& ctx)
     CHECK_BOOL( poolStats.UsedBytes == 0 );
     CHECK_BOOL( poolStats.UnusedBytes == poolDesc.BlockSize );
 
+    // # SetName and GetName
+    static const wchar_t* NAME = L"Custom pool name 1";
+    pool->SetName(NAME);
+    CHECK_BOOL( wcscmp(pool->GetName(), NAME) == 0 );
+
     // # Create buffers 2x 5 MB
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
