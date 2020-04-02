@@ -300,7 +300,6 @@ Features planned for future releases:
 
 Near future: feature parity with [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/), including:
 
-- Custom memory pools
 - Alternative allocation algorithms: linear allocator, buddy allocator
 - JSON dump that can be visualized on a picture
 - Support for priorities using `ID3D12Device1::SetResidencyPriority`
@@ -423,8 +422,8 @@ typedef enum ALLOCATION_FLAGS
     If new allocation cannot be placed in any of the existing heaps, allocation
     fails with `E_OUTOFMEMORY` error.
 
-    You should not use #ALLOCATION_FLAG_COMMITTED and
-    #ALLOCATION_FLAG_NEVER_ALLOCATE at the same time. It makes no sense.
+    You should not use D3D12MA::ALLOCATION_FLAG_COMMITTED and
+    D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE at the same time. It makes no sense.
     */
     ALLOCATION_FLAG_NEVER_ALLOCATE = 0x2,
 
@@ -434,7 +433,7 @@ typedef enum ALLOCATION_FLAGS
     ALLOCATION_FLAG_WITHIN_BUDGET = 0x4,
 } ALLOCATION_FLAGS;
 
-/// \brief Parameters of created Allocation object. To be used with Allocator::CreateResource.
+/// \brief Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.
 struct ALLOCATION_DESC
 {
     /// Flags.
@@ -635,6 +634,7 @@ private:
     D3D12MA_CLASS_NO_COPY(Allocation)
 };
 
+/// \brief Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.
 struct POOL_DESC
 {
     /** \brief The type of memory heap where allocations of this pool should be placed.
@@ -664,7 +664,7 @@ struct POOL_DESC
     Then sizes of particular blocks may vary.
     */
     UINT64 BlockSize;
-    /** \brief Minimum number of heaps (memory blocks) to be always allocated in this pool, even if they stay empty.
+    /** \brief Minimum number of heaps (memory blocks) to be always allocated in this pool, even if they stay empty. Optional.
 
     Set to 0 to have no preallocated blocks and allow the pool be completely empty.
     */
@@ -679,10 +679,27 @@ struct POOL_DESC
     UINT MaxBlockCount;
 };
 
+/** \brief Custom memory pool
+
+Represents a separate set of heaps (memory blocks) that can be used to create
+D3D12MA::Allocation-s and resources in it. Usually there is no need to create custom
+pools - creating resources in default pool is sufficient.
+
+To create custom pool, fill D3D12MA::POOL_DESC and call D3D12MA::Allocator::CreatePool.
+*/
 class Pool
 {
 public:
+    /** \brief Deletes pool object, frees D3D12 heaps (memory blocks) managed by it. Allocations and resources must already be released!
+
+    It doesn't delete allocations and resources created in this pool. They must be all
+    released before calling this function!
+    */
     void Release();
+    /** \brief Returns copy of parameters of the pool.
+
+    These are the same parameters as passed to D3D12MA::Allocator::CreatePool.
+    */
     POOL_DESC GetDesc();
 
 private:
@@ -902,7 +919,7 @@ public:
     `pAllocInfo->SizeInBytes` must be multiply of 64KB.
     `pAllocInfo->Alignment` must be one of the legal values as described in documentation of `D3D12_HEAP_DESC`.
 
-    If you use #ALLOCATION_FLAG_COMMITTED you will get a separate memory block -
+    If you use D3D12MA::ALLOCATION_FLAG_COMMITTED you will get a separate memory block -
     a heap that always has offset 0.
     */
     HRESULT AllocateMemory(
@@ -941,6 +958,8 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
+    /** \brief Creates custom pool.
+    */
     HRESULT CreatePool(
         const POOL_DESC* pPoolDesc,
         Pool** ppPool);

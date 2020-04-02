@@ -3701,16 +3701,7 @@ void BlockVector::WriteBlockInfoToJson(JsonWriter& json)
 class PoolPimpl
 {
 public:
-    PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
-        m_Allocator(allocator),
-        m_Desc(desc),
-        m_BlockVector(D3D12MA_NEW(allocator->GetAllocs(), BlockVector)(
-            allocator, desc.HeapType, desc.HeapFlags,
-            desc.BlockSize != 0 ? desc.BlockSize : D3D12MA_DEFAULT_BLOCK_SIZE, // preferredBlockSize
-            desc.MinBlockCount, desc.MaxBlockCount,
-            desc.BlockSize != 0)) // explicitBlockSize
-    {
-    }
+    PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc);
     ~PoolPimpl()
     {
         D3D12MA_DELETE(m_Allocator->GetAllocs(), m_BlockVector);
@@ -3733,6 +3724,30 @@ HRESULT PoolPimpl::Init()
 {
     return m_BlockVector->CreateMinBlocks();
 }
+
+PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
+    m_Allocator(allocator),
+    m_Desc(desc),
+    m_BlockVector(NULL)
+{
+    const bool explicitBlockSize = desc.BlockSize != 0;
+    const UINT64 preferredBlockSize = explicitBlockSize ? desc.BlockSize : D3D12MA_DEFAULT_BLOCK_SIZE;
+
+    D3D12_HEAP_FLAGS heapFlags = desc.HeapFlags;
+#if D3D12MA_ALLOW_SHADER_ATOMICS
+    if(desc.HeapType == D3D12_HEAP_TYPE_DEFAULT)
+    {
+        heapFlags |= D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS;
+    }
+#endif
+
+    m_BlockVector = D3D12MA_NEW(allocator->GetAllocs(), BlockVector)(
+        allocator, desc.HeapType, heapFlags,
+        preferredBlockSize,
+        desc.MinBlockCount, desc.MaxBlockCount,
+        explicitBlockSize);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Public class Pool implementation
