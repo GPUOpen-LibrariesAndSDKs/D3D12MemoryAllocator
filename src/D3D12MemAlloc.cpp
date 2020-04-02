@@ -3341,104 +3341,100 @@ HRESULT BlockVector::AllocatePage(
     const bool canCreateNewBlock =
         ((createInfo.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0) &&
         (m_Blocks.size() < m_MaxBlockCount) &&
+        // Even if we don't have to stay within budget with this allocation, when the
+        // budget would be exceeded, we don't want to allocate new blocks, but always
+        // create resources as committed.
         freeMemory >= size;
 
+    // 1. Search existing allocations
+    {
+        // Forward order in m_Blocks - prefer blocks with smallest amount of free space.
+        for(size_t blockIndex = 0; blockIndex < m_Blocks.size(); ++blockIndex )
+        {
+            NormalBlock* const pCurrBlock = m_Blocks[blockIndex];
+            D3D12MA_ASSERT(pCurrBlock);
+            HRESULT hr = AllocateFromBlock(
+                pCurrBlock,
+                size,
+                alignment,
+                createInfo.Flags,
+                pAllocation);
+            if(SUCCEEDED(hr))
+            {
+                return hr;
+            }
+        }
+    }
+
+    // 2. Try to create new block.
     if(canCreateNewBlock)
     {
-        // 1. Search existing allocations. Try to allocate without making other allocations lost.
-        ALLOCATION_FLAGS allocFlagsCopy = createInfo.Flags;
+        // Calculate optimal size for new block.
+        UINT64 newBlockSize = m_PreferredBlockSize;
+        UINT newBlockSizeShift = 0;
+        const UINT NEW_BLOCK_SIZE_SHIFT_MAX = 3;
 
+        if(!m_ExplicitBlockSize)
         {
+            // Allocate 1/8, 1/4, 1/2 as first blocks.
+            const UINT64 maxExistingBlockSize = CalcMaxBlockSize();
+            for(UINT i = 0; i < NEW_BLOCK_SIZE_SHIFT_MAX; ++i)
             {
-                // Forward order in m_Blocks - prefer blocks with smallest amount of free space.
-                for(size_t blockIndex = 0; blockIndex < m_Blocks.size(); ++blockIndex )
+                const UINT64 smallerNewBlockSize = newBlockSize / 2;
+                if(smallerNewBlockSize > maxExistingBlockSize && smallerNewBlockSize >= size * 2)
                 {
-                    NormalBlock* const pCurrBlock = m_Blocks[blockIndex];
-                    D3D12MA_ASSERT(pCurrBlock);
-                    HRESULT hr = AllocateFromBlock(
-                        pCurrBlock,
-                        size,
-                        alignment,
-                        allocFlagsCopy,
-                        pAllocation);
-                    if(SUCCEEDED(hr))
-                    {
-                        return hr;
-                    }
+                    newBlockSize = smallerNewBlockSize;
+                    ++newBlockSizeShift;
+                }
+                else
+                {
+                    break;
                 }
             }
         }
 
-        // 2. Try to create new block.
-        if(canCreateNewBlock)
+        size_t newBlockIndex = 0;
+        HRESULT hr = newBlockSize <= freeMemory ?
+            CreateBlock(newBlockSize, &newBlockIndex) : E_OUTOFMEMORY;
+        // Allocation of this size failed? Try 1/2, 1/4, 1/8 of m_PreferredBlockSize.
+        if(!m_ExplicitBlockSize)
         {
-            // Calculate optimal size for new block.
-            UINT64 newBlockSize = m_PreferredBlockSize;
-            UINT newBlockSizeShift = 0;
-            const UINT NEW_BLOCK_SIZE_SHIFT_MAX = 3;
-
-            if(!m_ExplicitBlockSize)
+            while(FAILED(hr) && newBlockSizeShift < NEW_BLOCK_SIZE_SHIFT_MAX)
             {
-                // Allocate 1/8, 1/4, 1/2 as first blocks.
-                const UINT64 maxExistingBlockSize = CalcMaxBlockSize();
-                for(UINT i = 0; i < NEW_BLOCK_SIZE_SHIFT_MAX; ++i)
+                const UINT64 smallerNewBlockSize = newBlockSize / 2;
+                if(smallerNewBlockSize >= size)
                 {
-                    const UINT64 smallerNewBlockSize = newBlockSize / 2;
-                    if(smallerNewBlockSize > maxExistingBlockSize && smallerNewBlockSize >= size * 2)
-                    {
-                        newBlockSize = smallerNewBlockSize;
-                        ++newBlockSizeShift;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-            }
-
-            size_t newBlockIndex = 0;
-            HRESULT hr = newBlockSize <= freeMemory ?
-                CreateBlock(newBlockSize, &newBlockIndex) : E_OUTOFMEMORY;
-            // Allocation of this size failed? Try 1/2, 1/4, 1/8 of m_PreferredBlockSize.
-            if(!m_ExplicitBlockSize)
-            {
-                while(FAILED(hr) && newBlockSizeShift < NEW_BLOCK_SIZE_SHIFT_MAX)
-                {
-                    const UINT64 smallerNewBlockSize = newBlockSize / 2;
-                    if(smallerNewBlockSize >= size)
-                    {
-                        newBlockSize = smallerNewBlockSize;
-                        ++newBlockSizeShift;
-                        hr = newBlockSize <= freeMemory ?
-                            CreateBlock(newBlockSize, &newBlockIndex) : E_OUTOFMEMORY;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-            }
-
-            if(SUCCEEDED(hr))
-            {
-                NormalBlock* const pBlock = m_Blocks[newBlockIndex];
-                D3D12MA_ASSERT(pBlock->m_pMetadata->GetSize() >= size);
-
-                hr = AllocateFromBlock(
-                    pBlock,
-                    size,
-                    alignment,
-                    allocFlagsCopy,
-                    pAllocation);
-                if(SUCCEEDED(hr))
-                {
-                    return hr;
+                    newBlockSize = smallerNewBlockSize;
+                    ++newBlockSizeShift;
+                    hr = newBlockSize <= freeMemory ?
+                        CreateBlock(newBlockSize, &newBlockIndex) : E_OUTOFMEMORY;
                 }
                 else
                 {
-                    // Allocation from new block failed, possibly due to D3D12MA_DEBUG_MARGIN or alignment.
-                    return E_OUTOFMEMORY;
+                    break;
                 }
+            }
+        }
+
+        if(SUCCEEDED(hr))
+        {
+            NormalBlock* const pBlock = m_Blocks[newBlockIndex];
+            D3D12MA_ASSERT(pBlock->m_pMetadata->GetSize() >= size);
+
+            hr = AllocateFromBlock(
+                pBlock,
+                size,
+                alignment,
+                createInfo.Flags,
+                pAllocation);
+            if(SUCCEEDED(hr))
+            {
+                return hr;
+            }
+            else
+            {
+                // Allocation from new block failed, possibly due to D3D12MA_DEBUG_MARGIN or alignment.
+                return E_OUTOFMEMORY;
             }
         }
     }
