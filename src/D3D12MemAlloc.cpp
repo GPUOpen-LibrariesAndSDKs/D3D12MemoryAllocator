@@ -2334,7 +2334,7 @@ public:
     HRESULT Allocate(
         UINT64 size,
         UINT64 alignment,
-        const ALLOCATION_DESC& createInfo,
+        const ALLOCATION_DESC& allocDesc,
         size_t allocationCount,
         Allocation** pAllocations);
 
@@ -2385,7 +2385,7 @@ private:
     HRESULT AllocatePage(
         UINT64 size,
         UINT64 alignment,
-        const ALLOCATION_DESC& createInfo,
+        const ALLOCATION_DESC& allocDesc,
         Allocation** pAllocation);
 
     HRESULT AllocateFromBlock(
@@ -3302,7 +3302,7 @@ bool BlockVector::IsEmpty()
 HRESULT BlockVector::Allocate(
     UINT64 size,
     UINT64 alignment,
-    const ALLOCATION_DESC& createInfo,
+    const ALLOCATION_DESC& allocDesc,
     size_t allocationCount,
     Allocation** pAllocations)
 {
@@ -3316,7 +3316,7 @@ HRESULT BlockVector::Allocate(
             hr = AllocatePage(
                 size,
                 alignment,
-                createInfo,
+                allocDesc,
                 pAllocations + allocIndex);
             if(FAILED(hr))
             {
@@ -3341,7 +3341,7 @@ HRESULT BlockVector::Allocate(
 HRESULT BlockVector::AllocatePage(
     UINT64 size,
     UINT64 alignment,
-    const ALLOCATION_DESC& createInfo,
+    const ALLOCATION_DESC& allocDesc,
     Allocation** pAllocation)
 {
     // Early reject: requested allocation size is larger that maximum block size for this block vector.
@@ -3358,7 +3358,7 @@ HRESULT BlockVector::AllocatePage(
     }
 
     const bool canCreateNewBlock =
-        ((createInfo.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0) &&
+        ((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0) &&
         (m_Blocks.size() < m_MaxBlockCount) &&
         // Even if we don't have to stay within budget with this allocation, when the
         // budget would be exceeded, we don't want to allocate new blocks, but always
@@ -3376,7 +3376,7 @@ HRESULT BlockVector::AllocatePage(
                 pCurrBlock,
                 size,
                 alignment,
-                createInfo.Flags,
+                allocDesc.Flags,
                 pAllocation);
             if(SUCCEEDED(hr))
             {
@@ -3444,7 +3444,7 @@ HRESULT BlockVector::AllocatePage(
                 pBlock,
                 size,
                 alignment,
-                createInfo.Flags,
+                allocDesc.Flags,
                 pAllocation);
             if(SUCCEEDED(hr))
             {
