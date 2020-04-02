@@ -3343,7 +3343,7 @@ HRESULT BlockVector::Allocate(
         {
             Free(pAllocations[allocIndex]);
         }
-        memset(pAllocations, 0, sizeof(Allocation*) * allocationCount);
+        ZeroMemory(pAllocations, sizeof(Allocation*) * allocationCount);
     }
 
     return hr;
@@ -3755,7 +3755,7 @@ HRESULT PoolPimpl::Init()
 
 void PoolPimpl::CalculateStats(StatInfo& outStats)
 {
-    memset(&outStats, 0, sizeof(outStats));
+    ZeroMemory(&outStats, sizeof(outStats));
     outStats.AllocationSizeMin = UINT64_MAX;
     outStats.UnusedRangeSizeMin = UINT64_MAX;
 
@@ -4542,7 +4542,7 @@ void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
 void AllocatorPimpl::CalculateStats(Stats& outStats)
 {
     // Init stats
-    memset(&outStats, 0, sizeof(outStats));
+    ZeroMemory(&outStats, sizeof(outStats));
     outStats.Total.AllocationSizeMin = UINT64_MAX;
     outStats.Total.UnusedRangeSizeMin = UINT64_MAX;
     for(size_t i = 0; i < HEAP_TYPE_COUNT; i++)
