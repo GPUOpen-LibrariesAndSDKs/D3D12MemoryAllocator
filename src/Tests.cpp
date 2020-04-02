@@ -420,6 +420,8 @@ static void TestCustomPools(const TestContext& ctx)
     CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &poolPtr) );
     PoolUniquePtr pool{poolPtr};
 
+    D3D12MA::Allocation* allocPtr;
+
     // # Create buffers 2x 5 MB
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -433,7 +435,6 @@ static void TestCustomPools(const TestContext& ctx)
     AllocationUniquePtr allocs[4];
     for(uint32_t i = 0; i < 2; ++i)
     {
-        D3D12MA::Allocation* allocPtr;
         CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL, // pOptimizedClearValue
@@ -449,7 +450,6 @@ static void TestCustomPools(const TestContext& ctx)
         allocDesc.Flags = i == 0 ?
             D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE:
             D3D12MA::ALLOCATION_FLAG_COMMITTED;
-        D3D12MA::Allocation* allocPtr;
         const HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL, // pOptimizedClearValue
@@ -463,7 +463,6 @@ static void TestCustomPools(const TestContext& ctx)
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
     for(uint32_t i = 2; i < 5; ++i)
     {
-        D3D12MA::Allocation* allocPtr;
         HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL, // pOptimizedClearValue
@@ -479,6 +478,27 @@ static void TestCustomPools(const TestContext& ctx)
             CHECK_BOOL( FAILED(hr) );
         }
     }
+
+    // # Make room, AllocateMemory, CreateAliasingResource
+
+    allocs[3].reset();
+    allocs[0].reset();
+
+    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = {};
+    resAllocInfo.SizeInBytes = 5 * MEGABYTE;
+    resAllocInfo.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+
+    CHECK_HR( ctx.allocator->AllocateMemory(&allocDesc, &resAllocInfo, &allocPtr) );
+    allocs[0].reset(allocPtr);
+
+    resDesc.Width = 1 * MEGABYTE;
+    CComPtr<ID3D12Resource> res;
+    CHECK_HR( ctx.allocator->CreateAliasingResource(allocs[0].get(),
+        0, // AllocationLocalOffset
+        &resDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        NULL, // pOptimizedClearValue
+        IID_PPV_ARGS(&res)) );
 }
 
 static void TestAliasingMemory(const TestContext& ctx)
