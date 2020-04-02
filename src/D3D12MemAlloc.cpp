@@ -2510,6 +2510,7 @@ public:
 
 private:
     friend class Allocator;
+    friend class Pool;
 
     /*
     Heuristics that decides whether a resource should better be placed in its own,
@@ -2534,6 +2535,10 @@ private:
     typedef Vector<Allocation*> AllocationVectorType;
     AllocationVectorType* m_pCommittedAllocations[HEAP_TYPE_COUNT];
     D3D12MA_RW_MUTEX m_CommittedAllocationsMutex[HEAP_TYPE_COUNT];
+
+    typedef Vector<Pool*> PoolVectorType;
+    PoolVectorType* m_pPools[HEAP_TYPE_COUNT];
+    D3D12MA_RW_MUTEX m_PoolsMutex[HEAP_TYPE_COUNT];
 
     // Default pools.
     BlockVector* m_BlockVectors[DEFAULT_POOL_MAX_COUNT];
@@ -2583,6 +2588,11 @@ private:
     void RegisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
     // Unregisters Allocation object from m_pCommittedAllocations.
     void UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
+
+    // Registers Pool object in m_pPools.
+    void RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType);
+    // Unregisters Pool object from m_pPools.
+    void UnregisterPool(Pool* pool, D3D12_HEAP_TYPE heapType);
 
     HRESULT UpdateD3D12Budget();
     
@@ -3812,6 +3822,8 @@ Pool::Pool(Allocator* allocator, const POOL_DESC &desc) :
 
 Pool::~Pool()
 {
+    m_Pimpl->GetAllocator()->UnregisterPool(this, m_Pimpl->GetDesc().HeapType);
+
     D3D12MA_DELETE(m_Pimpl->GetAllocator()->GetAllocs(), m_Pimpl);
 }
 
@@ -3836,11 +3848,13 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
 
     ZeroMemory(m_pCommittedAllocations, sizeof(m_pCommittedAllocations));
+    ZeroMemory(m_pPools, sizeof(m_pPools));
     ZeroMemory(m_BlockVectors, sizeof(m_BlockVectors));
 
     for(UINT heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
         m_pCommittedAllocations[heapTypeIndex] = D3D12MA_NEW(GetAllocs(), AllocationVectorType)(GetAllocs());
+        m_pPools[heapTypeIndex] = D3D12MA_NEW(GetAllocs(), PoolVectorType)(GetAllocs());
     }
 
     m_Device->AddRef();
@@ -3904,6 +3918,16 @@ AllocatorPimpl::~AllocatorPimpl()
     for(UINT i = DEFAULT_POOL_MAX_COUNT; i--; )
     {
         D3D12MA_DELETE(GetAllocs(), m_BlockVectors[i]);
+    }
+
+    for(UINT i = HEAP_TYPE_COUNT; i--; )
+    {
+        if(m_pPools[i] && !m_pPools[i]->empty())
+        {
+            D3D12MA_ASSERT(0 && "Unfreed pools found!");
+        }
+
+        D3D12MA_DELETE(GetAllocs(), m_pPools[i]);
     }
 
     for(UINT i = HEAP_TYPE_COUNT; i--; )
@@ -4447,6 +4471,27 @@ void AllocatorPimpl::UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP
     D3D12MA_ASSERT(success);
 }
 
+void AllocatorPimpl::RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
+{
+    const UINT heapTypeIndex = HeapTypeToIndex(heapType);
+
+    MutexLockWrite lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
+    PoolVectorType* const pools = m_pPools[heapTypeIndex];
+    D3D12MA_ASSERT(pools);
+    pools->InsertSorted(pool, PointerLess());
+}
+
+void AllocatorPimpl::UnregisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
+{
+    const UINT heapTypeIndex = HeapTypeToIndex(heapType);
+
+    MutexLockWrite lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
+    PoolVectorType* const pools = m_pPools[heapTypeIndex];
+    D3D12MA_ASSERT(pools);
+    bool success = pools->RemoveSorted(pool, PointerLess());
+    D3D12MA_ASSERT(success);
+}
+
 void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
 {
     D3D12MA_ASSERT(allocation && allocation->m_PackedData.GetType() == Allocation::TYPE_COMMITTED);
@@ -4514,16 +4559,30 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
         pBlockVector->AddStats(outStats);
     }
 
-    // Process committed allocations.
-    for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
+    // Process custom pools
+    for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
-        StatInfo& heapStatInfo = outStats.HeapType[i];
-        MutexLockRead lock(m_CommittedAllocationsMutex[i], m_UseMutex);
-        const AllocationVectorType* const allocationVector = m_pCommittedAllocations[i];
-        D3D12MA_ASSERT(allocationVector);
-        for(size_t j = 0, count = allocationVector->size(); j < count; ++j)
+        StatInfo& heapStatInfo = outStats.HeapType[heapTypeIndex];
+        MutexLockRead lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
+        const PoolVectorType* const poolVector = m_pPools[heapTypeIndex];
+        D3D12MA_ASSERT(poolVector);
+        for(size_t poolIndex = 0, count = poolVector->size(); poolIndex < count; ++poolIndex)
         {
-            UINT64 size = (*allocationVector)[j]->GetSize();
+            Pool* pool = (*poolVector)[poolIndex];
+            pool->m_Pimpl->GetBlockVector()->AddStats(outStats);
+        }
+    }
+
+    // Process committed allocations.
+    for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
+    {
+        StatInfo& heapStatInfo = outStats.HeapType[heapTypeIndex];
+        MutexLockRead lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
+        const AllocationVectorType* const allocationVector = m_pCommittedAllocations[heapTypeIndex];
+        D3D12MA_ASSERT(allocationVector);
+        for(size_t allocIndex = 0, count = allocationVector->size(); allocIndex < count; ++allocIndex)
+        {
+            UINT64 size = (*allocationVector)[allocIndex]->GetSize();
             StatInfo statInfo = {};
             statInfo.BlockCount = 1;
             statInfo.AllocationCount = 1;
@@ -5175,7 +5234,11 @@ HRESULT Allocator::CreatePool(
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     *ppPool = D3D12MA_NEW(m_Pimpl->GetAllocs(), Pool)(this, *pPoolDesc);
     HRESULT hr = (*ppPool)->m_Pimpl->Init();
-    if(FAILED(hr))
+    if(SUCCEEDED(hr))
+    {
+        m_Pimpl->RegisterPool(*ppPool, pPoolDesc->HeapType);
+    }
+    else
     {
         D3D12MA_DELETE(m_Pimpl->GetAllocs(), *ppPool);
         *ppPool = NULL;

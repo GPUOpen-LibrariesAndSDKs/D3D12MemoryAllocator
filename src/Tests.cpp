@@ -407,6 +407,11 @@ static void TestCustomPools(const TestContext& ctx)
 {
     wprintf(L"Test custom pools\n");
 
+    // # Fetch global stats 1
+
+    D3D12MA::Stats globalStatsBeg = {};
+    ctx.allocator->CalculateStats(&globalStatsBeg);
+
     // # Create pool, 1..2 blocks of 11 MB
     
     D3D12MA::POOL_DESC poolDesc = {};
@@ -422,12 +427,14 @@ static void TestCustomPools(const TestContext& ctx)
 
     D3D12MA::Allocation* allocPtr;
 
-    D3D12MA::StatInfo stats = {};
-    pool->CalculateStats(&stats);
-    CHECK_BOOL( stats.BlockCount == 1 );
-    CHECK_BOOL( stats.AllocationCount == 0 );
-    CHECK_BOOL( stats.UsedBytes == 0 );
-    CHECK_BOOL( stats.UnusedBytes == poolDesc.BlockSize );
+    // # Validate stats for empty pool
+
+    D3D12MA::StatInfo poolStats = {};
+    pool->CalculateStats(&poolStats);
+    CHECK_BOOL( poolStats.BlockCount == 1 );
+    CHECK_BOOL( poolStats.AllocationCount == 0 );
+    CHECK_BOOL( poolStats.UsedBytes == 0 );
+    CHECK_BOOL( poolStats.UnusedBytes == poolDesc.BlockSize );
 
     // # Create buffers 2x 5 MB
 
@@ -451,11 +458,22 @@ static void TestCustomPools(const TestContext& ctx)
         allocs[i].reset(allocPtr);
     }
 
-    pool->CalculateStats(&stats);
-    CHECK_BOOL( stats.BlockCount == 1 );
-    CHECK_BOOL( stats.AllocationCount == 2 );
-    CHECK_BOOL( stats.UsedBytes == 2 * BUFFER_SIZE );
-    CHECK_BOOL( stats.UnusedBytes == poolDesc.BlockSize - stats.UsedBytes );
+    // # Validate pool stats now
+
+    pool->CalculateStats(&poolStats);
+    CHECK_BOOL( poolStats.BlockCount == 1 );
+    CHECK_BOOL( poolStats.AllocationCount == 2 );
+    CHECK_BOOL( poolStats.UsedBytes == 2 * BUFFER_SIZE );
+    CHECK_BOOL( poolStats.UnusedBytes == poolDesc.BlockSize - poolStats.UsedBytes );
+
+    // # Check that global stats are updated as well
+
+    D3D12MA::Stats globalStatsCurr = {};
+    ctx.allocator->CalculateStats(&globalStatsCurr);
+
+    CHECK_BOOL( globalStatsCurr.Total.AllocationCount == globalStatsBeg.Total.AllocationCount + poolStats.AllocationCount );
+    CHECK_BOOL( globalStatsCurr.Total.BlockCount == globalStatsBeg.Total.BlockCount + poolStats.BlockCount );
+    CHECK_BOOL( globalStatsCurr.Total.UsedBytes == globalStatsBeg.Total.UsedBytes + poolStats.UsedBytes );
 
     // # NEVER_ALLOCATE and COMMITTED should fail
 
@@ -493,11 +511,11 @@ static void TestCustomPools(const TestContext& ctx)
         }
     }
 
-    pool->CalculateStats(&stats);
-    CHECK_BOOL( stats.BlockCount == 2 );
-    CHECK_BOOL( stats.AllocationCount == 4 );
-    CHECK_BOOL( stats.UsedBytes == 4 * BUFFER_SIZE );
-    CHECK_BOOL( stats.UnusedBytes == stats.BlockCount * poolDesc.BlockSize - stats.UsedBytes );
+    pool->CalculateStats(&poolStats);
+    CHECK_BOOL( poolStats.BlockCount == 2 );
+    CHECK_BOOL( poolStats.AllocationCount == 4 );
+    CHECK_BOOL( poolStats.UsedBytes == 4 * BUFFER_SIZE );
+    CHECK_BOOL( poolStats.UnusedBytes == poolStats.BlockCount * poolDesc.BlockSize - poolStats.UsedBytes );
 
     // # Make room, AllocateMemory, CreateAliasingResource
 
