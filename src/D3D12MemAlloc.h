@@ -375,10 +375,14 @@ namespace D3D12MA
 
 /// \cond INTERNAL
 class AllocatorPimpl;
+class PoolPimpl;
 class NormalBlock;
 class BlockVector;
 class JsonWriter;
 /// \endcond
+
+class Pool;
+class Allocator;
 
 /// Pointer to custom callback function that allocates CPU memory.
 typedef void* (*ALLOCATE_FUNC_PTR)(size_t Size, size_t Alignment, void* pUserData);
@@ -438,6 +442,8 @@ struct ALLOCATION_DESC
     /** \brief The type of memory heap where the new allocation should be placed.
 
     It must be one of: `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`.
+
+    When D3D12MA::ALLOCATION_DESC::CustomPool != NULL this member is ignored.
     */
     D3D12_HEAP_TYPE HeapType;
     /** \brief Additional heap flags to be used when allocating memory.
@@ -455,8 +461,16 @@ struct ALLOCATION_DESC
       `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS` is added automatically wherever it might be needed.
     - You can specify additional flags if needed. Then the memory will always be allocated as
       separate block using `D3D12Device::CreateCommittedResource` or `CreateHeap`, not as part of an existing larget block.
+
+    When D3D12MA::ALLOCATION_DESC::CustomPool != NULL this member is ignored.
     */
     D3D12_HEAP_FLAGS ExtraHeapFlags;
+    /** \brief Custom pool to place the new resource in. Optional.
+
+    When not NULL, the resource will be created inside specified custom pool.
+    It will then never be created as committed.
+    */
+    Pool* CustomPool;
 };
 
 /** \brief Represents single memory allocation.
@@ -619,6 +633,69 @@ private:
     void FreeName();
 
     D3D12MA_CLASS_NO_COPY(Allocation)
+};
+
+struct POOL_DESC
+{
+    /** \brief The type of memory heap where allocations of this pool should be placed.
+
+    It must be one of: `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`.
+    */
+    D3D12_HEAP_TYPE HeapType;
+    /** \brief Heap flags to be used when allocating heaps of this pool.
+
+    If ResourceHeapTier = 1, it must contain one of these values, depending on type
+    of resources you are going to create in this heap:
+    `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`,
+    `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
+    `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`.
+    If ResourceHeapTier = 2, it may be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0.
+    
+    If configuration macro `D3D12MA_ALLOW_SHADER_ATOMICS` is set to 1 (which is the default),
+    `D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS` is added automatically wherever it might be needed.
+    
+    You can specify additional flags if needed.
+    */
+    D3D12_HEAP_FLAGS HeapFlags;
+    /** \brief Size of a single heap (memory block) to be allocated as part of this pool, in bytes. Optional.
+
+    Specify nonzero to set explicit, constant size of memory blocks used by this pool.
+    Leave 0 to use default and let the library manage block sizes automatically.
+    Then sizes of particular blocks may vary.
+    */
+    UINT64 BlockSize;
+    /** \brief Minimum number of heaps (memory blocks) to be always allocated in this pool, even if they stay empty.
+
+    Set to 0 to have no preallocated blocks and allow the pool be completely empty.
+    */
+    UINT MinBlockCount;
+    /** \brief Maximum number of heaps (memory blocks) that can be allocated in this pool. Optional.
+
+    Set to 0 to use default, which is `UINT64_MAX`, which means no limit.
+
+    Set to same value as D3D12MA::POOL_DESC::MinBlockCount to have fixed amount of memory allocated
+    throughout whole lifetime of this pool.
+    */
+    UINT MaxBlockCount;
+};
+
+class Pool
+{
+public:
+    void Release();
+    POOL_DESC GetDesc();
+
+private:
+    friend class Allocator;
+    friend class AllocatorPimpl;
+    template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
+
+    PoolPimpl* m_Pimpl;
+
+    Pool(Allocator* allocator, const POOL_DESC &desc);
+    ~Pool();
+
+    D3D12MA_CLASS_NO_COPY(Pool)
 };
 
 /// \brief Bit flags to be used with ALLOCATOR_DESC::Flags.
@@ -864,6 +941,10 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
+    HRESULT CreatePool(
+        const POOL_DESC* pPoolDesc,
+        Pool** ppPool);
+
     /** \brief Sets the index of the current frame.
 
     This function is used to set the frame index in the allocator when a new game frame begins.
@@ -899,6 +980,7 @@ public:
 private:
     friend HRESULT CreateAllocator(const ALLOCATOR_DESC*, Allocator**);
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
+    friend class Pool;
 
     Allocator(const ALLOCATION_CALLBACKS& allocationCallbacks, const ALLOCATOR_DESC& desc);
     ~Allocator();

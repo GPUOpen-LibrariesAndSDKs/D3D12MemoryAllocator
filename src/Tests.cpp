@@ -27,9 +27,12 @@
 extern ID3D12GraphicsCommandList* BeginCommandList();
 extern void EndCommandList(ID3D12GraphicsCommandList* cmdList);
 
-struct AllocationDeleter
+static constexpr UINT64 MEGABYTE = 1024 * 1024;
+
+template<typename T>
+struct D3d12maObjDeleter
 {
-    void operator()(D3D12MA::Allocation* obj) const
+    void operator()(T* obj) const
     {
         if(obj)
         {
@@ -38,7 +41,8 @@ struct AllocationDeleter
     }
 };
 
-typedef std::unique_ptr<D3D12MA::Allocation, AllocationDeleter> AllocationUniquePtr;
+typedef std::unique_ptr<D3D12MA::Allocation, D3d12maObjDeleter<D3D12MA::Allocation>> AllocationUniquePtr;
+typedef std::unique_ptr<D3D12MA::Pool, D3d12maObjDeleter<D3D12MA::Pool>> PoolUniquePtr;
 
 struct ResourceWithAllocation
 {
@@ -397,6 +401,84 @@ static void TestPlacedResources(const TestContext& ctx)
         &alloc,
         IID_PPV_ARGS(&renderTargetRes.resource)) );
     renderTargetRes.allocation.reset(alloc);
+}
+
+static void TestCustomPools(const TestContext& ctx)
+{
+    wprintf(L"Test custom pools\n");
+
+    // # Create pool, 1..2 blocks of 11 MB
+    
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.BlockSize = 11 * MEGABYTE;
+    poolDesc.MinBlockCount = 1;
+    poolDesc.MaxBlockCount = 2;
+
+    D3D12MA::Pool* poolPtr;
+    CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &poolPtr) );
+    PoolUniquePtr pool{poolPtr};
+
+    // # Create buffers 2x 5 MB
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.get();
+    allocDesc.ExtraHeapFlags = (D3D12_HEAP_FLAGS)0xCDCDCDCD; // Should be ignored.
+    allocDesc.HeapType = (D3D12_HEAP_TYPE)0xCDCDCDCD; // Should be ignored.
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, 5 * MEGABYTE);
+
+    AllocationUniquePtr allocs[4];
+    for(uint32_t i = 0; i < 2; ++i)
+    {
+        D3D12MA::Allocation* allocPtr;
+        CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            NULL, // pOptimizedClearValue
+            &allocPtr,
+            __uuidof(ID3D12Resource), NULL) ); // riidResource, ppvResource
+        allocs[i].reset(allocPtr);
+    }
+
+    // # NEVER_ALLOCATE and COMMITTED should fail
+
+    for(uint32_t i = 0; i < 2; ++i)
+    {
+        allocDesc.Flags = i == 0 ?
+            D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE:
+            D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        D3D12MA::Allocation* allocPtr;
+        const HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            NULL, // pOptimizedClearValue
+            &allocPtr,
+            __uuidof(ID3D12Resource), NULL); // riidResource, ppvResource
+        CHECK_BOOL( FAILED(hr) );
+    }
+
+    // # 3 more buffers. 3rd should fail.
+
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+    for(uint32_t i = 2; i < 5; ++i)
+    {
+        D3D12MA::Allocation* allocPtr;
+        HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            NULL, // pOptimizedClearValue
+            &allocPtr,
+            __uuidof(ID3D12Resource), NULL); // riidResource, ppvResource
+        if(i < 4)
+        {
+            CHECK_HR( hr );
+            allocs[i].reset(allocPtr);
+        }
+        else
+        {
+            CHECK_BOOL( FAILED(hr) );
+        }
+    }
 }
 
 static void TestAliasingMemory(const TestContext& ctx)
@@ -1002,6 +1084,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCommittedResourcesAndJson(ctx);
     TestCustomHeapFlags(ctx);
     TestPlacedResources(ctx);
+    TestCustomPools(ctx);
     TestAliasingMemory(ctx);
     TestMapping(ctx);
     TestStats(ctx);
