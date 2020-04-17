@@ -708,7 +708,7 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC& resourceDesc)
     UINT sizeX = (UINT)resourceDesc.Width;
     UINT sizeY = resourceDesc.Height;
     UINT bitsPerPixel = GetBitsPerPixel(resourceDesc.Format);
-    if (bitsPerPixel == 0)
+    if(bitsPerPixel == 0)
         return false;
 
     if(IsFormatCompressed(resourceDesc.Format))
