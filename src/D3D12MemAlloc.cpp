@@ -5193,29 +5193,29 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
 
 void Allocation::PackedData::SetType(Type type)
 {
-    const uint32_t u = (UINT)type;
+    const UINT u = (UINT)type;
     D3D12MA_ASSERT(u < (1u << 2));
     m_Type = u;
 }
 
 void Allocation::PackedData::SetResourceDimension(D3D12_RESOURCE_DIMENSION resourceDimension)
 {
-    const uint32_t u = (UINT)resourceDimension;
+    const UINT u = (UINT)resourceDimension;
     D3D12MA_ASSERT(u < (1u << 3));
     m_ResourceDimension = u;
 }
 
 void Allocation::PackedData::SetResourceFlags(D3D12_RESOURCE_FLAGS resourceFlags)
 {
-    const uint32_t u = (UINT)resourceFlags;
-    D3D12MA_ASSERT(u < (1u << 7));
+    const UINT u = (UINT)resourceFlags;
+    D3D12MA_ASSERT(u < (1u << 24));
     m_ResourceFlags = u;
 }
 
 void Allocation::PackedData::SetTextureLayout(D3D12_TEXTURE_LAYOUT textureLayout)
 {
-    const uint32_t u = (UINT)textureLayout;
-    D3D12MA_ASSERT(u < (1u << 2));
+    const UINT u = (UINT)textureLayout;
+    D3D12MA_ASSERT(u < (1u << 9));
     m_TextureLayout = u;
 }
 

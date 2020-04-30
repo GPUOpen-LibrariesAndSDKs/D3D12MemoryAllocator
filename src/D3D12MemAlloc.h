@@ -656,8 +656,8 @@ private:
     private:
         UINT m_Type : 2;               // enum Type
         UINT m_ResourceDimension : 3;  // enum D3D12_RESOURCE_DIMENSION
-        UINT m_ResourceFlags : 7;      // flags D3D12_RESOURCE_FLAGS
-        UINT m_TextureLayout : 2;      // enum D3D12_TEXTURE_LAYOUT
+        UINT m_ResourceFlags : 24;     // flags D3D12_RESOURCE_FLAGS
+        UINT m_TextureLayout : 9;      // enum D3D12_TEXTURE_LAYOUT
         UINT m_WasZeroInitialized : 1; // BOOL
     } m_PackedData;
 
