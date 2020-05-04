@@ -5012,7 +5012,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
             json.WriteString(L"DefaultPools");
             json.BeginObject();
 
-            D3D12MA_ASSERT(SupportsResourceHeapTier2());
             if (SupportsResourceHeapTier2())
             {
                 for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
