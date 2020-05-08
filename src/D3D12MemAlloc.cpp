@@ -4769,7 +4769,7 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     // Process custom pools
     for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
-        StatInfo& heapStatInfo = outStats.HeapType[heapTypeIndex];
+        //StatInfo& heapStatInfo = outStats.HeapType[heapTypeIndex];
         MutexLockRead lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
         const PoolVectorType* const poolVector = m_pPools[heapTypeIndex];
         D3D12MA_ASSERT(poolVector);
