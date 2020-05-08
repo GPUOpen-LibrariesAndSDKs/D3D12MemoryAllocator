@@ -2708,8 +2708,10 @@ bool BlockMetadata_Generic::Validate() const
             D3D12MA_VALIDATE(subAlloc.allocation->GetOffset() == subAlloc.offset);
             D3D12MA_VALIDATE(subAlloc.allocation->GetSize() == subAlloc.size);
 
+            #if (D3D12MA_DEBUG_MARGIN != 0)
             // Margin required between allocations - previous allocation must be free.
-            D3D12MA_VALIDATE(D3D12MA_DEBUG_MARGIN == 0 || prevFree);
+			D3D12MA_VALIDATE(prevFree);
+			#endif // D3D12MA_DEBUG_MARGIN
         }
 
         calculatedOffset += subAlloc.size;
