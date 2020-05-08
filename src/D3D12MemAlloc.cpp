@@ -134,7 +134,7 @@ static T* AllocateArray(const ALLOCATION_CALLBACKS& allocs, size_t count)
 #define D3D12MA_NEW_ARRAY(allocs, type, count) new(D3D12MA::AllocateArray<type>((allocs), (count)))(type)
 
 template<typename T>
-static void D3D12MA_DELETE(const ALLOCATION_CALLBACKS& allocs, T* memory)
+void D3D12MA_DELETE(const ALLOCATION_CALLBACKS& allocs, T* memory)
 {
     if(memory)
     {
