@@ -3643,6 +3643,8 @@ HRESULT BlockVector::AllocateFromBlock(
     ALLOCATION_FLAGS allocFlags,
     Allocation** pAllocation)
 {
+    (void)allocFlags; // unused variable
+    
     AllocationRequest currRequest = {};
     if(pBlock->m_pMetadata->CreateAllocationRequest(
         size,
@@ -4416,6 +4418,8 @@ HRESULT AllocatorPimpl::SetDefaultHeapMinBytes(
 
 bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC& resourceDesc)
 {
+    (void)resourceDesc; // unused variable
+    
     // Intentional. It may change in the future.
     return false;
 }
@@ -5279,6 +5283,8 @@ void Allocation::InitCommitted(D3D12_HEAP_TYPE heapType)
 
 void Allocation::InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block)
 {
+    (void)alignment; // unused variable
+    
     m_PackedData.SetType(TYPE_PLACED);
     m_Placed.offset = offset;
     m_Placed.block = block;
