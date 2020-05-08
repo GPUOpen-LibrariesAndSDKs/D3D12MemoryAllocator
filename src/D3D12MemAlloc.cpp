@@ -2951,11 +2951,10 @@ bool BlockMetadata_Generic::CheckAllocation(
     // Start from offset equal to beginning of this suballocation.
     *pOffset = suballoc.offset;
 
+    #if (D3D12MA_DEBUG_MARGIN > 0)
     // Apply D3D12MA_DEBUG_MARGIN at the beginning.
-    if(D3D12MA_DEBUG_MARGIN > 0)
-    {
-        *pOffset += D3D12MA_DEBUG_MARGIN;
-    }
+    *pOffset += D3D12MA_DEBUG_MARGIN;
+    #endif // D3D12MA_DEBUG_MARGIN
 
     // Apply alignment.
     *pOffset = AlignUp(*pOffset, allocAlignment);
