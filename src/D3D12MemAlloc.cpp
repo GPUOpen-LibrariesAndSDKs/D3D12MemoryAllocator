@@ -2710,8 +2710,8 @@ bool BlockMetadata_Generic::Validate() const
 
             #if (D3D12MA_DEBUG_MARGIN != 0)
             // Margin required between allocations - previous allocation must be free.
-			D3D12MA_VALIDATE(prevFree);
-			#endif // D3D12MA_DEBUG_MARGIN
+            D3D12MA_VALIDATE(prevFree);
+            #endif // D3D12MA_DEBUG_MARGIN
         }
 
         calculatedOffset += subAlloc.size;
