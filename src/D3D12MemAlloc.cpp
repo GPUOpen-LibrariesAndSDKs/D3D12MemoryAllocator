@@ -1212,9 +1212,9 @@ void JsonWriter::ContinueString(LPCWSTR pStr)
                     UINT hexDigit = (val & 0xF000) >> 12;
                     val <<= 4;
                     if (hexDigit < 10)
-                        m_SB.Add(L'0' + hexDigit);
+                        m_SB.Add(L'0' + (WCHAR)hexDigit);
                     else
-                        m_SB.Add(L'A' + hexDigit);
+                        m_SB.Add(L'A' + (WCHAR)hexDigit);
                 }
             }
             break;
