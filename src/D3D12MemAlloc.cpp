@@ -134,7 +134,7 @@ static T* AllocateArray(const ALLOCATION_CALLBACKS& allocs, size_t count)
 #define D3D12MA_NEW_ARRAY(allocs, type, count) new(D3D12MA::AllocateArray<type>((allocs), (count)))(type)
 
 template<typename T>
-static void D3D12MA_DELETE(const ALLOCATION_CALLBACKS& allocs, T* memory)
+void D3D12MA_DELETE(const ALLOCATION_CALLBACKS& allocs, T* memory)
 {
     if(memory)
     {
@@ -143,7 +143,7 @@ static void D3D12MA_DELETE(const ALLOCATION_CALLBACKS& allocs, T* memory)
     }
 }
 template<typename T>
-static void D3D12MA_DELETE_ARRAY(const ALLOCATION_CALLBACKS& allocs, T* memory, size_t count)
+void D3D12MA_DELETE_ARRAY(const ALLOCATION_CALLBACKS& allocs, T* memory, size_t count)
 {
     if(memory)
     {
@@ -1212,9 +1212,9 @@ void JsonWriter::ContinueString(LPCWSTR pStr)
                     UINT hexDigit = (val & 0xF000) >> 12;
                     val <<= 4;
                     if (hexDigit < 10)
-                        m_SB.Add(L'0' + hexDigit);
+                        m_SB.Add(L'0' + (WCHAR)hexDigit);
                     else
-                        m_SB.Add(L'A' + hexDigit);
+                        m_SB.Add(L'A' + (WCHAR)hexDigit);
                 }
             }
             break;
@@ -4765,7 +4765,6 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     // Process custom pools
     for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
-        StatInfo& heapStatInfo = outStats.HeapType[heapTypeIndex];
         MutexLockRead lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
         const PoolVectorType* const poolVector = m_pPools[heapTypeIndex];
         D3D12MA_ASSERT(poolVector);
