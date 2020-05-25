@@ -27,6 +27,11 @@ floatingpoint "Fast"
 files { "../src/*.h", "../src/*.cpp" }
 flags { "NoPCH", "FatalWarnings" }
 characterset "Unicode"
+warnings "Extra"
+disablewarnings "4127" -- conditional expression is constant
+disablewarnings "4100" -- unreferenced formal parameter
+disablewarnings "4324" -- structure was padded due to alignment specifier
+disablewarnings "4189" -- local variable is initialized but not referenced
 
 filter "configurations:Debug"
 defines { "_DEBUG", "DEBUG" }

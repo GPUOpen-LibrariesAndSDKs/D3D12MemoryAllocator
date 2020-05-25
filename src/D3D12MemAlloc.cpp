@@ -112,7 +112,9 @@ static void DefaultFree(void* pMemory, void* /*pUserData*/)
 
 static void* Malloc(const ALLOCATION_CALLBACKS& allocs, size_t size, size_t alignment)
 {
-    return (*allocs.pAllocate)(size, alignment, allocs.pUserData);
+    void* const result = (*allocs.pAllocate)(size, alignment, allocs.pUserData);
+    D3D12MA_ASSERT(result);
+    return result;
 }
 static void Free(const ALLOCATION_CALLBACKS& allocs, void* memory)
 {

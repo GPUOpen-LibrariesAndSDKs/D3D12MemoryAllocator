@@ -131,7 +131,6 @@ static void TestFrameIndexAndJson(const TestContext& ctx)
 
     const UINT BEGIN_INDEX = 10;
     const UINT END_INDEX = 20;
-    UINT frameIndex = 0;
     for (UINT frameIndex = BEGIN_INDEX; frameIndex < END_INDEX; ++frameIndex)
     {
         ctx.allocator->SetCurrentFrameIndex(frameIndex);

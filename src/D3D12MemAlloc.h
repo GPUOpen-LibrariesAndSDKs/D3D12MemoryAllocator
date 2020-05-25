@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-04-07)
+<b>Version 2.0.0-development</b> (2020-05-25)
 
 Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -339,7 +339,6 @@ Features planned for future releases:
 Near future: feature parity with [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/), including:
 
 - Alternative allocation algorithms: linear allocator, buddy allocator
-- JSON dump that can be visualized on a picture
 - Support for priorities using `ID3D12Device1::SetResidencyPriority`
 
 Later:
@@ -357,7 +356,17 @@ Features deliberately excluded from the scope of this library:
   `UPLOAD`, `DEFAULT`, `READBACK`.
 - Support for reserved (tiled) resources. We don't recommend using them.
 - Support for `ID3D12Device::Evict` and `MakeResident`. We don't recommend using them.
-
+- Handling CPU memory allocation failures. When dynamically creating small C++
+  objects in CPU memory (not the GPU memory), allocation failures are not
+  handled gracefully, because that would complicate code significantly and
+  is usually not needed in desktop PC applications anyway.
+  Success of an allocation is just checked with an assert.
+- Code free of any compiler warnings - especially those that would require complicating the code
+  just to please the compiler complaining about unused parameters, variables, or expressions being
+  constant in Relese configuration, e.g. because they are only used inside an assert.
+- This is a C++ library.
+  Bindings or ports to any other programming languages are welcomed as external projects and
+  are not going to be included into this repository.
 */
 
 // Define this macro to 0 to disable usage of DXGI 1.4 (needed for IDXGIAdapter3 and query for memory budget).
