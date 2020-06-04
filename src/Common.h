@@ -82,6 +82,8 @@ inline constexpr T AlignUp(T val, T align)
 
 static const float PI = 3.14159265358979323846264338327950288419716939937510582f;
 
+static const D3D12_RANGE EMPTY_RANGE = {0, 0};
+
 struct vec2
 {
     float x, y;
