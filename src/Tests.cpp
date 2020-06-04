@@ -677,7 +677,7 @@ static void TestMapping(const TestContext& ctx)
         resources[i].allocation.reset(alloc);
 
         void* mappedPtr = NULL;
-        CHECK_HR( resources[i].resource->Map(0, NULL, &mappedPtr) );
+        CHECK_HR( resources[i].resource->Map(0, &EMPTY_RANGE, &mappedPtr) );
 
         FillData(mappedPtr, bufSize, i);
 
@@ -849,7 +849,7 @@ static void TestTransfer(const TestContext& ctx)
     for(UINT i = 0; i < count; ++i)
     {
         void* mappedPtr = nullptr;
-        CHECK_HR( resourcesUpload[i].resource->Map(0, NULL, &mappedPtr) );
+        CHECK_HR( resourcesUpload[i].resource->Map(0, &EMPTY_RANGE, &mappedPtr) );
 
         FillData(mappedPtr, bufSize, i);
 
@@ -894,8 +894,7 @@ static void TestTransfer(const TestContext& ctx)
         // Unmap every 3rd resource, leave others mapped.
         if((i % 3) != 0)
         {
-            const D3D12_RANGE writtenRange = {0, 0};
-            resourcesReadback[i].resource->Unmap(0, &writtenRange);
+            resourcesReadback[i].resource->Unmap(0, &EMPTY_RANGE);
         }
     }
 }
@@ -927,7 +926,7 @@ static void TestZeroInitialized(const TestContext& ctx)
 
     {
         void* mappedPtr = nullptr;
-        CHECK_HR( bufUpload.resource->Map(0, NULL, &mappedPtr) );
+        CHECK_HR( bufUpload.resource->Map(0, &EMPTY_RANGE, &mappedPtr) );
         FillData(mappedPtr, bufSize, 5236245);
         bufUpload.resource->Unmap(0, NULL);
     }
@@ -959,10 +958,11 @@ static void TestZeroInitialized(const TestContext& ctx)
 
         bool isZero = false;
         {
+            const D3D12_RANGE readRange{0, bufSize}; // I could pass pReadRange = NULL but it generates D3D Debug layer warning: EXECUTION WARNING #930: MAP_INVALID_NULLRANGE
             void* mappedPtr = nullptr;
-            CHECK_HR( bufReadback.resource->Map(0, NULL, &mappedPtr) );
+            CHECK_HR( bufReadback.resource->Map(0, &readRange, &mappedPtr) );
             isZero = ValidateDataZero(mappedPtr, bufSize);
-            bufReadback.resource->Unmap(0, NULL);
+            bufReadback.resource->Unmap(0, &EMPTY_RANGE);
         }
 
         wprintf(L"Should be zero: %u, is zero: %u\n", shouldBeZero ? 1 : 0, isZero ? 1 : 0);
@@ -1087,7 +1087,7 @@ static void TestMultithreading(const TestContext& ctx)
                 res.allocation.reset(alloc);
                 
                 void* mappedPtr = nullptr;
-                CHECK_HR( res.resource->Map(0, NULL, &mappedPtr) );
+                CHECK_HR( res.resource->Map(0, &EMPTY_RANGE, &mappedPtr) );
 
                 FillData(mappedPtr, res.size, res.dataSeed);
 
@@ -1159,8 +1159,7 @@ static void TestMultithreading(const TestContext& ctx)
                 // Unmap some of them, leave others mapped.
                 if((resIndex % 3) == 1)
                 {
-                    D3D12_RANGE writtenRange = {0, 0};
-                    resources[resIndex].resource->Unmap(0, &writtenRange);
+                    resources[resIndex].resource->Unmap(0, &EMPTY_RANGE);
                 } 
 
                 resources.pop_back();

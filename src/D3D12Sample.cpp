@@ -282,7 +282,7 @@ inline UINT64 UpdateSubresources(
     }
 
     BYTE* pData;
-    HRESULT hr = pIntermediate->Map(0, NULL, reinterpret_cast<void**>(&pData));
+    HRESULT hr = pIntermediate->Map(0, &EMPTY_RANGE, reinterpret_cast<void**>(&pData));
     if (FAILED(hr))
     {
         return 0;
@@ -704,8 +704,7 @@ void InitD3D() // initializes direct3d 12
         cbvDesc.SizeInBytes = AlignUp<UINT>(sizeof(ConstantBuffer0_PS), 256);
         g_Device->CreateConstantBufferView(&cbvDesc, g_MainDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart());
 
-        D3D12_RANGE readRange{0, 0};
-        CHECK_HR( g_ConstantBufferUploadHeap[i]->Map(0, &readRange, &g_ConstantBufferAddress[i]) );
+        CHECK_HR( g_ConstantBufferUploadHeap[i]->Map(0, &EMPTY_RANGE, &g_ConstantBufferAddress[i]) );
     }
 
     // create input layout
@@ -1019,9 +1018,7 @@ void InitD3D() // initializes direct3d 12
             IID_PPV_ARGS(&g_CbPerObjectUploadHeaps[i])) );
         g_CbPerObjectUploadHeaps[i]->SetName(L"Constant Buffer Upload Resource Heap");
 
-        D3D12_RANGE readRange{0, 0};    // We do not intend to read from this resource on the CPU. (so end is less than or equal to begin)
-                                          // map the resource heap to get a gpu virtual address to the beginning of the heap
-        CHECK_HR( g_CbPerObjectUploadHeaps[i]->Map(0, &readRange, &g_CbPerObjectAddress[i]) );
+        CHECK_HR( g_CbPerObjectUploadHeaps[i]->Map(0, &EMPTY_RANGE, &g_CbPerObjectAddress[i]) );
     }
 
     // # TEXTURE
