@@ -43,6 +43,7 @@ struct D3d12maObjDeleter
 
 typedef std::unique_ptr<D3D12MA::Allocation, D3d12maObjDeleter<D3D12MA::Allocation>> AllocationUniquePtr;
 typedef std::unique_ptr<D3D12MA::Pool, D3d12maObjDeleter<D3D12MA::Pool>> PoolUniquePtr;
+typedef std::unique_ptr<D3D12MA::VirtualBlock, D3d12maObjDeleter<D3D12MA::VirtualBlock>> VirtualBlockUniquePtr;
 
 struct ResourceWithAllocation
 {
@@ -116,6 +117,127 @@ static bool ValidateDataZero(const void* ptr, const UINT64 sizeInBytes)
         }
     }
     return true;
+}
+
+static void TestVirtualBlocks(const TestContext& ctx)
+{
+    wprintf(L"Test virtual blocks\n");
+
+    using namespace D3D12MA;
+
+    const UINT64 blockSize = 16 * MEGABYTE;
+    const UINT64 alignment = 256;
+
+    // # Create block 16 MB
+
+    VirtualBlockUniquePtr block;
+    VirtualBlock* blockPtr = nullptr;
+    VIRTUAL_BLOCK_DESC blockDesc = {};
+    blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
+    blockDesc.Size = blockSize;
+    CHECK_HR( CreateVirtualBlock(&blockDesc, &blockPtr) );
+    CHECK_BOOL( blockPtr );
+    block.reset(blockPtr);
+
+    // # Allocate 8 MB
+
+    VIRTUAL_ALLOCATION_DESC allocDesc = {};
+    allocDesc.alignment = alignment;
+    allocDesc.pUserData = (void*)(uintptr_t)1;
+    allocDesc.size = 8 * MEGABYTE;
+    UINT64 alloc0Offset;
+    CHECK_HR( block->Allocate(&allocDesc, &alloc0Offset) );
+    CHECK_BOOL( alloc0Offset < blockSize );
+
+    // # Validate the allocation
+  
+    VIRTUAL_ALLOCATION_INFO allocInfo = {};
+    block->GetAllocationInfo(alloc0Offset, &allocInfo);
+    CHECK_BOOL( allocInfo.size == allocDesc.size );
+    CHECK_BOOL( allocInfo.pUserData == allocDesc.pUserData );
+
+    // # Check SetUserData
+
+    block->SetAllocationUserData(alloc0Offset, (void*)(uintptr_t)2);
+    block->GetAllocationInfo(alloc0Offset, &allocInfo);
+    CHECK_BOOL( allocInfo.pUserData == (void*)(uintptr_t)2 );
+
+    // # Allocate 4 MB
+
+    allocDesc.size = 4 * MEGABYTE;
+    allocDesc.alignment = alignment;
+    UINT64 alloc1Offset;
+    CHECK_HR( block->Allocate(&allocDesc, &alloc1Offset) );
+    CHECK_BOOL( alloc1Offset < blockSize );
+    CHECK_BOOL( alloc1Offset + 4 * MEGABYTE <= alloc0Offset || alloc0Offset + 8 * MEGABYTE <= alloc1Offset ); // Check if they don't overlap.
+
+    // # Allocate another 8 MB - it should fail
+
+    allocDesc.size = 8 * MEGABYTE;
+    allocDesc.alignment = alignment;
+    UINT64 alloc2Offset;
+    CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2Offset)) );
+    CHECK_BOOL( alloc2Offset == UINT64_MAX );
+
+    // # Free the 4 MB block. Now allocation of 8 MB should succeed.
+
+    block->FreeAllocation(alloc1Offset);
+    CHECK_HR( block->Allocate(&allocDesc, &alloc2Offset) );
+    CHECK_BOOL( alloc2Offset < blockSize );
+    CHECK_BOOL( alloc2Offset + 4 * MEGABYTE <= alloc0Offset || alloc0Offset + 8 * MEGABYTE <= alloc2Offset ); // Check if they don't overlap.
+
+    // # Calculate statistics
+
+    StatInfo statInfo = {};
+    block->CalculateStats(&statInfo);
+    CHECK_BOOL(statInfo.AllocationCount == 2);
+    CHECK_BOOL(statInfo.BlockCount == 1);
+    CHECK_BOOL(statInfo.UsedBytes == blockSize);
+    CHECK_BOOL(statInfo.UnusedBytes + statInfo.UsedBytes == blockSize);
+
+    // # Generate JSON dump
+
+    WCHAR* json = nullptr;
+    block->BuildStatsString(&json);
+    {
+        std::wstring str(json);
+        CHECK_BOOL( str.find(L"\"UserData\": 1") != std::wstring::npos );
+        CHECK_BOOL( str.find(L"\"UserData\": 2") != std::wstring::npos );
+    }
+    block->FreeStatsString(json);
+
+    // # Free alloc0, leave alloc2 unfreed.
+
+    block->FreeAllocation(alloc0Offset);
+
+    // # Test alignment
+
+    {
+        constexpr size_t allocCount = 10;
+        UINT64 allocOffset[allocCount] = {};
+        for(size_t i = 0; i < allocCount; ++i)
+        {
+            const bool alignment0 = i == allocCount - 1;
+            allocDesc.size = i * 3 + 15;
+            allocDesc.alignment = alignment0 ? 0 : 8;
+            CHECK_HR(block->Allocate(&allocDesc, &allocOffset[i]));
+            if(!alignment0)
+            {
+                CHECK_BOOL(allocOffset[i] % allocDesc.alignment == 0);
+            }
+        }
+
+        for(size_t i = allocCount; i--; )
+        {
+            block->FreeAllocation(allocOffset[i]);
+        }
+    }
+
+    // # Final cleanup
+
+    block->FreeAllocation(alloc2Offset);
+
+    //block->Clear();
 }
 
 static void TestFrameIndexAndJson(const TestContext& ctx)
@@ -1175,6 +1297,11 @@ static void TestMultithreading(const TestContext& ctx)
     }
 }
 
+static void TestGroupVirtual(const TestContext& ctx)
+{
+    TestVirtualBlocks(ctx);
+}
+
 static void TestGroupBasics(const TestContext& ctx)
 {
     TestFrameIndexAndJson(ctx);
@@ -1202,6 +1329,7 @@ void Test(const TestContext& ctx)
         return;
     }
 
+    TestGroupVirtual(ctx);
     TestGroupBasics(ctx);
 
     wprintf(L"TESTS END\n");

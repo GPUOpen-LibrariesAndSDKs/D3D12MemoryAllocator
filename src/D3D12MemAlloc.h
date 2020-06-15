@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-05-25)
+<b>Version 2.0.0-development</b> (2020-06-15)
 
 Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -425,6 +425,7 @@ class PoolPimpl;
 class NormalBlock;
 class BlockVector;
 class JsonWriter;
+class VirtualBlockPimpl;
 /// \endcond
 
 class Pool;
@@ -1074,10 +1075,10 @@ public:
     /** @param[out] ppStatsString Must be freed using Allocator::FreeStatsString.
     @param DetailedMap `TRUE` to include full list of allocations (can make the string quite long), `FALSE` to only return statistics.
     */
-    void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap);
+    void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap) const;
 
     /// Frees memory of a string returned from Allocator::BuildStatsString.
-    void FreeStatsString(WCHAR* pStatsString);
+    void FreeStatsString(WCHAR* pStatsString) const;
 
 private:
     friend HRESULT CreateAllocator(const ALLOCATOR_DESC*, Allocator**);
@@ -1092,11 +1093,133 @@ private:
     D3D12MA_CLASS_NO_COPY(Allocator)
 };
 
-/** \brief Creates new main Allocator object and returns it through `ppAllocator`.
+/// Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().
+struct VIRTUAL_BLOCK_DESC
+{
+    /** \brief Total size of the block.
+
+    Sizes can be expressed in bytes or any units you want as long as you are consistent in using them.
+    For example, if you allocate from some array of structures, 1 can mean single instance of entire structure.
+    */
+    UINT64 Size;
+    /** \brief Custom CPU memory allocation callbacks. Optional.
+
+    Optional, can be null. When specified, will be used for all CPU-side memory allocations.
+    */
+    const ALLOCATION_CALLBACKS* pAllocationCallbacks;
+};
+
+/// Parameters of created virtual allocation to be passed to VirtualBlock::Allocate().
+struct VIRTUAL_ALLOCATION_DESC
+{
+    /** \brief Size of the allocation.
+    
+    Cannot be zero.
+    */
+    UINT64 size;
+    /** \brief Required alignment of the allocation.
+    
+    Must be power of two. Special value 0 has the same meaning as 1 - means no special alignment is required, so allocation can start at any offset.
+    */
+    UINT64 alignment;
+    /** \brief Custom pointer to be associated with the allocation.
+
+    It can be fetched or changed later.
+    */
+    void* pUserData;
+};
+
+/// Parameters of an existing virtual allocation, returned by VirtualBlock::GetAllocationInfo().
+struct VIRTUAL_ALLOCATION_INFO
+{
+    /** \brief Size of the allocation.
+
+    Same value as passed in VIRTUAL_ALLOCATION_DESC::size.
+    */
+    UINT64 size;
+    /** \brief Custom pointer associated with the allocation.
+
+    Same value as passed in VIRTUAL_ALLOCATION_DESC::pUserData or VirtualBlock::SetAllocationUserData().
+    */
+    void* pUserData;
+};
+
+/** \brief Represents pure allocation algorithm and a data structure with allocations in some memory block, without actually allocating any GPU memory.
+
+This class allows to use the core algorithm of the library custom allocations e.g. CPU memory or
+sub-allocation regions inside a single GPU buffer.
+
+To create this object, fill in D3D12MA::VIRTUAL_BLOCK_DESC and call CreateVirtualBlock().
+To destroy it, call its method VirtualBlock::Release().
+*/
+class VirtualBlock
+{
+public:
+    /** \brief Destroys this object and frees it from memory.
+
+    You need to free all the allocations within this block or call Clear() before destroying it.
+    */
+    void Release();
+
+    /** \brief Returns true if the block is empty - contains 0 allocations.
+    */
+    BOOL IsEmpty() const;
+    /** \brief Returns information about an allocation at given offset - its size and custom pointer.
+    */
+    void GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO* pInfo) const;
+
+    /** \brief Creates new allocation.
+    \param pDesc
+    \param[out] pOffset Offset of the new allocation, which can also be treated as an unique identifier of the allocation within this block. `UINT64_MAX` if allocation failed.
+    \return `S_OK` if allocation succeeded, `E_OUTOFMEMORY` if it failed.
+    */
+    HRESULT Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOffset);
+    /** \brief Frees the allocation at given offset.
+    */
+    void FreeAllocation(UINT64 offset);
+    /** \brief Frees all the allocations.
+    */
+    void Clear();
+    /** \brief Changes custom pointer for an allocation at given offset to a new value.
+    */
+    void SetAllocationUserData(UINT64 offset, void* pUserData);
+
+    /** \brief Retrieves statistics from the current state of the block.
+    */
+    void CalculateStats(StatInfo* pInfo) const;
+
+    /** \brief Builds and returns statistics as a string in JSON format, including the list of allocations with their parameters.
+    @param[out] ppStatsString Must be freed using VirtualBlock::FreeStatsString.
+    */
+    void BuildStatsString(WCHAR** ppStatsString) const;
+
+    /** \brief Frees memory of a string returned from VirtualBlock::BuildStatsString.
+    */
+    void FreeStatsString(WCHAR* pStatsString) const;
+
+private:
+    friend HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC*, VirtualBlock**);
+    template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
+
+    VirtualBlockPimpl* m_Pimpl;
+
+    VirtualBlock(const ALLOCATION_CALLBACKS& allocationCallbacks, const VIRTUAL_BLOCK_DESC& desc);
+    ~VirtualBlock();
+
+    D3D12MA_CLASS_NO_COPY(VirtualBlock)
+};
+
+/** \brief Creates new main D3D12MA::Allocator object and returns it through `ppAllocator`.
 
 You normally only need to call it once and keep a single Allocator object for your `ID3D12Device`.
 */
 HRESULT CreateAllocator(const ALLOCATOR_DESC* pDesc, Allocator** ppAllocator);
+
+/** \brief Creates new D3D12MA::VirtualBlock object and returns it through `ppVirtualBlock`.
+
+Note you don't need to create D3D12MA::Allocator to use virtual blocks.
+*/
+HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC* pDesc, VirtualBlock** ppVirtualBlock);
 
 } // namespace D3D12MA
 

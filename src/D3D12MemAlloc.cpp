@@ -157,11 +157,11 @@ void D3D12MA_DELETE_ARRAY(const ALLOCATION_CALLBACKS& allocs, T* memory, size_t 
     }
 }
 
-static void SetupAllocationCallbacks(ALLOCATION_CALLBACKS& outAllocs, const ALLOCATOR_DESC& allocatorDesc)
+static void SetupAllocationCallbacks(ALLOCATION_CALLBACKS& outAllocs, const ALLOCATION_CALLBACKS* allocationCallbacks)
 {
-    if(allocatorDesc.pAllocationCallbacks)
+    if(allocationCallbacks)
     {
-        outAllocs = *allocatorDesc.pAllocationCallbacks;
+        outAllocs = *allocationCallbacks;
         D3D12MA_ASSERT(outAllocs.pAllocate != NULL && outAllocs.pFree != NULL);
     }
     else
@@ -1996,7 +1996,7 @@ struct Suballocation
 {
     UINT64 offset;
     UINT64 size;
-    Allocation* allocation;
+    void* userData;
     SuballocationType type;
 };
 
@@ -2106,18 +2106,21 @@ in a single ID3D12Heap memory block.
 class BlockMetadata
 {
 public:
-    BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks);
+    BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual);
     virtual ~BlockMetadata() { }
     virtual void Init(UINT64 size) { m_Size = size; }
 
     // Validates all data structures inside this object. If not valid, returns false.
     virtual bool Validate() const = 0;
     UINT64 GetSize() const { return m_Size; }
+    bool IsVirtual() const { return m_IsVirtual; }
     virtual size_t GetAllocationCount() const = 0;
     virtual UINT64 GetSumFreeSize() const = 0;
     virtual UINT64 GetUnusedRangeSizeMax() const = 0;
     // Returns true if this block is empty - contains only single free suballocation.
     virtual bool IsEmpty() const = 0;
+
+    virtual void GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const = 0;
 
     // Tries to find a place for suballocation with given parameters inside this block.
     // If succeeded, fills pAllocationRequest and returns true.
@@ -2131,11 +2134,14 @@ public:
     virtual void Alloc(
         const AllocationRequest& request,
         UINT64 allocSize,
-        Allocation* Allocation) = 0;
+        void* userData) = 0;
 
-    // Frees suballocation assigned to given memory region.
-    virtual void Free(const Allocation* allocation) = 0;
     virtual void FreeAtOffset(UINT64 offset) = 0;
+    // Frees all allocations.
+    // Careful! Don't call it if there are Allocation objects owned by pUserData of of cleared allocations!
+    virtual void Clear() = 0;
+
+    virtual void SetAllocationUserData(UINT64 offset, void* userData) = 0;
 
     virtual void CalcAllocationStatInfo(StatInfo& outInfo) const = 0;
     virtual void WriteAllocationInfoToJson(JsonWriter& json) const = 0;
@@ -2145,6 +2151,7 @@ protected:
 
 private:
     UINT64 m_Size;
+    bool m_IsVirtual;
     const ALLOCATION_CALLBACKS* m_pAllocationCallbacks;
 
     D3D12MA_CLASS_NO_COPY(BlockMetadata);
@@ -2153,7 +2160,7 @@ private:
 class BlockMetadata_Generic : public BlockMetadata
 {
 public:
-    BlockMetadata_Generic(const ALLOCATION_CALLBACKS* allocationCallbacks);
+    BlockMetadata_Generic(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual);
     virtual ~BlockMetadata_Generic();
     virtual void Init(UINT64 size);
 
@@ -2163,6 +2170,8 @@ public:
     virtual UINT64 GetUnusedRangeSizeMax() const;
     virtual bool IsEmpty() const;
 
+    virtual void GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const;
+
     virtual bool CreateAllocationRequest(
         UINT64 allocSize,
         UINT64 allocAlignment,
@@ -2171,10 +2180,12 @@ public:
     virtual void Alloc(
         const AllocationRequest& request,
         UINT64 allocSize,
-        Allocation* hAllocation);
+        void* userData);
 
-    virtual void Free(const Allocation* allocation);
     virtual void FreeAtOffset(UINT64 offset);
+    virtual void Clear();
+
+    virtual void SetAllocationUserData(UINT64 offset, void* userData);
 
     virtual void CalcAllocationStatInfo(StatInfo& outInfo) const;
     virtual void WriteAllocationInfoToJson(JsonWriter& json) const;
@@ -2617,8 +2628,9 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Private class BlockMetadata implementation
 
-BlockMetadata::BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks) :
+BlockMetadata::BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual) :
     m_Size(0),
+    m_IsVirtual(isVirtual),
     m_pAllocationCallbacks(allocationCallbacks)
 {
     D3D12MA_ASSERT(allocationCallbacks);
@@ -2627,8 +2639,8 @@ BlockMetadata::BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks) :
 ////////////////////////////////////////////////////////////////////////////////
 // Private class BlockMetadata_Generic implementation
 
-BlockMetadata_Generic::BlockMetadata_Generic(const ALLOCATION_CALLBACKS* allocationCallbacks) :
-    BlockMetadata(allocationCallbacks),
+BlockMetadata_Generic::BlockMetadata_Generic(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual) :
+    BlockMetadata(allocationCallbacks, isVirtual),
     m_FreeCount(0),
     m_SumFreeSize(0),
     m_Suballocations(*allocationCallbacks),
@@ -2653,7 +2665,7 @@ void BlockMetadata_Generic::Init(UINT64 size)
     suballoc.offset = 0;
     suballoc.size = size;
     suballoc.type = SUBALLOCATION_TYPE_FREE;
-    suballoc.allocation = NULL;
+    suballoc.userData = NULL;
 
     D3D12MA_ASSERT(size > MIN_FREE_SUBALLOCATION_SIZE_TO_REGISTER);
     m_Suballocations.push_back(suballoc);
@@ -2691,7 +2703,11 @@ bool BlockMetadata_Generic::Validate() const
         // Two adjacent free suballocations are invalid. They should be merged.
         D3D12MA_VALIDATE(!prevFree || !currFree);
 
-        D3D12MA_VALIDATE(currFree == (subAlloc.allocation == NULL));
+        const Allocation* const alloc = (Allocation*)subAlloc.userData;
+        if(!IsVirtual())
+        {
+            D3D12MA_VALIDATE(currFree == (alloc == NULL));
+        }
 
         if(currFree)
         {
@@ -2707,8 +2723,11 @@ bool BlockMetadata_Generic::Validate() const
         }
         else
         {
-            D3D12MA_VALIDATE(subAlloc.allocation->GetOffset() == subAlloc.offset);
-            D3D12MA_VALIDATE(subAlloc.allocation->GetSize() == subAlloc.size);
+            if(!IsVirtual())
+            {
+                D3D12MA_VALIDATE(alloc->GetOffset() == subAlloc.offset);
+                D3D12MA_VALIDATE(alloc->GetSize() == subAlloc.size);
+            }
 
             // Margin required between allocations - previous allocation must be free.
             D3D12MA_VALIDATE(D3D12MA_DEBUG_MARGIN == 0 || prevFree);
@@ -2761,6 +2780,23 @@ bool BlockMetadata_Generic::IsEmpty() const
     return (m_Suballocations.size() == 1) && (m_FreeCount == 1);
 }
 
+void BlockMetadata_Generic::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const
+{
+    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
+        suballocItem != m_Suballocations.cend();
+        ++suballocItem)
+    {
+        const Suballocation& suballoc = *suballocItem;
+        if(suballoc.offset == offset)
+        {
+            outInfo.size = suballoc.size;
+            outInfo.pUserData = suballoc.userData;
+            return;
+        }
+    }
+    D3D12MA_ASSERT(0 && "Not found!");
+}
+
 bool BlockMetadata_Generic::CreateAllocationRequest(
     UINT64 allocSize,
     UINT64 allocAlignment,
@@ -2810,7 +2846,7 @@ bool BlockMetadata_Generic::CreateAllocationRequest(
 void BlockMetadata_Generic::Alloc(
     const AllocationRequest& request,
     UINT64 allocSize,
-    Allocation* allocation)
+    void* userData)
 {
     D3D12MA_ASSERT(request.item != m_Suballocations.end());
     Suballocation& suballoc = *request.item;
@@ -2829,7 +2865,7 @@ void BlockMetadata_Generic::Alloc(
     suballoc.offset = request.offset;
     suballoc.size = allocSize;
     suballoc.type = SUBALLOCATION_TYPE_ALLOCATION;
-    suballoc.allocation = allocation;
+    suballoc.userData = userData;
 
     // If there are any free bytes remaining at the end, insert new free suballocation after current one.
     if(paddingEnd)
@@ -2872,23 +2908,6 @@ void BlockMetadata_Generic::Alloc(
     m_ZeroInitializedRange.MarkRangeAsUsed(request.offset, request.offset + allocSize);
 }
 
-void BlockMetadata_Generic::Free(const Allocation* allocation)
-{
-    for(SuballocationList::iterator suballocItem = m_Suballocations.begin();
-        suballocItem != m_Suballocations.end();
-        ++suballocItem)
-    {
-        Suballocation& suballoc = *suballocItem;
-        if(suballoc.allocation == allocation)
-        {
-            FreeSuballocation(suballocItem);
-            D3D12MA_HEAVY_ASSERT(Validate());
-            return;
-        }
-    }
-    D3D12MA_ASSERT(0 && "Not found!");
-}
-
 void BlockMetadata_Generic::FreeAtOffset(UINT64 offset)
 {
     for(SuballocationList::iterator suballocItem = m_Suballocations.begin();
@@ -2903,6 +2922,22 @@ void BlockMetadata_Generic::FreeAtOffset(UINT64 offset)
         }
     }
     D3D12MA_ASSERT(0 && "Not found!");
+}
+
+void BlockMetadata_Generic::Clear()
+{
+    m_FreeCount = 1;
+    m_SumFreeSize = GetSize();
+
+    m_Suballocations.clear();
+    Suballocation suballoc = {};
+    suballoc.offset = 0;
+    suballoc.size = GetSize();
+    suballoc.type = SUBALLOCATION_TYPE_FREE;
+    m_Suballocations.push_back(suballoc);
+
+    m_FreeSuballocationsBySize.clear();
+    m_FreeSuballocationsBySize.push_back(m_Suballocations.begin());
 }
 
 bool BlockMetadata_Generic::ValidateFreeSuballocationList() const
@@ -2997,7 +3032,7 @@ SuballocationList::iterator BlockMetadata_Generic::FreeSuballocation(Suballocati
     // Change this suballocation to be marked as free.
     Suballocation& suballoc = *suballocItem;
     suballoc.type = SUBALLOCATION_TYPE_FREE;
-    suballoc.allocation = NULL;
+    suballoc.userData = NULL;
 
     // Update totals.
     ++m_FreeCount;
@@ -3102,6 +3137,22 @@ void BlockMetadata_Generic::UnregisterFreeSuballocation(SuballocationList::itera
     //D3D12MA_HEAVY_ASSERT(ValidateFreeSuballocationList());
 }
 
+void BlockMetadata_Generic::SetAllocationUserData(UINT64 offset, void* userData)
+{
+    for(SuballocationList::iterator suballocItem = m_Suballocations.begin();
+        suballocItem != m_Suballocations.end();
+        ++suballocItem)
+    {
+        Suballocation& suballoc = *suballocItem;
+        if(suballoc.offset == offset)
+        {
+            suballoc.userData = userData;
+            return;
+        }
+    }
+    D3D12MA_ASSERT(0 && "Not found!");
+}
+
 void BlockMetadata_Generic::CalcAllocationStatInfo(StatInfo& outInfo) const
 {
     outInfo.BlockCount = 1;
@@ -3164,9 +3215,21 @@ void BlockMetadata_Generic::WriteAllocationInfoToJson(JsonWriter& json) const
             json.WriteString(L"Size");
             json.WriteNumber(suballoc.size);
         }
+        else if(IsVirtual())
+        {
+            json.WriteString(L"Type");
+            json.WriteString(L"ALLOCATION");
+            json.WriteString(L"Size");
+            json.WriteNumber(suballoc.size);
+            if(suballoc.userData)
+            {
+                json.WriteString(L"UserData");
+                json.WriteNumber((uintptr_t)suballoc.userData);
+            }
+        }
         else
         {
-            const Allocation* const alloc = suballoc.allocation;
+            const Allocation* const alloc = (const Allocation*)suballoc.userData;
             D3D12MA_ASSERT(alloc);
             json.AddAllocationToObject(*alloc);
         }
@@ -3212,7 +3275,7 @@ HRESULT NormalBlock::Init()
         return hr;
     }
     
-    m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_Generic)(&m_Allocator->GetAllocs());
+    m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_Generic)(&m_Allocator->GetAllocs(), false);
     m_pMetadata->Init(m_Size);
 
     return hr;
@@ -3501,7 +3564,7 @@ void BlockVector::Free(Allocation* hAllocation)
 
         NormalBlock* pBlock = hAllocation->m_Placed.block;
 
-        pBlock->m_pMetadata->Free(hAllocation);
+        pBlock->m_pMetadata->FreeAtOffset(hAllocation->GetOffset());
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
 
         const size_t blockCount = m_Blocks.size();
@@ -5481,14 +5544,14 @@ void Allocator::GetBudget(Budget* pGpuBudget, Budget* pCpuBudget)
     m_Pimpl->GetBudget(pGpuBudget, pCpuBudget);
 }
 
-void Allocator::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
+void Allocator::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap) const
 {
     D3D12MA_ASSERT(ppStatsString);
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
     m_Pimpl->BuildStatsString(ppStatsString, DetailedMap);
 }
 
-void Allocator::FreeStatsString(WCHAR* pStatsString)
+void Allocator::FreeStatsString(WCHAR* pStatsString) const
 {
     if (pStatsString != NULL)
     {
@@ -5496,6 +5559,169 @@ void Allocator::FreeStatsString(WCHAR* pStatsString)
         m_Pimpl->FreeStatsString(pStatsString);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class VirtualBlockPimpl definition
+
+class VirtualBlockPimpl
+{
+public:
+    const ALLOCATION_CALLBACKS m_AllocationCallbacks;
+    const UINT64 m_Size;
+    BlockMetadata_Generic m_Metadata;
+
+    VirtualBlockPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, UINT64 size);
+    ~VirtualBlockPimpl();
+};
+
+VirtualBlockPimpl::VirtualBlockPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, UINT64 size) :
+    m_AllocationCallbacks(allocationCallbacks),
+    m_Size(size),
+    m_Metadata(&m_AllocationCallbacks,
+        true) // isVirtual
+{
+    m_Metadata.Init(m_Size);
+}
+
+VirtualBlockPimpl::~VirtualBlockPimpl()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Public class VirtualBlock implementation
+
+VirtualBlock::VirtualBlock(const ALLOCATION_CALLBACKS& allocationCallbacks, const VIRTUAL_BLOCK_DESC& desc) :
+    m_Pimpl(D3D12MA_NEW(allocationCallbacks, VirtualBlockPimpl)(allocationCallbacks, desc.Size))
+{
+}
+
+VirtualBlock::~VirtualBlock()
+{
+    // THIS IS AN IMPORTANT ASSERT!
+    // Hitting it means you have some memory leak - unreleased allocations in this virtual block.
+    D3D12MA_ASSERT(m_Pimpl->m_Metadata.IsEmpty() && "Some allocations were not freed before destruction of this virtual block!");
+
+    D3D12MA_DELETE(m_Pimpl->m_AllocationCallbacks, m_Pimpl);
+}
+
+void VirtualBlock::Release()
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    // Copy is needed because otherwise we would call destructor and invalidate the structure with callbacks before using it to free memory.
+    const ALLOCATION_CALLBACKS allocationCallbacksCopy = m_Pimpl->m_AllocationCallbacks;
+    D3D12MA_DELETE(allocationCallbacksCopy, this);
+}
+
+BOOL VirtualBlock::IsEmpty() const
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    return m_Pimpl->m_Metadata.IsEmpty() ? TRUE : FALSE;
+}
+
+void VirtualBlock::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO* pInfo) const
+{
+    D3D12MA_ASSERT(offset != UINT64_MAX && pInfo);
+
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    m_Pimpl->m_Metadata.GetAllocationInfo(offset, *pInfo);
+}
+
+HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOffset)
+{
+    if(!pDesc || !pOffset || pDesc->size == 0 || !IsPow2(pDesc->alignment))
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to VirtualBlock::Allocate.");
+        return E_INVALIDARG;
+    }
+
+    *pOffset = UINT64_MAX;
+
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+        
+    const UINT64 alignment = pDesc->alignment != 0 ? pDesc->alignment : 1;
+    AllocationRequest allocRequest = {};
+    if(m_Pimpl->m_Metadata.CreateAllocationRequest(pDesc->size, alignment, &allocRequest))
+    {
+        m_Pimpl->m_Metadata.Alloc(allocRequest, pDesc->size, pDesc->pUserData);
+        D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
+        *pOffset = allocRequest.offset;
+        return S_OK;
+    }
+    else
+    {
+        return E_OUTOFMEMORY;
+    }
+}
+
+void VirtualBlock::FreeAllocation(UINT64 offset)
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    D3D12MA_ASSERT(offset != UINT64_MAX);
+        
+    m_Pimpl->m_Metadata.FreeAtOffset(offset);
+    D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
+}
+
+void VirtualBlock::Clear()
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    m_Pimpl->m_Metadata.Clear();
+    D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
+}
+
+void VirtualBlock::SetAllocationUserData(UINT64 offset, void* pUserData)
+{
+    D3D12MA_ASSERT(offset != UINT64_MAX);
+
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    m_Pimpl->m_Metadata.SetAllocationUserData(offset, pUserData);
+}
+
+void VirtualBlock::CalculateStats(StatInfo* pInfo) const
+{
+    D3D12MA_ASSERT(pInfo);
+
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
+    m_Pimpl->m_Metadata.CalcAllocationStatInfo(*pInfo);
+}
+
+void VirtualBlock::BuildStatsString(WCHAR** ppStatsString) const
+{
+    D3D12MA_ASSERT(ppStatsString);
+
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    StringBuilder sb(m_Pimpl->m_AllocationCallbacks);
+    {
+        JsonWriter json(m_Pimpl->m_AllocationCallbacks, sb);
+        D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
+        m_Pimpl->m_Metadata.WriteAllocationInfoToJson(json);
+    } // Scope for JsonWriter
+
+    const size_t length = sb.GetLength();
+    WCHAR* result = AllocateArray<WCHAR>(m_Pimpl->m_AllocationCallbacks, length + 1);
+    memcpy(result, sb.GetData(), length * sizeof(WCHAR));
+    result[length] = L'\0';
+    *ppStatsString = result;
+}
+
+void VirtualBlock::FreeStatsString(WCHAR* pStatsString) const
+{
+    if (pStatsString != NULL)
+    {
+        D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+        D3D12MA::Free(m_Pimpl->m_AllocationCallbacks, pStatsString);
+    }
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Public global functions
@@ -5512,7 +5738,7 @@ HRESULT CreateAllocator(const ALLOCATOR_DESC* pDesc, Allocator** ppAllocator)
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
     ALLOCATION_CALLBACKS allocationCallbacks;
-    SetupAllocationCallbacks(allocationCallbacks, *pDesc);
+    SetupAllocationCallbacks(allocationCallbacks, pDesc->pAllocationCallbacks);
 
     *ppAllocator = D3D12MA_NEW(allocationCallbacks, Allocator)(allocationCallbacks, *pDesc);
     HRESULT hr = (*ppAllocator)->m_Pimpl->Init(*pDesc);
@@ -5522,6 +5748,23 @@ HRESULT CreateAllocator(const ALLOCATOR_DESC* pDesc, Allocator** ppAllocator)
         *ppAllocator = NULL;
     }
     return hr;
+}
+
+HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC* pDesc, VirtualBlock** ppVirtualBlock)
+{
+    if(!pDesc || !ppVirtualBlock)
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to CreateVirtualBlock.");
+        return E_INVALIDARG;
+    }
+
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    ALLOCATION_CALLBACKS allocationCallbacks;
+    SetupAllocationCallbacks(allocationCallbacks, pDesc->pAllocationCallbacks);
+
+    *ppVirtualBlock = D3D12MA_NEW(allocationCallbacks, VirtualBlock)(allocationCallbacks, *pDesc);
+    return S_OK;
 }
 
 } // namespace D3D12MA
