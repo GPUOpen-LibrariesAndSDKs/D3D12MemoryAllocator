@@ -1116,12 +1116,12 @@ struct VIRTUAL_ALLOCATION_DESC
     
     Cannot be zero.
     */
-    UINT64 size;
+    UINT64 Size;
     /** \brief Required alignment of the allocation.
     
     Must be power of two. Special value 0 has the same meaning as 1 - means no special alignment is required, so allocation can start at any offset.
     */
-    UINT64 alignment;
+    UINT64 Alignment;
     /** \brief Custom pointer to be associated with the allocation.
 
     It can be fetched or changed later.

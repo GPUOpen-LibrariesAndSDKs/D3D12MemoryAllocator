@@ -5631,7 +5631,7 @@ void VirtualBlock::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO* pIn
 
 HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOffset)
 {
-    if(!pDesc || !pOffset || pDesc->size == 0 || !IsPow2(pDesc->alignment))
+    if(!pDesc || !pOffset || pDesc->Size == 0 || !IsPow2(pDesc->Alignment))
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to VirtualBlock::Allocate.");
         return E_INVALIDARG;
@@ -5641,11 +5641,11 @@ HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOf
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
         
-    const UINT64 alignment = pDesc->alignment != 0 ? pDesc->alignment : 1;
+    const UINT64 alignment = pDesc->Alignment != 0 ? pDesc->Alignment : 1;
     AllocationRequest allocRequest = {};
-    if(m_Pimpl->m_Metadata.CreateAllocationRequest(pDesc->size, alignment, &allocRequest))
+    if(m_Pimpl->m_Metadata.CreateAllocationRequest(pDesc->Size, alignment, &allocRequest))
     {
-        m_Pimpl->m_Metadata.Alloc(allocRequest, pDesc->size, pDesc->pUserData);
+        m_Pimpl->m_Metadata.Alloc(allocRequest, pDesc->Size, pDesc->pUserData);
         D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
         *pOffset = allocRequest.offset;
         return S_OK;

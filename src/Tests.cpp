@@ -142,9 +142,9 @@ static void TestVirtualBlocks(const TestContext& ctx)
     // # Allocate 8 MB
 
     VIRTUAL_ALLOCATION_DESC allocDesc = {};
-    allocDesc.alignment = alignment;
+    allocDesc.Alignment = alignment;
     allocDesc.pUserData = (void*)(uintptr_t)1;
-    allocDesc.size = 8 * MEGABYTE;
+    allocDesc.Size = 8 * MEGABYTE;
     UINT64 alloc0Offset;
     CHECK_HR( block->Allocate(&allocDesc, &alloc0Offset) );
     CHECK_BOOL( alloc0Offset < blockSize );
@@ -153,7 +153,7 @@ static void TestVirtualBlocks(const TestContext& ctx)
   
     VIRTUAL_ALLOCATION_INFO allocInfo = {};
     block->GetAllocationInfo(alloc0Offset, &allocInfo);
-    CHECK_BOOL( allocInfo.size == allocDesc.size );
+    CHECK_BOOL( allocInfo.size == allocDesc.Size );
     CHECK_BOOL( allocInfo.pUserData == allocDesc.pUserData );
 
     // # Check SetUserData
@@ -164,8 +164,8 @@ static void TestVirtualBlocks(const TestContext& ctx)
 
     // # Allocate 4 MB
 
-    allocDesc.size = 4 * MEGABYTE;
-    allocDesc.alignment = alignment;
+    allocDesc.Size = 4 * MEGABYTE;
+    allocDesc.Alignment = alignment;
     UINT64 alloc1Offset;
     CHECK_HR( block->Allocate(&allocDesc, &alloc1Offset) );
     CHECK_BOOL( alloc1Offset < blockSize );
@@ -173,8 +173,8 @@ static void TestVirtualBlocks(const TestContext& ctx)
 
     // # Allocate another 8 MB - it should fail
 
-    allocDesc.size = 8 * MEGABYTE;
-    allocDesc.alignment = alignment;
+    allocDesc.Size = 8 * MEGABYTE;
+    allocDesc.Alignment = alignment;
     UINT64 alloc2Offset;
     CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2Offset)) );
     CHECK_BOOL( alloc2Offset == UINT64_MAX );
@@ -218,12 +218,12 @@ static void TestVirtualBlocks(const TestContext& ctx)
         for(size_t i = 0; i < allocCount; ++i)
         {
             const bool alignment0 = i == allocCount - 1;
-            allocDesc.size = i * 3 + 15;
-            allocDesc.alignment = alignment0 ? 0 : 8;
+            allocDesc.Size = i * 3 + 15;
+            allocDesc.Alignment = alignment0 ? 0 : 8;
             CHECK_HR(block->Allocate(&allocDesc, &allocOffset[i]));
             if(!alignment0)
             {
-                CHECK_BOOL(allocOffset[i] % allocDesc.alignment == 0);
+                CHECK_BOOL(allocOffset[i] % allocDesc.Alignment == 0);
             }
         }
 
