@@ -49,6 +49,7 @@ static const bool ENABLE_DEBUG_LAYER = true;
 static const bool ENABLE_CPU_ALLOCATION_CALLBACKS = true;
 static const bool ENABLE_CPU_ALLOCATION_CALLBACKS_PRINT = false;
 static constexpr D3D12MA::ALLOCATOR_FLAGS g_AllocatorFlags = D3D12MA::ALLOCATOR_FLAG_NONE;
+static D3D12MA::ALLOCATION_CALLBACKS g_AllocationCallbacks = {}; // Used only when ENABLE_CPU_ALLOCATION_CALLBACKS
 
 static HINSTANCE g_Instance;
 static HWND g_Wnd;
@@ -422,13 +423,12 @@ void InitD3D() // initializes direct3d 12
         desc.pDevice = device;
         desc.pAdapter = adapter;
 
-        D3D12MA::ALLOCATION_CALLBACKS allocationCallbacks = {};
         if(ENABLE_CPU_ALLOCATION_CALLBACKS)
         {
-            allocationCallbacks.pAllocate = &CustomAllocate;
-            allocationCallbacks.pFree = &CustomFree;
-            allocationCallbacks.pUserData = CUSTOM_ALLOCATION_USER_DATA;
-            desc.pAllocationCallbacks = &allocationCallbacks;
+            g_AllocationCallbacks.pAllocate = &CustomAllocate;
+            g_AllocationCallbacks.pFree = &CustomFree;
+            g_AllocationCallbacks.pUserData = CUSTOM_ALLOCATION_USER_DATA;
+            desc.pAllocationCallbacks = &g_AllocationCallbacks;
         }
 
         CHECK_HR( D3D12MA::CreateAllocator(&desc, &g_Allocator) );
@@ -1373,6 +1373,7 @@ static void ExecuteTests()
     try
     {
         TestContext ctx = {};
+        ctx.allocationCallbacks = &g_AllocationCallbacks;
         ctx.device = g_Device;
         ctx.allocator = g_Allocator;
         ctx.allocatorFlags = g_AllocatorFlags;
