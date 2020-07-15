@@ -26,6 +26,7 @@ This library can help developers to manage memory allocations and resource creat
 
 Additional features:
 
+- Virtual allocator - possibility to use core allocation algorithm without using real GPU memory, to allocate your own stuff, e.g. sub-allocate pieces of one large buffer.
 - Well-documented - description of all classes and functions provided, along with chapters that contain general description and example code.
 - Thread-safety: Library is designed to be used in multithreaded code.
 - Configuration: Fill optional members of `ALLOCATOR_DESC` structure to provide custom CPU memory allocator and other parameters.

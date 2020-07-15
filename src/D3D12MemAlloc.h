@@ -1134,7 +1134,7 @@ struct VIRTUAL_ALLOCATION_INFO
 {
     /** \brief Size of the allocation.
 
-    Same value as passed in VIRTUAL_ALLOCATION_DESC::size.
+    Same value as passed in VIRTUAL_ALLOCATION_DESC::Size.
     */
     UINT64 size;
     /** \brief Custom pointer associated with the allocation.
