@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-06-15)
+<b>Version 2.0.0-development</b> (2020-07-16)
 
 Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -39,6 +39,7 @@ Documentation of all members: D3D12MemAlloc.h
         - [Creating resources](@ref quick_start_creating_resources)
         - [Mapping memory](@ref quick_start_mapping_memory)
     - \subpage reserving_memory
+    - \subpage virtual_allocator
 - \subpage configuration
   - [Custom CPU memory allocator](@ref custom_memory_allocator)
 - \subpage general_considerations
@@ -271,6 +272,158 @@ Some restrictions apply:
   to create additional heaps when necessary without checking if they will exceed the budget.
 - Resources created as committed don't count into the number of bytes compared with `MinBytes` set.
   Only placed resources are considered.
+
+
+\page virtual_allocator Virtual allocator
+
+As an extra feature, the core allocation algorithm of the library is exposed through a simple and convenient API of "virtual allocator".
+It doesn't allocate any real GPU memory. It just keeps track of used and free regions of a "virtual block".
+You can use it to allocate your own memory or other objects, even completely unrelated to D3D12.
+A common use case is sub-allocation of pieces of one large GPU buffer.
+
+\section virtual_allocator_creating_virtual_block Creating virtual block
+
+To use this functionality, there is no main "allocator" object.
+You don't need to have D3D12MA::Allocator object created.
+All you need to do is to create a separate D3D12MA::VirtualBlock object for each block of memory you want to be managed by the allocator:
+
+-# Fill in D3D12MA::ALLOCATOR_DESC structure.
+-# Call D3D12MA::CreateVirtualBlock. Get new D3D12MA::VirtualBlock object.
+
+Example:
+
+\code
+D3D12MA::VIRTUAL_BLOCK_DESC blockDesc = {};
+blockDesc.Size = 1048576; // 1 MB
+
+D3D12MA::VirtualBlock *block;
+HRESULT hr = CreateVirtualBlock(&blockDesc, &block);
+\endcode
+
+\section virtual_allocator_making_virtual_allocations Making virtual allocations
+
+D3D12MA::VirtualBlock object contains internal data structure that keeps track of free and occupied regions
+using the same code as the main D3D12 memory allocator.
+However, there is no "virtual allocation" object.
+When you request a new allocation, a `UINT64` number is returned.
+It is an offset inside the block where the allocation has been placed, but it also uniquely identifies the allocation within this block.
+
+In order to make an allocation:
+
+-# Fill in D3D12MA::VIRTUAL_ALLOCATION_DESC structure.
+-# Call D3D12MA::VirtualBlock::Allocate. Get new `UINT64 offset` that identifies the allocation.
+
+Example:
+
+\code
+D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
+allocDesc.Size = 4096; // 4 KB
+
+UINT64 allocOffset;
+hr = block->Allocate(&allocDesc, &allocOffset);
+if(SUCCEEDED(hr))
+{
+    // Use the 4 KB of your memory starting at allocOffset.
+}
+else
+{
+    // Allocation failed - no space for it could be found. Handle this error!
+}
+\endcode
+
+\section virtual_allocator_deallocation Deallocation
+
+When no longer needed, an allocation can be freed by calling D3D12MA::VirtualBlock::FreeAllocation.
+You can only pass to this function the exact offset that was previously returned by D3D12MA::VirtualBlock::Allocate
+and not any other location within the memory.
+
+When whole block is no longer needed, the block object can be released by calling D3D12MA::VirtualBlock::Release.
+All allocations must be freed before the block is destroyed, which is checked internally by an assert.
+However, if you don't want to call `block->FreeAllocation` for each allocation, you can use D3D12MA::VirtualBlock::Clear to free them all at once -
+a feature not available in normal D3D12 memory allocator. Example:
+
+\code
+block->FreeAllocation(allocOffset);
+block->Release();
+\endcode
+
+\section virtual_allocator_allocation_parameters Allocation parameters
+
+You can attach a custom pointer to each allocation by using D3D12MA::VirtualBlock::SetAllocationUserData.
+Its default value is `NULL`.
+It can be used to store any data that needs to be associated with that allocation - e.g. an index, a handle, or a pointer to some
+larger data structure containing more information. Example:
+
+\code
+struct CustomAllocData
+{
+    std::string m_AllocName;
+};
+CustomAllocData* allocData = new CustomAllocData();
+allocData->m_AllocName = "My allocation 1";
+block->SetAllocationUserData(allocOffset, allocData);
+\endcode
+
+The pointer can later be fetched, along with allocation size, by passing the allocation offset to function
+D3D12MA::VirtualBlock::GetAllocationInfo and inspecting returned structure D3D12MA::VIRTUAL_ALLOCATION_INFO.
+If you allocated a new object to be used as the custom pointer, don't forget to delete that object before freeing the allocation!
+Example:
+
+\code
+VIRTUAL_ALLOCATION_INFO allocInfo;
+block->GetAllocationInfo(allocOffset, &allocInfo);
+delete (CustomAllocData*)allocInfo.pUserData;
+
+block->FreeAllocation(allocOffset);
+\endcode
+
+\section virtual_allocator_alignment_and_units Alignment and units
+
+It feels natural to express sizes and offsets in bytes.
+If an offset of an allocation needs to be aligned to a multiply of some number (e.g. 4 bytes), you can fill optional member
+D3D12MA::VIRTUAL_ALLOCATION_DESC::Alignment to request it. Example:
+
+\code
+D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
+allocDesc.Size = 4096; // 4 KB
+allocDesc.Alignment = 4; // Returned offset must be a multiply of 4 B
+
+UINT64 allocOffset;
+hr = block->Allocate(&allocDesc, &allocOffset);
+\endcode
+
+Alignments of different allocations made from one block may vary.
+However, if all alignments and sizes are always multiply of some size e.g. 4 B or `sizeof(MyDataStruct)`,
+you can express all sizes, alignments, and offsets in multiples of that size instead of individual bytes.
+It might be more convenient, but you need to make sure to use this new unit consistently in all the places:
+
+- D3D12MA::VIRTUAL_BLOCK_DESC::Size
+- D3D12MA::VIRTUAL_ALLOCATION_DESC::Size and D3D12MA::VIRTUAL_ALLOCATION_DESC::Alignment
+- Using offset returned by D3D12MA::VirtualBlock::Allocate
+
+\section virtual_allocator_statistics Statistics
+
+You can obtain statistics of a virtual block using D3D12MA::VirtualBlock::CalculateStats.
+The function fills structure D3D12MA::StatInfo - same as used by the normal D3D12 memory allocator.
+Example:
+
+\code
+D3D12MA::StatInfo statInfo;
+block->CalculateStats(&statInfo);
+printf("My virtual block has %llu bytes used by %u virtual allocations\n",
+    statInfo.UsedBytes, statInfo.AllocationCount);
+\endcode
+
+You can also request a full list of allocations and free regions as a string in JSON format by calling
+D3D12MA::VirtualBlock::BuildStatsString.
+Returned string must be later freed using D3D12MA::VirtualBlock::FreeStatsString.
+The format of this string may differ from the one returned by the main D3D12 allocator, but it is similar.
+
+\section virtual_allocator_additional_considerations Additional considerations
+
+Note that the "virtual allocator" functionality is implemented on a level of individual memory blocks.
+Keeping track of a whole collection of blocks, allocating new ones when out of free space,
+deleting empty ones, and deciding which one to try first for a new allocation must be implemented by the user.
 
 
 \page configuration Configuration
