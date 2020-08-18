@@ -1221,7 +1221,7 @@ public:
     It is automatically destroyed when you destroy the allocation object.
 
     If 'ppvResource` is not null, you receive pointer to the resource next to allocation object.
-    Reference count of the resource object is then 2, so you need to manually `Release` it
+    Reference count of the resource object is then increased by calling `QueryInterface`, so you need to manually `Release` it
     along with the allocation.
 
     \param pAllocDesc   Parameters of the allocation.
@@ -1229,7 +1229,7 @@ public:
     \param InitialResourceState   Initial resource state.
     \param pOptimizedClearValue   Optional. Either null or optimized clear value.
     \param[out] ppAllocation   Filled with pointer to new allocation object created.
-    \param riidResource   IID of a resource to be created. Must be `__uuidof(ID3D12Resource)`.
+    \param riidResource   IID of a resource to be returned via `ppvResource`.
     \param[out] ppvResource   Optional. If not null, filled with pointer to new resouce created.
     */
     HRESULT CreateResource(

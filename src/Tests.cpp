@@ -524,6 +524,41 @@ static void TestPlacedResources(const TestContext& ctx)
     renderTargetRes.allocation.reset(alloc);
 }
 
+static void TestOtherComInterface(const TestContext& ctx)
+{
+    wprintf(L"Test other COM interface\n");
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, 0x10000);
+
+    for(uint32_t i = 0; i < 2; ++i)
+    {
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        if(i == 1)
+        {
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        }
+
+        D3D12MA::Allocation* alloc = nullptr;
+        CComPtr<ID3D12Pageable> pageable;
+        CHECK_HR(ctx.allocator->CreateResource(
+            &allocDesc,
+            &resDesc,
+            D3D12_RESOURCE_STATE_COMMON,
+            nullptr, // pOptimizedClearValue
+            &alloc,
+            IID_PPV_ARGS(&pageable)));
+
+        // Do something with the interface to make sure it's valid.
+        CComPtr<ID3D12Device> device;
+        CHECK_HR(pageable->GetDevice(IID_PPV_ARGS(&device)));
+        CHECK_BOOL(device == ctx.device);
+
+        alloc->Release();
+    }
+}
+
 static void TestCustomPools(const TestContext& ctx)
 {
     wprintf(L"Test custom pools\n");
@@ -1311,6 +1346,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCommittedResourcesAndJson(ctx);
     TestCustomHeapFlags(ctx);
     TestPlacedResources(ctx);
+    TestOtherComInterface(ctx);
     TestCustomPools(ctx);
     TestDefaultPoolMinBytes(ctx);
     TestAliasingMemory(ctx);

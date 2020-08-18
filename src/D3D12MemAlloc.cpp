@@ -29,6 +29,7 @@
     #endif
 #endif
 
+#include <combaseapi.h>
 #include <mutex>
 #include <atomic>
 #include <algorithm>
@@ -3634,15 +3635,21 @@ HRESULT BlockVector::CreateResource(
             &resourceDesc,
             InitialResourceState,
             pOptimizedClearValue,
-            riidResource,
-            (void**)&res);
+            IID_PPV_ARGS(&res));
         if(SUCCEEDED(hr))
         {
-            (*ppAllocation)->SetResource(res, &resourceDesc);
             if(ppvResource != NULL)
             {
-                res->AddRef();
-                *ppvResource = res;
+                hr = res->QueryInterface(riidResource, ppvResource);
+            }
+            if(SUCCEEDED(hr))
+            {
+                (*ppAllocation)->SetResource(res, &resourceDesc);
+            }
+            else
+            {
+                res->Release();
+                SAFE_RELEASE(*ppAllocation);
             }
         }
         else
@@ -4515,31 +4522,37 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = pAllocDesc->HeapType;
 
-    D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
+    const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
 
     ID3D12Resource* res = NULL;
     HRESULT hr = m_Device->CreateCommittedResource(
         &heapProps, heapFlags, pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, riidResource, (void**)&res);
+        pOptimizedClearValue, IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
-        const BOOL wasZeroInitialized = TRUE;
-        Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resAllocInfo.SizeInBytes, wasZeroInitialized);
-        alloc->InitCommitted(pAllocDesc->HeapType);
-        alloc->SetResource(res, pResourceDesc);
-
-        *ppAllocation = alloc;
         if(ppvResource != NULL)
         {
-            res->AddRef();
-            *ppvResource = res;
+            hr = res->QueryInterface(riidResource, ppvResource);
         }
+        if(SUCCEEDED(hr))
+        {
+            const BOOL wasZeroInitialized = TRUE;
+            Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resAllocInfo.SizeInBytes, wasZeroInitialized);
+            alloc->InitCommitted(pAllocDesc->HeapType);
+            alloc->SetResource(res, pResourceDesc);
 
-        RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
+            *ppAllocation = alloc;
 
-        const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
-        m_Budget.AddAllocation(heapTypeIndex, resAllocInfo.SizeInBytes);
-        m_Budget.m_BlockBytes[heapTypeIndex] += resAllocInfo.SizeInBytes;
+            RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
+
+            const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
+            m_Budget.AddAllocation(heapTypeIndex, resAllocInfo.SizeInBytes);
+            m_Budget.m_BlockBytes[heapTypeIndex] += resAllocInfo.SizeInBytes;
+        }
+        else
+        {
+            res->Release();
+        }
     }
     return hr;
 }
@@ -5359,8 +5372,7 @@ void Allocation::InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
 
 void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc)
 {
-    D3D12MA_ASSERT(m_Resource == NULL);
-    D3D12MA_ASSERT(pResourceDesc);
+    D3D12MA_ASSERT(m_Resource == NULL && pResourceDesc);
     m_Resource = resource;
     m_PackedData.SetResourceDimension(pResourceDesc->Dimension);
     m_PackedData.SetResourceFlags(pResourceDesc->Flags);
@@ -5435,7 +5447,7 @@ HRESULT Allocator::CreateResource(
     REFIID riidResource,
     void** ppvResource)
 {
-    if(!pAllocDesc || !pResourceDesc || !ppAllocation || riidResource == IID_NULL)
+    if(!pAllocDesc || !pResourceDesc || !ppAllocation)
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreateResource.");
         return E_INVALIDARG;
@@ -5474,7 +5486,7 @@ HRESULT Allocator::CreateAliasingResource(
     REFIID riidResource,
     void** ppvResource)
 {
-    if(!pAllocation || !pResourceDesc || riidResource == IID_NULL || !ppvResource)
+    if(!pAllocation || !pResourceDesc || !ppvResource)
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreateAliasingResource.");
         return E_INVALIDARG;
