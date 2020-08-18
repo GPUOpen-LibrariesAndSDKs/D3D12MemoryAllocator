@@ -26,6 +26,7 @@ This library can help developers to manage memory allocations and resource creat
 
 Additional features:
 
+- Support for resource aliasing (overlap).
 - Virtual allocator - possibility to use core allocation algorithm without using real GPU memory, to allocate your own stuff, e.g. sub-allocate pieces of one large buffer.
 - Well-documented - description of all classes and functions provided, along with chapters that contain general description and example code.
 - Thread-safety: Library is designed to be used in multithreaded code.

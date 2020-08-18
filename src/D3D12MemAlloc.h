@@ -38,6 +38,7 @@ Documentation of all members: D3D12MemAlloc.h
         - [Project setup](@ref quick_start_project_setup)
         - [Creating resources](@ref quick_start_creating_resources)
         - [Mapping memory](@ref quick_start_mapping_memory)
+    - \subpage resource_aliasing
     - \subpage reserving_memory
     - \subpage virtual_allocator
 - \subpage configuration
@@ -235,6 +236,120 @@ memcpy(mappedPtr, bufData, bufSize);
 
 resource->Unmap(0, NULL);
 \endcode
+
+
+\page resource_aliasing Resource aliasing (overlap)
+
+New explicit graphics APIs (Vulkan and Direct3D 12), thanks to manual memory
+management, give an opportunity to alias (overlap) multiple resources in the
+same region of memory - a feature not available in the old APIs (Direct3D 11, OpenGL).
+It can be useful to save video memory, but it must be used with caution.
+
+For example, if you know the flow of your whole render frame in advance, you
+are going to use some intermediate textures or buffers only during a small range of render passes,
+and you know these ranges don't overlap in time, you can create these resources in
+the same place in memory, even if they have completely different parameters (width, height, format etc.).
+
+![Resource aliasing (overlap)](../gfx/Aliasing.png)
+
+Such scenario is possible using D3D12MA, but you need to create your resources
+using special function D3D12MA::Allocator::CreateAliasingResource.
+Before that, you need to allocate memory with parameters calculated using formula:
+
+- allocation size = max(size of each resource)
+- allocation alignment = max(alignment of each resource)
+
+Following example shows two different textures created in the same place in memory,
+allocated to fit largest of them.
+
+\code
+D3D12_RESOURCE_DESC resDesc1 = {};
+resDesc1.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+resDesc1.Alignment = 0;
+resDesc1.Width = 1920;
+resDesc1.Height = 1080;
+resDesc1.DepthOrArraySize = 1;
+resDesc1.MipLevels = 1;
+resDesc1.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+resDesc1.SampleDesc.Count = 1;
+resDesc1.SampleDesc.Quality = 0;
+resDesc1.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+resDesc1.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+D3D12_RESOURCE_DESC resDesc2 = {};
+resDesc2.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+resDesc2.Alignment = 0;
+resDesc2.Width = 1024;
+resDesc2.Height = 1024;
+resDesc2.DepthOrArraySize = 1;
+resDesc2.MipLevels = 0;
+resDesc2.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+resDesc2.SampleDesc.Count = 1;
+resDesc2.SampleDesc.Quality = 0;
+resDesc2.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+resDesc2.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+const D3D12_RESOURCE_ALLOCATION_INFO allocInfo1 =
+    device->GetResourceAllocationInfo(0, 1, &resDesc1);
+const D3D12_RESOURCE_ALLOCATION_INFO allocInfo2 =
+    device->GetResourceAllocationInfo(0, 1, &resDesc2);
+
+D3D12_RESOURCE_ALLOCATION_INFO finalAllocInfo = {};
+finalAllocInfo.Alignment = std::max(allocInfo1.Alignment, allocInfo2.Alignment);
+finalAllocInfo.SizeInBytes = std::max(allocInfo1.SizeInBytes, allocInfo2.SizeInBytes);
+
+D3D12MA::ALLOCATION_DESC allocDesc = {};
+allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+
+D3D12MA::Allocation* alloc;
+hr = allocator->AllocateMemory(&allocDesc, &finalAllocInfo, &alloc);
+assert(alloc != NULL && alloc->GetHeap() != NULL);
+
+ID3D12Resource* res1;
+hr = allocator->CreateAliasingResource(
+    alloc,
+    0, // AllocationLocalOffset
+    &resDesc1,
+    D3D12_RESOURCE_STATE_COMMON,
+    NULL, // pOptimizedClearValue
+    IID_PPV_ARGS(&res1));
+
+ID3D12Resource* res2;
+hr = allocator->CreateAliasingResource(
+    alloc,
+    0, // AllocationLocalOffset
+    &resDesc2,
+    D3D12_RESOURCE_STATE_COMMON,
+    NULL, // pOptimizedClearValue
+    IID_PPV_ARGS(&res2));
+
+// You can use res1 and res2, but not at the same time!
+
+res2->Release();
+res1->Release();
+alloc->Release();
+\endcode
+
+Remember that using resouces that alias in memory requires proper synchronization.
+You need to issue a special barrier of type `D3D12_RESOURCE_BARRIER_TYPE_ALIASING`.
+You also need to treat a resource after aliasing as uninitialized - containing garbage data.
+For example, if you use `res1` and then want to use `res2`, you need to first initialize `res2`
+using either Clear, Discard, or Copy to the entire resource.
+
+Additional considerations:
+
+- D3D12 also allows to interpret contents of memory between aliasing resources consistently in some cases,
+  which is called "data inheritance". For details, see
+  Microsoft documentation, chapter [Memory Aliasing and Data Inheritance](https://docs.microsoft.com/en-us/windows/win32/direct3d12/memory-aliasing-and-data-inheritance).
+- You can create more complex layout where different textures and buffers are bound
+  at different offsets inside one large allocation. For example, one can imagine
+  a big texture used in some render passes, aliasing with a set of many small buffers
+  used in some further passes. To bind a resource at non-zero offset of an allocation,
+  call D3D12MA::Allocator::CreateAliasingResource with appropriate value of `AllocationLocalOffset` parameter.
+- Resources of the three categories: buffers, textures with `RENDER_TARGET` or `DEPTH_STENCIL` flags, and all other textures,
+  can be placed in the same memory only when `allocator->GetD3D12Options().ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2`.
+  Otherwise they must be placed in different memory heap types, and thus aliasing them is not possible.
 
 
 \page reserving_memory Reserving minimum amount of memory

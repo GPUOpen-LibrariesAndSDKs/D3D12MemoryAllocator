@@ -705,71 +705,74 @@ static void TestAliasingMemory(const TestContext& ctx)
 {
     wprintf(L"Test aliasing memory\n");
 
+    D3D12_RESOURCE_DESC resDesc1 = {};
+    resDesc1.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resDesc1.Alignment = 0;
+    resDesc1.Width = 1920;
+    resDesc1.Height = 1080;
+    resDesc1.DepthOrArraySize = 1;
+    resDesc1.MipLevels = 1;
+    resDesc1.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc1.SampleDesc.Count = 1;
+    resDesc1.SampleDesc.Quality = 0;
+    resDesc1.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc1.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    D3D12_RESOURCE_DESC resDesc2 = {};
+    resDesc2.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resDesc2.Alignment = 0;
+    resDesc2.Width = 1024;
+    resDesc2.Height = 1024;
+    resDesc2.DepthOrArraySize = 1;
+    resDesc2.MipLevels = 0;
+    resDesc2.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc2.SampleDesc.Count = 1;
+    resDesc2.SampleDesc.Quality = 0;
+    resDesc2.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc2.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    const D3D12_RESOURCE_ALLOCATION_INFO allocInfo1 =
+        ctx.device->GetResourceAllocationInfo(0, 1, &resDesc1);
+    const D3D12_RESOURCE_ALLOCATION_INFO allocInfo2 =
+        ctx.device->GetResourceAllocationInfo(0, 1, &resDesc2);
+
+    D3D12_RESOURCE_ALLOCATION_INFO finalAllocInfo = {};
+    finalAllocInfo.Alignment = std::max(allocInfo1.Alignment, allocInfo2.Alignment);
+    finalAllocInfo.SizeInBytes = std::max(allocInfo1.SizeInBytes, allocInfo2.SizeInBytes);
+
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
     allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
 
-    D3D12_RESOURCE_DESC resourceDesc1 = {};
-    resourceDesc1.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc1.Alignment = 0;
-    resourceDesc1.Width = 1920;
-    resourceDesc1.Height = 1080;
-    resourceDesc1.DepthOrArraySize = 1;
-    resourceDesc1.MipLevels = 1;
-    resourceDesc1.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    resourceDesc1.SampleDesc.Count = 1;
-    resourceDesc1.SampleDesc.Quality = 0;
-    resourceDesc1.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resourceDesc1.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    D3D12MA::Allocation* alloc = NULL;
+    CHECK_HR( ctx.allocator->AllocateMemory(&allocDesc, &finalAllocInfo, &alloc) );
+    CHECK_BOOL(alloc != NULL && alloc->GetHeap() != NULL);
 
-    D3D12_RESOURCE_DESC resourceDesc2 = {};
-    resourceDesc2.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc2.Alignment = 0;
-    resourceDesc2.Width = 1024;
-    resourceDesc2.Height = 1024;
-    resourceDesc2.DepthOrArraySize = 1;
-    resourceDesc2.MipLevels = 0;
-    resourceDesc2.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    resourceDesc2.SampleDesc.Count = 1;
-    resourceDesc2.SampleDesc.Quality = 0;
-    resourceDesc2.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resourceDesc2.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-
-    const D3D12_RESOURCE_ALLOCATION_INFO allocInfo1 = ctx.device->GetResourceAllocationInfo(0, 1, &resourceDesc1);
-    const D3D12_RESOURCE_ALLOCATION_INFO allocInfo2 = ctx.device->GetResourceAllocationInfo(0, 1, &resourceDesc2);
-
-    D3D12_RESOURCE_ALLOCATION_INFO allocInfo = {};
-    allocInfo.Alignment = std::max(allocInfo1.Alignment, allocInfo2.Alignment);
-    allocInfo.SizeInBytes = AlignUp(std::max(allocInfo1.SizeInBytes, allocInfo2.SizeInBytes), 64ull * 1024);
-
-    D3D12MA::Allocation* allocPtr = NULL;
-    CHECK_HR( ctx.allocator->AllocateMemory(
-        &allocDesc,
-        &allocInfo,
-        &allocPtr) );
-    AllocationUniquePtr alloc(allocPtr);
-    CHECK_BOOL(allocPtr != NULL && allocPtr->GetHeap() != NULL);
-
-    ID3D12Resource* resPtr = NULL;
+    ID3D12Resource* res1 = NULL;
     CHECK_HR( ctx.allocator->CreateAliasingResource(
-        alloc.get(),
+        alloc,
         0, // AllocationLocalOffset
-        &resourceDesc1,
+        &resDesc1,
         D3D12_RESOURCE_STATE_COMMON,
         NULL, // pOptimizedClearValue
-        IID_PPV_ARGS(&resPtr)) );
-    CComPtr<ID3D12Resource> res1(resPtr);
-    CHECK_BOOL(resPtr != NULL);
+        IID_PPV_ARGS(&res1)) );
+    CHECK_BOOL(res1 != NULL);
 
+    ID3D12Resource* res2 = NULL;
     CHECK_HR( ctx.allocator->CreateAliasingResource(
-        alloc.get(),
+        alloc,
         0, // AllocationLocalOffset
-        &resourceDesc2,
+        &resDesc2,
         D3D12_RESOURCE_STATE_COMMON,
         NULL, // pOptimizedClearValue
-        IID_PPV_ARGS(&resPtr)) );
-    CComPtr<ID3D12Resource> res2(resPtr);
-    CHECK_BOOL(resPtr != NULL);
+        IID_PPV_ARGS(&res2)) );
+    CHECK_BOOL(res2 != NULL);
+
+    // You can use res1 and res2, but not at the same time!
+
+    res2->Release();
+    res1->Release();
+    alloc->Release();
 }
 
 static void TestMapping(const TestContext& ctx)
