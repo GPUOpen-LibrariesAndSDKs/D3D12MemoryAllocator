@@ -812,17 +812,21 @@ public:
 
     /** \brief Returns offset in bytes from the start of memory heap.
 
-    If the Allocation represents committed resource with implicit heap, returns 0.
-
     You usually don't need to use this offset. If you create a buffer or a texture together with the allocation using function
     D3D12MA::Allocator::CreateResource, functions that operate on that resource refer to the beginning of the resource,
     not entire memory heap.
+
+    If the Allocation represents committed resource with implicit heap, returns 0.
     */
     UINT64 GetOffset() const;
 
-    /** \brief Returns size in bytes of the resource.
+    /** \brief Returns size in bytes of the allocation.
 
-    Works also with committed resources.
+    - If you created a buffer or a texture together with the allocation using function D3D12MA::Allocator::CreateResource,
+      this is the size of the resource returned by `ID3D12Device::GetResourceAllocationInfo`.
+    - For allocations made out of bigger memory blocks, this also is the size of the memory region assigned exclusively to this allocation.
+    - For resources created as committed, this value may not be accurate. DirectX implementation may optimize memory usage internally
+      so that you may even observe regions of `ID3D12Resource::GetGPUVirtualAddress()` + Allocation::GetSize() to overlap in memory and still work correctly.
     */
     UINT64 GetSize() const { return m_Size; }
 
