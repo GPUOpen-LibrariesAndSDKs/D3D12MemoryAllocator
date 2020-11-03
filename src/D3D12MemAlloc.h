@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2020-07-16)
+<b>Version 2.0.0-development</b> (2020-11-03)
 
 Copyright (c) 2019-2020 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -813,6 +813,10 @@ public:
     /** \brief Returns offset in bytes from the start of memory heap.
 
     If the Allocation represents committed resource with implicit heap, returns 0.
+
+    You usually don't need to use this offset. If you create a buffer or a texture together with the allocation using function
+    D3D12MA::Allocator::CreateResource, functions that operate on that resource refer to the beginning of the resource,
+    not entire memory heap.
     */
     UINT64 GetOffset() const;
 
@@ -1216,11 +1220,11 @@ public:
     whole library.
 
     If `ppvResource` is null, you receive only `ppAllocation` object from this function.
-    It holds pointer to `ID3D12Resource` that can be queried using function D3D12::Allocation::GetResource().
+    It holds pointer to `ID3D12Resource` that can be queried using function D3D12MA::Allocation::GetResource().
     Reference count of the resource object is 1.
     It is automatically destroyed when you destroy the allocation object.
 
-    If 'ppvResource` is not null, you receive pointer to the resource next to allocation object.
+    If `ppvResource` is not null, you receive pointer to the resource next to allocation object.
     Reference count of the resource object is then increased by calling `QueryInterface`, so you need to manually `Release` it
     along with the allocation.
 
@@ -1231,6 +1235,10 @@ public:
     \param[out] ppAllocation   Filled with pointer to new allocation object created.
     \param riidResource   IID of a resource to be returned via `ppvResource`.
     \param[out] ppvResource   Optional. If not null, filled with pointer to new resouce created.
+
+    \note This function creates a new resource. Sub-allocation of parts of one large buffer,
+    although recommended as a good practice, is out of scope of this library and could be implemented
+    by the user as a higher-level logic on top of it, e.g. using the \ref virtual_allocator feature.
     */
     HRESULT CreateResource(
         const ALLOCATION_DESC* pAllocDesc,
