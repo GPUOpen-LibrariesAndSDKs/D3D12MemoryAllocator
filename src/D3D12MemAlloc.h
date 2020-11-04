@@ -639,7 +639,11 @@ Features deliberately excluded from the scope of this library:
 
 // Define this macro to 0 to disable usage of DXGI 1.4 (needed for IDXGIAdapter3 and query for memory budget).
 #ifndef D3D12MA_DXGI_1_4
-    #define D3D12MA_DXGI_1_4 1
+    #ifdef __IDXGIAdapter3_INTERFACE_DEFINED__
+        #define D3D12MA_DXGI_1_4 1
+    #else
+        #define D3D12MA_DXGI_1_4 0
+    #endif
 #endif
 
 // If using this library on a platform different than Windows PC, you should
