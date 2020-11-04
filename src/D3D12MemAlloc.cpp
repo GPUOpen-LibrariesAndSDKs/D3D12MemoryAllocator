@@ -2725,6 +2725,8 @@ private:
     template<typename D3D12_RESOURCE_DESC_T>
     D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const;
 
+    bool NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size);
+
     // Writes object { } with data of given budget.
     static void WriteBudgetToJson(JsonWriter& json, const Budget& budget);
 };
@@ -4373,12 +4375,9 @@ HRESULT AllocatorPimpl::CreateResource(
         *ppvResource = NULL;
     }
 
-    if(pAllocDesc->CustomPool == NULL)
+    if(pAllocDesc->CustomPool == NULL && !IsHeapTypeValid(pAllocDesc->HeapType))
     {
-        if(!IsHeapTypeValid(pAllocDesc->HeapType))
-        {
-            return E_INVALIDARG;
-        }
+        return E_INVALIDARG;
     }
 
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
@@ -4554,12 +4553,9 @@ HRESULT AllocatorPimpl::CreateResource2(
         return E_NOINTERFACE;
     }
 
-    if(pAllocDesc->CustomPool == NULL)
+    if(pAllocDesc->CustomPool == NULL && !IsHeapTypeValid(pAllocDesc->HeapType))
     {
-        if(!IsHeapTypeValid(pAllocDesc->HeapType))
-        {
-            return E_INVALIDARG;
-        }
+        return E_INVALIDARG;
     }
 
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
@@ -4899,14 +4895,10 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         return E_OUTOFMEMORY;
     }
 
-    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0)
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0 &&
+        !NewAllocationWithinBudget(pAllocDesc->HeapType, resAllocInfo.SizeInBytes))
     {
-        Budget budget = {};
-        GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.UsageBytes + resAllocInfo.SizeInBytes > budget.BudgetBytes)
-        {
-            return E_OUTOFMEMORY;
-        }
+        return E_OUTOFMEMORY;
     }
 
     D3D12_HEAP_PROPERTIES heapProps = {};
@@ -4969,14 +4961,10 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
         return E_OUTOFMEMORY;
     }
 
-    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0)
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0 &&
+        !NewAllocationWithinBudget(pAllocDesc->HeapType, resAllocInfo.SizeInBytes))
     {
-        Budget budget = {};
-        GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.UsageBytes + resAllocInfo.SizeInBytes > budget.BudgetBytes)
-        {
-            return E_OUTOFMEMORY;
-        }
+        return E_OUTOFMEMORY;
     }
 
     D3D12_HEAP_PROPERTIES heapProps = {};
@@ -5040,14 +5028,10 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
         return E_OUTOFMEMORY;
     }
 
-    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0)
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0 &&
+        !NewAllocationWithinBudget(pAllocDesc->HeapType, resAllocInfo.SizeInBytes))
     {
-        Budget budget = {};
-        GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.UsageBytes + resAllocInfo.SizeInBytes > budget.BudgetBytes)
-        {
-            return E_OUTOFMEMORY;
-        }
+        return E_OUTOFMEMORY;
     }
 
     D3D12_HEAP_PROPERTIES heapProps = {};
@@ -5101,14 +5085,10 @@ HRESULT AllocatorPimpl::AllocateHeap(
         return E_OUTOFMEMORY;
     }
 
-    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0)
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0 &&
+        !NewAllocationWithinBudget(pAllocDesc->HeapType, allocInfo.SizeInBytes))
     {
-        Budget budget = {};
-        GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.UsageBytes + allocInfo.SizeInBytes > budget.BudgetBytes)
-        {
-            return E_OUTOFMEMORY;
-        }
+        return E_OUTOFMEMORY;
     }
 
     D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
@@ -5154,14 +5134,10 @@ HRESULT AllocatorPimpl::AllocateHeap1(
         return E_OUTOFMEMORY;
     }
 
-    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0)
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0 &&
+        !NewAllocationWithinBudget(pAllocDesc->HeapType, allocInfo.SizeInBytes))
     {
-        Budget budget = {};
-        GetBudgetForHeapType(budget, pAllocDesc->HeapType);
-        if(budget.UsageBytes + allocInfo.SizeInBytes > budget.BudgetBytes)
-        {
-            return E_OUTOFMEMORY;
-        }
+        return E_OUTOFMEMORY;
     }
 
     D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
@@ -5828,6 +5804,13 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
     return GetResourceAllocationInfoNative(inOutResourceDesc);
 }
 
+bool AllocatorPimpl::NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size)
+{
+    Budget budget = {};
+    GetBudgetForHeapType(budget, heapType);
+    return budget.UsageBytes + size <= budget.BudgetBytes;
+}
+
 void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
 {
     json.BeginObject();
@@ -6113,23 +6096,31 @@ HRESULT Allocator::CreateResource2(
         return E_INVALIDARG;
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-        return m_Pimpl->CreateResource2(pAllocDesc, pResourceDesc, InitialResourceState, pOptimizedClearValue, pProtectedSession, ppAllocation, riidResource, ppvResource);
+    return m_Pimpl->CreateResource2(pAllocDesc, pResourceDesc, InitialResourceState, pOptimizedClearValue, pProtectedSession, ppAllocation, riidResource, ppvResource);
 }
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
+static inline bool ValidateAllocateMemoryParameters(
+    const ALLOCATION_DESC* pAllocDesc,
+    const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
+    Allocation** ppAllocation)
+{
+    return pAllocDesc &&
+        pAllocInfo &&
+        ppAllocation &&
+        (pAllocInfo->Alignment == 0 ||
+            pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
+            pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) &&
+        pAllocInfo->SizeInBytes != 0 &&
+        pAllocInfo->SizeInBytes % (64ull * 1024) == 0;
+}
 
 HRESULT Allocator::AllocateMemory(
     const ALLOCATION_DESC* pAllocDesc,
     const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
     Allocation** ppAllocation)
 {
-    if(!pAllocDesc ||
-        !pAllocInfo ||
-        !ppAllocation ||
-        !(pAllocInfo->Alignment == 0 ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) ||
-        pAllocInfo->SizeInBytes == 0 ||
-        pAllocInfo->SizeInBytes % (64ull * 1024) != 0)
+    if(!ValidateAllocateMemoryParameters(pAllocDesc, pAllocInfo, ppAllocation))
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::AllocateMemory.");
         return E_INVALIDARG;
@@ -6145,16 +6136,9 @@ HRESULT Allocator::AllocateMemory1(
     ID3D12ProtectedResourceSession *pProtectedSession,
     Allocation** ppAllocation)
 {
-    if(!pAllocDesc ||
-        !pAllocInfo ||
-        !ppAllocation ||
-        !(pAllocInfo->Alignment == 0 ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) ||
-        pAllocInfo->SizeInBytes == 0 ||
-        pAllocInfo->SizeInBytes % (64ull * 1024) != 0)
+    if(!ValidateAllocateMemoryParameters(pAllocDesc, pAllocInfo, ppAllocation))
     {
-        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::AllocateMemory.");
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::AllocateMemory1.");
         return E_INVALIDARG;
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
