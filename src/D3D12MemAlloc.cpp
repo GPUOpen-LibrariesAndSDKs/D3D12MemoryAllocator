@@ -688,7 +688,8 @@ static UINT GetBitsPerPixel(DXGI_FORMAT format)
 }
 
 // This algorithm is overly conservative.
-static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC& resourceDesc)
+template<typename D3D12_RESOURCE_DESC_T>
+static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
 {
     if(resourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
         return false;
@@ -2356,6 +2357,20 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    HRESULT CreateResource2(
+        UINT64 size,
+        UINT64 alignment,
+        const ALLOCATION_DESC& allocDesc,
+        const D3D12_RESOURCE_DESC1& resourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation,
+        REFIID riidResource,
+        void** ppvResource);
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
     HRESULT SetMinBytes(UINT64 minBytes);
 
     void AddStats(StatInfo& outStats);
@@ -2465,6 +2480,9 @@ public:
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     ID3D12Device4* GetDevice4() const { return m_Device4; }
 #endif
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    ID3D12Device8* GetDevice8() const { return m_Device8; }
+#endif
     // Shortcut for "Allocation Callbacks", because this function is called so often.
     const ALLOCATION_CALLBACKS& GetAllocs() const { return m_AllocationCallbacks; }
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const { return m_D3D12Options; }
@@ -2493,6 +2511,18 @@ public:
         REFIID riidResource,
         void** ppvResource);
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    HRESULT CreateResource2(
+        const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation,
+        REFIID riidResource,
+        void** ppvResource);
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
     HRESULT AllocateMemory(
         const ALLOCATION_DESC* pAllocDesc,
@@ -2552,13 +2582,17 @@ private:
     Heuristics that decides whether a resource should better be placed in its own,
     dedicated allocation (committed resource rather than placed resource).
     */
-    static bool PrefersCommittedAllocation(const D3D12_RESOURCE_DESC& resourceDesc);
+    template<typename D3D12_RESOURCE_DESC_T>
+    static bool PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc);
 
     const bool m_UseMutex;
     const bool m_AlwaysCommitted;
     ID3D12Device* m_Device; // AddRef
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     ID3D12Device4* m_Device4 = NULL; // AddRef, optional
+#endif
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    ID3D12Device8* m_Device8 = NULL; // AddRef, optional
 #endif
     IDXGIAdapter* m_Adapter; // AddRef
 #if D3D12MA_DXGI_1_4
@@ -2612,6 +2646,19 @@ private:
         void** ppvResource);
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    HRESULT AllocateCommittedResource2(
+        const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
+        const D3D12_RESOURCE_ALLOCATION_INFO& resAllocInfo,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation,
+        REFIID riidResource,
+        void** ppvResource);
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
     // Allocates and registers new heap without any resources placed in it, as dedicated allocation.
     // Creates and returns Allocation object.
     HRESULT AllocateHeap(
@@ -2644,7 +2691,8 @@ private:
         8: D3D12_HEAP_TYPE_READBACK + texture RT or DS
     */
     UINT CalcDefaultPoolCount() const;
-    UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC& resourceDesc) const;
+    template<typename D3D12_RESOURCE_DESC_T>
+    UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC_T& resourceDesc) const;
     // This one returns UINT32_MAX if nonstandard heap flags are used and index cannot be calculcated.
     static UINT CalcDefaultPoolIndex(D3D12_HEAP_TYPE heapType, D3D12_HEAP_FLAGS heapFlags, bool supportsResourceHeapTier2);
     UINT CalcDefaultPoolIndex(D3D12_HEAP_TYPE heapType, D3D12_HEAP_FLAGS heapFlags) const
@@ -2669,7 +2717,13 @@ private:
 
     HRESULT UpdateD3D12Budget();
     
-    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo(D3D12_RESOURCE_DESC& inOutResourceDesc) const;
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC& resourceDesc) const;
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC1& resourceDesc) const;
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
+    template<typename D3D12_RESOURCE_DESC_T>
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const;
 
     // Writes object { } with data of given budget.
     static void WriteBudgetToJson(JsonWriter& json, const Budget& budget);
@@ -3707,6 +3761,63 @@ HRESULT BlockVector::CreateResource(
     return hr;
 }
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+HRESULT BlockVector::CreateResource2(
+    UINT64 size,
+    UINT64 alignment,
+    const ALLOCATION_DESC& allocDesc,
+    const D3D12_RESOURCE_DESC1& resourceDesc,
+    D3D12_RESOURCE_STATES InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+    ID3D12ProtectedResourceSession *pProtectedSession,
+    Allocation** ppAllocation,
+    REFIID riidResource,
+    void** ppvResource)
+{
+    D3D12MA_ASSERT(pProtectedSession == NULL && "Should never get here. pProtectedSession != NULL currently requires committed resources.");
+
+    ID3D12Device8* const device8 = m_hAllocator->GetDevice8();
+    if(device8 == NULL)
+    {
+        return E_NOINTERFACE;
+    }
+
+    HRESULT hr = Allocate(size, alignment, allocDesc, 1, ppAllocation);
+    if(SUCCEEDED(hr))
+    {
+        ID3D12Resource* res = NULL;
+        hr = device8->CreatePlacedResource1(
+            (*ppAllocation)->m_Placed.block->GetHeap(),
+            (*ppAllocation)->GetOffset(),
+            &resourceDesc,
+            InitialResourceState,
+            pOptimizedClearValue,
+            IID_PPV_ARGS(&res));
+        if(SUCCEEDED(hr))
+        {
+            if(ppvResource != NULL)
+            {
+                hr = res->QueryInterface(riidResource, ppvResource);
+            }
+            if(SUCCEEDED(hr))
+            {
+                (*ppAllocation)->SetResource(res, &resourceDesc);
+            }
+            else
+            {
+                res->Release();
+                SAFE_RELEASE(*ppAllocation);
+            }
+        }
+        else
+        {
+            SAFE_RELEASE(*ppAllocation);
+        }
+    }
+    return hr;
+}
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
 UINT64 BlockVector::CalcSumBlockSize() const
 {
     UINT64 result = 0;
@@ -4147,6 +4258,10 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
     m_Device->QueryInterface<ID3D12Device4>(&m_Device4);
 #endif
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    m_Device->QueryInterface<ID3D12Device8>(&m_Device8);
+#endif
+
     HRESULT hr = m_Adapter->GetDesc(&m_AdapterDesc);
     if(FAILED(hr))
     {
@@ -4189,6 +4304,9 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 
 AllocatorPimpl::~AllocatorPimpl()
 {
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    SAFE_RELEASE(m_Device8);
+#endif
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     SAFE_RELEASE(m_Device4);
 #endif
@@ -4414,6 +4532,146 @@ HRESULT AllocatorPimpl::CreateResource1(
 }
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+HRESULT AllocatorPimpl::CreateResource2(
+    const ALLOCATION_DESC* pAllocDesc,
+    const D3D12_RESOURCE_DESC1* pResourceDesc,
+    D3D12_RESOURCE_STATES InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+    ID3D12ProtectedResourceSession *pProtectedSession,
+    Allocation** ppAllocation,
+    REFIID riidResource,
+    void** ppvResource)
+{
+    *ppAllocation = NULL;
+    if(ppvResource)
+    {
+        *ppvResource = NULL;
+    }
+
+    if(m_Device8 == NULL)
+    {
+        return E_NOINTERFACE;
+    }
+
+    if(pAllocDesc->CustomPool == NULL)
+    {
+        if(!IsHeapTypeValid(pAllocDesc->HeapType))
+        {
+            return E_INVALIDARG;
+        }
+    }
+
+    ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
+
+    D3D12_RESOURCE_DESC1 finalResourceDesc = *pResourceDesc;
+    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
+    resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
+    D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
+    D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
+
+    bool requireCommittedMemory = pProtectedSession != NULL || (finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0;
+
+    if(pAllocDesc->CustomPool != NULL)
+    {
+        if(requireCommittedMemory)
+        {
+            return E_INVALIDARG;
+        }
+
+        BlockVector* blockVector = pAllocDesc->CustomPool->m_Pimpl->GetBlockVector();
+        D3D12MA_ASSERT(blockVector);
+        return blockVector->CreateResource2(
+            resAllocInfo.SizeInBytes,
+            resAllocInfo.Alignment,
+            finalAllocDesc,
+            finalResourceDesc,
+            InitialResourceState,
+            pOptimizedClearValue,
+            pProtectedSession,
+            ppAllocation,
+            riidResource,
+            ppvResource);
+    }
+    else
+    {
+        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, finalResourceDesc);
+        requireCommittedMemory = requireCommittedMemory || defaultPoolIndex == UINT32_MAX;
+        if(requireCommittedMemory)
+        {
+            return AllocateCommittedResource2(
+                &finalAllocDesc,
+                &finalResourceDesc,
+                resAllocInfo,
+                InitialResourceState,
+                pOptimizedClearValue,
+                pProtectedSession,
+                ppAllocation,
+                riidResource,
+                ppvResource);
+        }
+
+        BlockVector* const blockVector = m_BlockVectors[defaultPoolIndex];
+        D3D12MA_ASSERT(blockVector);
+
+        const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
+        bool preferCommittedMemory =
+            m_AlwaysCommitted ||
+            PrefersCommittedAllocation(finalResourceDesc) ||
+            // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
+            resAllocInfo.SizeInBytes > preferredBlockSize / 2;
+        if(preferCommittedMemory &&
+            (finalAllocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
+        {
+            finalAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
+        }
+
+        if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
+        {
+            return AllocateCommittedResource2(
+                &finalAllocDesc,
+                &finalResourceDesc,
+                resAllocInfo,
+                InitialResourceState,
+                pOptimizedClearValue,
+                pProtectedSession,
+                ppAllocation,
+                riidResource,
+                ppvResource);
+        }
+        else
+        {
+            HRESULT hr = blockVector->CreateResource2(
+                resAllocInfo.SizeInBytes,
+                resAllocInfo.Alignment,
+                finalAllocDesc,
+                finalResourceDesc,
+                InitialResourceState,
+                pOptimizedClearValue,
+                pProtectedSession,
+                ppAllocation,
+                riidResource,
+                ppvResource);
+            if(SUCCEEDED(hr))
+            {
+                return hr;
+            }
+
+            return AllocateCommittedResource2(
+                &finalAllocDesc,
+                &finalResourceDesc,
+                resAllocInfo,
+                InitialResourceState,
+                pOptimizedClearValue,
+                pProtectedSession,
+                ppAllocation,
+                riidResource,
+                ppvResource);
+        }
+    }
+}
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
 HRESULT AllocatorPimpl::AllocateMemory(
     const ALLOCATION_DESC* pAllocDesc,
     const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
@@ -4619,7 +4877,8 @@ HRESULT AllocatorPimpl::SetDefaultHeapMinBytes(
     }
 }
 
-bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC& resourceDesc)
+template<typename D3D12_RESOURCE_DESC_T>
+bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc)
 {
     // Intentional. It may change in the future.
     return false;
@@ -4759,6 +5018,77 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
 }
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+HRESULT AllocatorPimpl::AllocateCommittedResource2(
+    const ALLOCATION_DESC* pAllocDesc,
+    const D3D12_RESOURCE_DESC1* pResourceDesc,
+    const D3D12_RESOURCE_ALLOCATION_INFO& resAllocInfo,
+    D3D12_RESOURCE_STATES InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+    ID3D12ProtectedResourceSession *pProtectedSession,
+    Allocation** ppAllocation,
+    REFIID riidResource,
+    void** ppvResource)
+{
+    if(m_Device8 == NULL)
+    {
+        return E_NOINTERFACE;
+    }
+
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) != 0)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    if((pAllocDesc->Flags & ALLOCATION_FLAG_WITHIN_BUDGET) != 0)
+    {
+        Budget budget = {};
+        GetBudgetForHeapType(budget, pAllocDesc->HeapType);
+        if(budget.UsageBytes + resAllocInfo.SizeInBytes > budget.BudgetBytes)
+        {
+            return E_OUTOFMEMORY;
+        }
+    }
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = pAllocDesc->HeapType;
+
+    const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
+
+    ID3D12Resource* res = NULL;
+    HRESULT hr = m_Device8->CreateCommittedResource2(
+        &heapProps, heapFlags, pResourceDesc, InitialResourceState,
+        pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
+    if(SUCCEEDED(hr))
+    {
+        if(ppvResource != NULL)
+        {
+            hr = res->QueryInterface(riidResource, ppvResource);
+        }
+        if(SUCCEEDED(hr))
+        {
+            const BOOL wasZeroInitialized = TRUE;
+            Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resAllocInfo.SizeInBytes, wasZeroInitialized);
+            alloc->InitCommitted(pAllocDesc->HeapType);
+            alloc->SetResource(res, pResourceDesc);
+
+            *ppAllocation = alloc;
+
+            RegisterCommittedAllocation(*ppAllocation, pAllocDesc->HeapType);
+
+            const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
+            m_Budget.AddAllocation(heapTypeIndex, resAllocInfo.SizeInBytes);
+            m_Budget.m_BlockBytes[heapTypeIndex] += resAllocInfo.SizeInBytes;
+        }
+        else
+        {
+            res->Release();
+        }
+    }
+    return hr;
+}
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
 HRESULT AllocatorPimpl::AllocateHeap(
     const ALLOCATION_DESC* pAllocDesc,
     const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
@@ -4871,7 +5201,8 @@ UINT AllocatorPimpl::CalcDefaultPoolCount() const
     }
 }
 
-UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC& resourceDesc) const
+template<typename D3D12_RESOURCE_DESC_T>
+UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC_T& resourceDesc) const
 {
     const D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~GetExtraHeapFlagsToIgnore();
     if(extraHeapFlags != 0)
@@ -5434,7 +5765,22 @@ HRESULT AllocatorPimpl::UpdateD3D12Budget()
 #endif
 }
 
-D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC& inOutResourceDesc) const
+D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC& resourceDesc) const
+{
+    return m_Device->GetResourceAllocationInfo(0, 1, &resourceDesc);
+}
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC1& resourceDesc) const
+{
+    D3D12MA_ASSERT(m_Device8 != NULL);
+    D3D12_RESOURCE_ALLOCATION_INFO1 info1Unused;
+    return m_Device8->GetResourceAllocationInfo2(0, 1, &resourceDesc, &info1Unused);
+}
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
+template<typename D3D12_RESOURCE_DESC_T>
+D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const
 {
     /* Optional optimization: Microsoft documentation says:
     https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
@@ -5469,7 +5815,7 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
             D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT :
             D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
         inOutResourceDesc.Alignment = smallAlignmentToTry;
-        const D3D12_RESOURCE_ALLOCATION_INFO smallAllocInfo = m_Device->GetResourceAllocationInfo(0, 1, &inOutResourceDesc);
+        const D3D12_RESOURCE_ALLOCATION_INFO smallAllocInfo = GetResourceAllocationInfoNative(inOutResourceDesc);
         // Check if alignment requested has been granted.
         if(smallAllocInfo.Alignment == smallAlignmentToTry)
         {
@@ -5479,7 +5825,7 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
     }
 #endif // #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
 
-    return m_Device->GetResourceAllocationInfo(0, 1, &inOutResourceDesc);
+    return GetResourceAllocationInfoNative(inOutResourceDesc);
 }
 
 void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
@@ -5642,7 +5988,8 @@ void Allocation::InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
     m_Heap.heap = heap;
 }
 
-void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc)
+template<typename D3D12_RESOURCE_DESC_T>
+void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc)
 {
     D3D12MA_ASSERT(m_Resource == NULL && pResourceDesc);
     m_Resource = resource;
@@ -5748,6 +6095,27 @@ HRESULT Allocator::CreateResource1(
     return m_Pimpl->CreateResource1(pAllocDesc, pResourceDesc, InitialResourceState, pOptimizedClearValue, pProtectedSession, ppAllocation, riidResource, ppvResource);
 }
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+HRESULT Allocator::CreateResource2(
+    const ALLOCATION_DESC* pAllocDesc,
+    const D3D12_RESOURCE_DESC1* pResourceDesc,
+    D3D12_RESOURCE_STATES InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+    ID3D12ProtectedResourceSession *pProtectedSession,
+    Allocation** ppAllocation,
+    REFIID riidResource,
+    void** ppvResource)
+{
+    if(!pAllocDesc || !pResourceDesc || !ppAllocation)
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreateResource2.");
+        return E_INVALIDARG;
+    }
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+        return m_Pimpl->CreateResource2(pAllocDesc, pResourceDesc, InitialResourceState, pOptimizedClearValue, pProtectedSession, ppAllocation, riidResource, ppvResource);
+}
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
 HRESULT Allocator::AllocateMemory(
     const ALLOCATION_DESC* pAllocDesc,

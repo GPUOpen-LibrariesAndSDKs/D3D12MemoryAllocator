@@ -61,7 +61,8 @@ struct ResourceWithAllocation
     }
 };
 
-static void FillResourceDescForBuffer(D3D12_RESOURCE_DESC& outResourceDesc, UINT64 size)
+template<typename D3D12_RESOURCE_DESC_T>
+static void FillResourceDescForBuffer(D3D12_RESOURCE_DESC_T& outResourceDesc, UINT64 size)
 {
     outResourceDesc = {};
     outResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -1370,7 +1371,43 @@ static void TestDevice4(const TestContext& ctx)
 
     CHECK_HR(ctx.allocator->AllocateMemory1(&allocDesc, &heapAllocInfo, session, &alloc));
     AllocationUniquePtr heapAllocPtr{alloc};
+}
 
+static void TestDevice8(const TestContext& ctx)
+{
+    wprintf(L"Test ID3D12Device8\n");
+
+    CComPtr<ID3D12Device8> dev8;
+    CHECK_HR(ctx.device->QueryInterface(&dev8));
+
+    D3D12_RESOURCE_DESC1 resourceDesc;
+    FillResourceDescForBuffer(resourceDesc, 1024 * 1024);
+
+    // Create a committed buffer
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+    D3D12MA::Allocation* alloc0 = nullptr;
+    CComPtr<ID3D12Resource> res0;
+    CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, NULL,
+        &alloc0, IID_PPV_ARGS(&res0)));
+    AllocationUniquePtr allocPtr0{alloc0};
+    CHECK_BOOL(alloc0->GetHeap() == NULL);
+
+    // Create a placed buffer
+
+    allocDesc.Flags &= ~D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+    D3D12MA::Allocation* alloc1 = nullptr;
+    CComPtr<ID3D12Resource> res1;
+    CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, NULL,
+        &alloc1, IID_PPV_ARGS(&res1)));
+    AllocationUniquePtr allocPtr1{alloc1};
+    CHECK_BOOL(alloc1->GetHeap()!= NULL);
 }
 
 static void TestGroupVirtual(const TestContext& ctx)
@@ -1394,6 +1431,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestZeroInitialized(ctx);
     TestMultithreading(ctx);
     TestDevice4(ctx);
+    TestDevice8(ctx);
 }
 
 void Test(const TestContext& ctx)

@@ -954,7 +954,8 @@ private:
     void InitCommitted(D3D12_HEAP_TYPE heapType);
     void InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block);
     void InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap);
-    void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC* pResourceDesc);
+    template<typename D3D12_RESOURCE_DESC_T>
+    void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc);
     void FreeName();
 
     D3D12MA_CLASS_NO_COPY(Allocation)
@@ -1268,6 +1269,24 @@ public:
     HRESULT CreateResource1(
         const ALLOCATION_DESC* pAllocDesc,
         const D3D12_RESOURCE_DESC* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation,
+        REFIID riidResource,
+        void** ppvResource);
+#endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    /** \brief Similar to Allocator::CreateResource1, but supports new structure `D3D12_RESOURCE_DESC1`.
+    
+    It internally uses `ID3D12Device8::CreateCommittedResource2` or `ID3D12Device8::CreatePlacedResource1`.
+
+    To work correctly, `ID3D12Device8` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    */
+    HRESULT CreateResource2(
+        const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
         D3D12_RESOURCE_STATES InitialResourceState,
         const D3D12_CLEAR_VALUE *pOptimizedClearValue,
         ID3D12ProtectedResourceSession *pProtectedSession,
