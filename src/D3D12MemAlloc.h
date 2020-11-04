@@ -1253,6 +1253,25 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
+#ifdef __ID3D12Device4_INTERFACE_DEFINED__
+    /** \brief Similar to Allocator::CreateResource, but supports additional parameter `pProtectedSession`.
+    
+    If `pProtectedSession` is not null, current implementation always creates the resource as committed
+    using `ID3D12Device4::CreateCommittedResource1`.
+
+    To work correctly, `ID3D12Device4` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    */
+    HRESULT CreateResource1(
+        const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_DESC* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation,
+        REFIID riidResource,
+        void** ppvResource);
+#endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
+
     /** \brief Allocates memory without creating any resource placed in it.
 
     This function is similar to `ID3D12Device::CreateHeap`, but it may really assign
@@ -1276,6 +1295,21 @@ public:
         const ALLOCATION_DESC* pAllocDesc,
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
+
+#ifdef __ID3D12Device4_INTERFACE_DEFINED__
+    /** \brief Similar to Allocator::AllocateMemory, but supports additional parameter `pProtectedSession`.
+    
+    If `pProtectedSession` is not null, current implementation always creates separate heap
+    using `ID3D12Device4::CreateHeap1`.
+
+    To work correctly, `ID3D12Device4` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    */
+    HRESULT AllocateMemory1(
+        const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation);
+#endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 
     /** \brief Creates a new resource in place of an existing allocation. This is useful for memory aliasing.
 

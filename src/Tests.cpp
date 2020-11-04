@@ -1335,6 +1335,44 @@ static void TestMultithreading(const TestContext& ctx)
     }
 }
 
+static void TestDevice4(const TestContext& ctx)
+{
+    wprintf(L"Test ID3D12Device4\n");
+
+    CComPtr<ID3D12Device4> dev4;
+    CHECK_HR(ctx.device->QueryInterface(&dev4));
+
+    D3D12_PROTECTED_RESOURCE_SESSION_DESC sessionDesc = {};
+    CComPtr<ID3D12ProtectedResourceSession> session;
+    CHECK_HR(dev4->CreateProtectedResourceSession(&sessionDesc, IID_PPV_ARGS(&session)));
+
+    // Create a buffer
+
+    D3D12_RESOURCE_DESC resourceDesc;
+    FillResourceDescForBuffer(resourceDesc, 1024);
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12MA::Allocation* alloc = nullptr;
+    CComPtr<ID3D12Resource> bufRes;
+    CHECK_HR(ctx.allocator->CreateResource1(&allocDesc, &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL,
+        session, &alloc, IID_PPV_ARGS(&bufRes)));
+    AllocationUniquePtr bufAllocPtr{alloc};
+
+    // Create a heap
+
+    D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {
+        D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 100, // SizeInBytes
+        D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // Alignment
+    };
+
+    CHECK_HR(ctx.allocator->AllocateMemory1(&allocDesc, &heapAllocInfo, session, &alloc));
+    AllocationUniquePtr heapAllocPtr{alloc};
+
+}
+
 static void TestGroupVirtual(const TestContext& ctx)
 {
     TestVirtualBlocks(ctx);
@@ -1355,6 +1393,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestTransfer(ctx);
     TestZeroInitialized(ctx);
     TestMultithreading(ctx);
+    TestDevice4(ctx);
 }
 
 void Test(const TestContext& ctx)
