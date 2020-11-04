@@ -5180,6 +5180,22 @@ HRESULT AllocatorPimpl::UpdateD3D12Budget()
 
 D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC& inOutResourceDesc) const
 {
+    /* Optional optimization: Microsoft documentation says:
+    https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
+    
+    Your application can forgo using GetResourceAllocationInfo for buffer resources
+    (D3D12_RESOURCE_DIMENSION_BUFFER). Buffers have the same size on all adapters,
+    which is merely the smallest multiple of 64KB that's greater or equal to
+    D3D12_RESOURCE_DESC::Width.
+    */
+    if(inOutResourceDesc.Alignment == 0 &&
+        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+    {
+        return {
+            AlignUp<UINT64>(inOutResourceDesc.Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT), // SizeInBytes
+            D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT}; // Alignment
+    }
+
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
     if(inOutResourceDesc.Alignment == 0 &&
         inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
