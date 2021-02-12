@@ -1363,7 +1363,8 @@ static void TestDevice4(const TestContext& ctx)
     AllocationUniquePtr bufAllocPtr{alloc};
 
     // Create a heap
-
+    // Temporarily commented out as it caues BSOD on RTX2080Ti driver 461.40.
+#if 0
     D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {
         D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 100, // SizeInBytes
         D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // Alignment
@@ -1371,6 +1372,7 @@ static void TestDevice4(const TestContext& ctx)
 
     CHECK_HR(ctx.allocator->AllocateMemory1(&allocDesc, &heapAllocInfo, session, &alloc));
     AllocationUniquePtr heapAllocPtr{alloc};
+#endif
 }
 
 static void TestDevice8(const TestContext& ctx)
