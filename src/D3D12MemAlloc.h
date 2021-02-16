@@ -802,7 +802,7 @@ The object remembers size and some other information.
 To retrieve this information, use methods of this class.
 
 The object also remembers `ID3D12Resource` and "owns" a reference to it,
-so it calls `Release()` on the resource when destroyed.
+so it calls `%Release()` on the resource when destroyed.
 */
 class Allocation
 {
