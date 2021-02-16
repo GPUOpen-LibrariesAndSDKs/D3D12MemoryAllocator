@@ -82,6 +82,12 @@
     #define D3D12MA_DEBUG_GLOBAL_MUTEX (0)
 #endif
 
+/*
+Define this macro for debugging purposes only to force specific D3D12_RESOURCE_HEAP_TIER,
+especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
+*/
+//#define D3D12MA_FORCE_RESOURCE_HEAP_TIER D3D12_RESOURCE_HEAP_TIER_1
+
 #ifndef D3D12MA_DEFAULT_BLOCK_SIZE
    /// Default size of a block allocated as single ID3D12Heap.
    #define D3D12MA_DEFAULT_BLOCK_SIZE (256ull * 1024 * 1024)
@@ -4275,6 +4281,9 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
     {
         return hr;
     }
+#ifdef D3D12MA_FORCE_RESOURCE_HEAP_TIER
+    m_D3D12Options.ResourceHeapTier = (D3D12MA_FORCE_RESOURCE_HEAP_TIER);
+#endif
 
     const UINT defaultPoolCount = CalcDefaultPoolCount();
     for(UINT i = 0; i < defaultPoolCount; ++i)
@@ -5398,11 +5407,27 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     }
 
     // Process deafult pools.
-    for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
+    
+    if(SupportsResourceHeapTier2())
     {
-        BlockVector* const pBlockVector = m_BlockVectors[i];
-        D3D12MA_ASSERT(pBlockVector);
-        pBlockVector->AddStats(outStats);
+        for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
+        {
+            BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex];
+            D3D12MA_ASSERT(pBlockVector);
+            pBlockVector->AddStats(outStats);
+        }
+    }
+    else
+    {
+        for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
+        {
+            for(size_t heapSubType = 0; heapSubType < 3; ++heapSubType)
+            {
+                BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex * 3 + heapSubType];
+                D3D12MA_ASSERT(pBlockVector);
+                pBlockVector->AddStats(outStats);
+            }
+        }
     }
 
     // Process custom pools
