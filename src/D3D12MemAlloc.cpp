@@ -90,7 +90,7 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 
 #ifndef D3D12MA_DEFAULT_BLOCK_SIZE
    /// Default size of a block allocated as single ID3D12Heap.
-   #define D3D12MA_DEFAULT_BLOCK_SIZE (256ull * 1024 * 1024)
+   #define D3D12MA_DEFAULT_BLOCK_SIZE (64ull * 1024 * 1024)
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////

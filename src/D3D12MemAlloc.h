@@ -1102,7 +1102,7 @@ struct ALLOCATOR_DESC
     
     /** \brief Preferred size of a single `ID3D12Heap` block to be allocated.
     
-    Set to 0 to use default, which is currently 256 MiB.
+    Set to 0 to use default, which is currently 64 MiB.
     */
     UINT64 PreferredBlockSize;
     
