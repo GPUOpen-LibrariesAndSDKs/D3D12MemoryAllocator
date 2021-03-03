@@ -477,14 +477,6 @@ IterT BinaryFindSorted(const IterT& beg, const IterT& end, const KeyT& value, co
     return end;
 }
 
-struct PointerLess
-{
-    bool operator()(const void* lhs, const void* rhs) const
-    {
-        return lhs < rhs;
-    }
-};
-
 static UINT HeapTypeToIndex(D3D12_HEAP_TYPE type)
 {
     switch(type)
@@ -2714,6 +2706,47 @@ struct CommittedAllocationListItemTraits
     }
 };
 
+class PoolPimpl
+{
+public:
+    PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc);
+    HRESULT Init();
+    ~PoolPimpl();
+
+    AllocatorPimpl* GetAllocator() const { return m_Allocator; }
+    const POOL_DESC& GetDesc() const { return m_Desc; }
+    BlockVector* GetBlockVector() { return m_BlockVector; }
+
+    HRESULT SetMinBytes(UINT64 minBytes) { return m_BlockVector->SetMinBytes(minBytes); }
+
+    void CalculateStats(StatInfo& outStats);
+
+    void SetName(LPCWSTR Name);
+    LPCWSTR GetName() const { return m_Name; }
+
+private:
+    friend class Allocator;
+    friend struct PoolListItemTraits;
+
+    AllocatorPimpl* m_Allocator; // Externally owned object.
+    POOL_DESC m_Desc;
+    BlockVector* m_BlockVector; // Owned object.
+    wchar_t* m_Name;
+    PoolPimpl* m_PrevPool = NULL;
+    PoolPimpl* m_NextPool = NULL;
+
+    void FreeName();
+};
+
+struct PoolListItemTraits
+{
+    typedef PoolPimpl ItemType;
+    static ItemType* GetPrev(const ItemType* item) { return item->m_PrevPool; }
+    static ItemType* GetNext(const ItemType* item) { return item->m_NextPool; }
+    static ItemType*& AccessPrev(ItemType* item) { return item->m_PrevPool; }
+    static ItemType*& AccessNext(ItemType* item) { return item->m_NextPool; }
+};
+
 class AllocatorPimpl
 {
 public:
@@ -2856,8 +2889,8 @@ private:
     CommittedAllocationList m_CommittedAllocations[HEAP_TYPE_COUNT];
     D3D12MA_RW_MUTEX m_CommittedAllocationsMutex[HEAP_TYPE_COUNT];
 
-    typedef Vector<Pool*> PoolVectorType;
-    PoolVectorType* m_pPools[HEAP_TYPE_COUNT];
+    typedef IntrusiveLinkedList<PoolListItemTraits> PoolList;
+    PoolList m_Pools[HEAP_TYPE_COUNT];
     D3D12MA_RW_MUTEX m_PoolsMutex[HEAP_TYPE_COUNT];
 
     // Default pools.
@@ -2957,9 +2990,9 @@ private:
     // Unregisters Allocation object from m_CommittedAllocations.
     void UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
 
-    // Registers Pool object in m_pPools.
+    // Registers Pool object in m_Pools.
     void RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType);
-    // Unregisters Pool object from m_pPools.
+    // Unregisters Pool object from m_Pools.
     void UnregisterPool(Pool* pool, D3D12_HEAP_TYPE heapType);
 
     HRESULT UpdateD3D12Budget();
@@ -4312,35 +4345,6 @@ void BlockVector::WriteBlockInfoToJson(JsonWriter& json)
 ////////////////////////////////////////////////////////////////////////////////
 // Private class PoolPimpl
 
-class PoolPimpl
-{
-public:
-    PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc);
-    HRESULT Init();
-    ~PoolPimpl();
-
-    AllocatorPimpl* GetAllocator() const { return m_Allocator; }
-    const POOL_DESC& GetDesc() const { return m_Desc; }
-    BlockVector* GetBlockVector() { return m_BlockVector; }
-    
-    HRESULT SetMinBytes(UINT64 minBytes) { return m_BlockVector->SetMinBytes(minBytes); }
-    
-    void CalculateStats(StatInfo& outStats);
-
-    void SetName(LPCWSTR Name);
-    LPCWSTR GetName() const { return m_Name; }
-
-private:
-    friend class Allocator;
-
-    AllocatorPimpl* m_Allocator; // Externally owned object.
-    POOL_DESC m_Desc;
-    BlockVector* m_BlockVector; // Owned object.
-    wchar_t* m_Name;
-
-    void FreeName();
-};
-
 PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
     m_Allocator(allocator),
     m_Desc(desc),
@@ -4368,6 +4372,7 @@ HRESULT PoolPimpl::Init()
 
 PoolPimpl::~PoolPimpl()
 {
+    D3D12MA_ASSERT(m_PrevPool == NULL && m_NextPool == NULL);
     FreeName();
     D3D12MA_DELETE(m_Allocator->GetAllocs(), m_BlockVector);
 }
@@ -4477,18 +4482,12 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
 
-    ZeroMemory(m_pPools, sizeof(m_pPools));
     ZeroMemory(m_BlockVectors, sizeof(m_BlockVectors));
     ZeroMemory(m_DefaultPoolTier1MinBytes, sizeof(m_DefaultPoolTier1MinBytes));
 
     for(UINT i = 0; i < HEAP_TYPE_COUNT; ++i)
     {
         m_DefaultPoolHeapTypeMinBytes[i] = UINT64_MAX;
-    }
-
-    for(UINT heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
-    {
-        m_pPools[heapTypeIndex] = D3D12MA_NEW(GetAllocs(), PoolVectorType)(GetAllocs());
     }
 
     m_Device->AddRef();
@@ -4573,12 +4572,10 @@ AllocatorPimpl::~AllocatorPimpl()
 
     for(UINT i = HEAP_TYPE_COUNT; i--; )
     {
-        if(m_pPools[i] && !m_pPools[i]->empty())
+        if(!m_Pools[i].IsEmpty())
         {
             D3D12MA_ASSERT(0 && "Unfreed pools found!");
         }
-
-        D3D12MA_DELETE(GetAllocs(), m_pPools[i]);
     }
 
     for(UINT i = HEAP_TYPE_COUNT; i--; )
@@ -5565,9 +5562,7 @@ void AllocatorPimpl::RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
     const UINT heapTypeIndex = HeapTypeToIndex(heapType);
 
     MutexLockWrite lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
-    PoolVectorType* const pools = m_pPools[heapTypeIndex];
-    D3D12MA_ASSERT(pools);
-    pools->InsertSorted(pool, PointerLess());
+    m_Pools[heapTypeIndex].PushBack(pool->m_Pimpl);
 }
 
 void AllocatorPimpl::UnregisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
@@ -5575,10 +5570,7 @@ void AllocatorPimpl::UnregisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
     const UINT heapTypeIndex = HeapTypeToIndex(heapType);
 
     MutexLockWrite lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
-    PoolVectorType* const pools = m_pPools[heapTypeIndex];
-    D3D12MA_ASSERT(pools);
-    bool success = pools->RemoveSorted(pool, PointerLess());
-    D3D12MA_ASSERT(success);
+    m_Pools[heapTypeIndex].Remove(pool->m_Pimpl);
 }
 
 void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
@@ -5668,12 +5660,10 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
         MutexLockRead lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
-        const PoolVectorType* const poolVector = m_pPools[heapTypeIndex];
-        D3D12MA_ASSERT(poolVector);
-        for(size_t poolIndex = 0, count = poolVector->size(); poolIndex < count; ++poolIndex)
+        PoolList& poolList = m_Pools[heapTypeIndex];
+        for(PoolPimpl* pool = poolList.Front(); pool != NULL; pool = poolList.GetNext(pool))
         {
-            Pool* pool = (*poolVector)[poolIndex];
-            pool->m_Pimpl->GetBlockVector()->AddStats(outStats);
+            pool->GetBlockVector()->AddStats(outStats);
         }
     }
 
