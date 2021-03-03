@@ -886,6 +886,7 @@ private:
     friend class AllocatorPimpl;
     friend class BlockVector;
     friend class JsonWriter;
+    friend struct CommittedAllocationListItemTraits;
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
     template<typename T> friend class PoolAllocator;
 
@@ -908,6 +909,8 @@ private:
         struct
         {
             D3D12_HEAP_TYPE heapType;
+            Allocation* prev;
+            Allocation* next;
         } m_Committed;
 
         struct
@@ -918,7 +921,10 @@ private:
 
         struct
         {
+            // Beginning must be compatible with m_Committed.
             D3D12_HEAP_TYPE heapType;
+            Allocation* prev;
+            Allocation* next;
             ID3D12Heap* heap;
         } m_Heap;
     };

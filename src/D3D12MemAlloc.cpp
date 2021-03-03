@@ -1970,6 +1970,222 @@ typename List<T>::Item* List<T>::InsertAfter(Item* pItem, const T& value)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Private class IntrusiveLinkedList
+
+/*
+Expected interface of ItemTypeTraits:
+struct MyItemTypeTraits
+{
+    typedef MyItem ItemType;
+    static ItemType* GetPrev(const ItemType* item) { return item->myPrevPtr; }
+    static ItemType* GetNext(const ItemType* item) { return item->myNextPtr; }
+    static ItemType*& AccessPrev(ItemType* item) { return item->myPrevPtr; }
+    static ItemType*& AccessNext(ItemType* item) { return item->myNextPtr; }
+};
+*/
+template<typename ItemTypeTraits>
+class IntrusiveLinkedList
+{
+public:
+    typedef typename ItemTypeTraits::ItemType ItemType;
+    static ItemType* GetPrev(const ItemType* item) { return ItemTypeTraits::GetPrev(item); }
+    static ItemType* GetNext(const ItemType* item) { return ItemTypeTraits::GetNext(item); }
+    // Movable, not copyable.
+    IntrusiveLinkedList() { }
+    IntrusiveLinkedList(const IntrusiveLinkedList<ItemTypeTraits>& src) = delete;
+    IntrusiveLinkedList(IntrusiveLinkedList<ItemTypeTraits>&& src) :
+        m_Front(src.m_Front), m_Back(src.m_Back), m_Count(src.m_Count)
+    {
+        src.m_Front = src.m_Back = NULL;
+        src.m_Count = 0;
+    }
+    ~IntrusiveLinkedList()
+    {
+        D3D12MA_HEAVY_ASSERT(IsEmpty());
+    }
+    IntrusiveLinkedList<ItemTypeTraits>& operator=(const IntrusiveLinkedList<ItemTypeTraits>& src) = delete;
+    IntrusiveLinkedList<ItemTypeTraits>& operator=(IntrusiveLinkedList<ItemTypeTraits>&& src)
+    {
+        if(&src != this)
+        {
+            D3D12MA_HEAVY_ASSERT(IsEmpty());
+            m_Front = src.m_Front;
+            m_Back = src.m_Back;
+            m_Count = src.m_Count;
+            src.m_Front = src.m_Back = NULL;
+            src.m_Count = 0;
+        }
+        return *this;
+    }
+    void RemoveAll()
+    {
+        if(!IsEmpty())
+        {
+            ItemType* item = m_Back;
+            while(item != NULL)
+            {
+                ItemType* const prevItem = ItemTypeTraits::AccessPrev(item);
+                ItemTypeTraits::AccessPrev(item) = NULL;
+                ItemTypeTraits::AccessNext(item) = NULL;
+                item = prevItem;
+            }
+            m_Front = NULL;
+            m_Back = NULL;
+            m_Count = 0;
+        }
+    }
+    size_t GetCount() const { return m_Count; }
+    bool IsEmpty() const { return m_Count == 0; }
+    ItemType* Front() { return m_Front; }
+    const ItemType* Front() const { return m_Front; }
+    ItemType* Back() { return m_Back; }
+    const ItemType* Back() const { return m_Back; }
+    void PushBack(ItemType* item)
+    {
+        D3D12MA_HEAVY_ASSERT(ItemTypeTraits::GetPrev(item) == NULL && ItemTypeTraits::GetNext(item) == NULL);
+        if(IsEmpty())
+        {
+            m_Front = item;
+            m_Back = item;
+            m_Count = 1;
+        }
+        else
+        {
+            ItemTypeTraits::AccessPrev(item) = m_Back;
+            ItemTypeTraits::AccessNext(m_Back) = item;
+            m_Back = item;
+            ++m_Count;
+        }
+    }
+    void PushFront(ItemType* item)
+    {
+        D3D12MA_HEAVY_ASSERT(ItemTypeTraits::GetPrev(item) == NULL && ItemTypeTraits::GetNext(item) == NULL);
+        if(IsEmpty())
+        {
+            m_Front = item;
+            m_Back = item;
+            m_Count = 1;
+        }
+        else
+        {
+            ItemTypeTraits::AccessNext(item) = m_Front;
+            ItemTypeTraits::AccessPrev(m_Front) = item;
+            m_Front = item;
+            ++m_Count;
+        }
+    }
+    ItemType* PopBack()
+    {
+        D3D12MA_HEAVY_ASSERT(m_Count > 0);
+        ItemType* const backItem = m_Back;
+        ItemType* const prevItem = ItemTypeTraits::GetPrev(backItem);
+        if(prevItem != NULL)
+        {
+            ItemTypeTraits::AccessNext(prevItem) = NULL;
+        }
+        m_Back = prevItem;
+        --m_Count;
+        ItemTypeTraits::AccessPrev(backItem) = NULL;
+        ItemTypeTraits::AccessNext(backItem) = NULL;
+        return backItem;
+    }
+    ItemType* PopFront()
+    {
+        D3D12MA_HEAVY_ASSERT(m_Count > 0);
+        ItemType* const frontItem = m_Front;
+        ItemType* const nextItem = ItemTypeTraits::GetNext(frontItem);
+        if(nextItem != NULL)
+        {
+            ItemTypeTraits::AccessPrev(nextItem) = NULL;
+        }
+        m_Front = nextItem;
+        --m_Count;
+        ItemTypeTraits::AccessPrev(frontItem) = NULL;
+        ItemTypeTraits::AccessNext(frontItem) = NULL;
+        return frontItem;
+    }
+
+    // MyItem can be null - it means PushBack.
+    void InsertBefore(ItemType* existingItem, ItemType* newItem)
+    {
+        D3D12MA_HEAVY_ASSERT(newItem != NULL && ItemTypeTraits::GetPrev(newItem) == NULL && ItemTypeTraits::GetNext(newItem) == NULL);
+        if(existingItem != NULL)
+        {
+            ItemType* const prevItem = ItemTypeTraits::GetPrev(existingItem);
+            ItemTypeTraits::AccessPrev(newItem) = prevItem;
+            ItemTypeTraits::AccessNext(newItem) = existingItem;
+            ItemTypeTraits::AccessPrev(existingItem) = newItem;
+            if(prevItem != NULL)
+            {
+                ItemTypeTraits::AccessNext(prevItem) = newItem;
+            }
+            else
+            {
+                D3D12MA_HEAVY_ASSERT(m_Front == existingItem);
+                m_Front = newItem;
+            }
+            ++m_Count;
+        }
+        else
+            PushBack(newItem);
+    }
+    // MyItem can be null - it means PushFront.
+    void InsertAfter(ItemType* existingItem, ItemType* newItem)
+    {
+        D3D12MA_HEAVY_ASSERT(newItem != NULL && ItemTypeTraits::GetPrev(newItem) == NULL && ItemTypeTraits::GetNext(newItem) == NULL);
+        if(existingItem != NULL)
+        {
+            ItemType* const nextItem = ItemTypeTraits::GetNext(existingItem);
+            ItemTypeTraits::AccessNext(newItem) = nextItem;
+            ItemTypeTraits::AccessPrev(newItem) = existingItem;
+            ItemTypeTraits::AccessNext(existingItem) = newItem;
+            if(nextItem != NULL)
+            {
+                ItemTypeTraits::AccessPrev(nextItem) = newItem;
+            }
+            else
+            {
+                D3D12MA_HEAVY_ASSERT(m_Back == existingItem);
+                m_Back = newItem;
+            }
+            ++m_Count;
+        }
+        else
+            return PushFront(newItem);
+    }
+    void Remove(ItemType* item)
+    {
+        D3D12MA_HEAVY_ASSERT(item != NULL && m_Count > 0);
+        if(ItemTypeTraits::GetPrev(item) != NULL)
+        {
+            ItemTypeTraits::AccessNext(ItemTypeTraits::AccessPrev(item)) = ItemTypeTraits::GetNext(item);
+        }
+        else
+        {
+            D3D12MA_HEAVY_ASSERT(m_Front == item);
+            m_Front = ItemTypeTraits::GetNext(item);
+        }
+
+        if(ItemTypeTraits::GetNext(item) != NULL)
+        {
+            ItemTypeTraits::AccessPrev(ItemTypeTraits::AccessNext(item)) = ItemTypeTraits::GetPrev(item);
+        }
+        else
+        {
+            D3D12MA_HEAVY_ASSERT(m_Back == item);
+            m_Back = ItemTypeTraits::GetPrev(item);
+        }
+        ItemTypeTraits::AccessPrev(item) = NULL;
+        ItemTypeTraits::AccessNext(item) = NULL;
+        --m_Count;
+    }
+private:
+    ItemType* m_Front = NULL;
+    ItemType* m_Back = NULL;
+    size_t m_Count = 0;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Private class AllocationObjectAllocator definition
 
 /*
@@ -2473,6 +2689,31 @@ struct CurrentBudgetData
     }
 };
 
+struct CommittedAllocationListItemTraits
+{
+    typedef Allocation ItemType;
+    static ItemType* GetPrev(const ItemType* item)
+    {
+        D3D12MA_ASSERT(item->m_PackedData.GetType() == Allocation::TYPE_COMMITTED || item->m_PackedData.GetType() == Allocation::TYPE_HEAP);
+        return item->m_Committed.prev;
+    }
+    static ItemType* GetNext(const ItemType* item)
+    {
+        D3D12MA_ASSERT(item->m_PackedData.GetType() == Allocation::TYPE_COMMITTED || item->m_PackedData.GetType() == Allocation::TYPE_HEAP);
+        return item->m_Committed.next;
+    }
+    static ItemType*& AccessPrev(ItemType* item)
+    {
+        D3D12MA_ASSERT(item->m_PackedData.GetType() == Allocation::TYPE_COMMITTED || item->m_PackedData.GetType() == Allocation::TYPE_HEAP);
+        return item->m_Committed.prev;
+    }
+    static ItemType*& AccessNext(ItemType* item)
+    {
+        D3D12MA_ASSERT(item->m_PackedData.GetType() == Allocation::TYPE_COMMITTED || item->m_PackedData.GetType() == Allocation::TYPE_HEAP);
+        return item->m_Committed.next;
+    }
+};
+
 class AllocatorPimpl
 {
 public:
@@ -2611,8 +2852,8 @@ private:
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
     AllocationObjectAllocator m_AllocationObjectAllocator;
 
-    typedef Vector<Allocation*> AllocationVectorType;
-    AllocationVectorType* m_pCommittedAllocations[HEAP_TYPE_COUNT];
+    typedef IntrusiveLinkedList<CommittedAllocationListItemTraits> CommittedAllocationList;
+    CommittedAllocationList m_CommittedAllocations[HEAP_TYPE_COUNT];
     D3D12MA_RW_MUTEX m_CommittedAllocationsMutex[HEAP_TYPE_COUNT];
 
     typedef Vector<Pool*> PoolVectorType;
@@ -2711,9 +2952,9 @@ private:
     }
     void CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_HEAP_FLAGS& outHeapFlags, UINT index) const;
 
-    // Registers Allocation object in m_pCommittedAllocations.
+    // Registers Allocation object in m_CommittedAllocations.
     void RegisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
-    // Unregisters Allocation object from m_pCommittedAllocations.
+    // Unregisters Allocation object from m_CommittedAllocations.
     void UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType);
 
     // Registers Pool object in m_pPools.
@@ -4236,7 +4477,6 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
 
-    ZeroMemory(m_pCommittedAllocations, sizeof(m_pCommittedAllocations));
     ZeroMemory(m_pPools, sizeof(m_pPools));
     ZeroMemory(m_BlockVectors, sizeof(m_BlockVectors));
     ZeroMemory(m_DefaultPoolTier1MinBytes, sizeof(m_DefaultPoolTier1MinBytes));
@@ -4248,7 +4488,6 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
 
     for(UINT heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
-        m_pCommittedAllocations[heapTypeIndex] = D3D12MA_NEW(GetAllocs(), AllocationVectorType)(GetAllocs());
         m_pPools[heapTypeIndex] = D3D12MA_NEW(GetAllocs(), PoolVectorType)(GetAllocs());
     }
 
@@ -4344,12 +4583,10 @@ AllocatorPimpl::~AllocatorPimpl()
 
     for(UINT i = HEAP_TYPE_COUNT; i--; )
     {
-        if(m_pCommittedAllocations[i] && !m_pCommittedAllocations[i]->empty())
+        if(!m_CommittedAllocations[i].IsEmpty())
         {
             D3D12MA_ASSERT(0 && "Unfreed committed allocations found!");
         }
-
-        D3D12MA_DELETE(GetAllocs(), m_pCommittedAllocations[i]);
     }
 }
 
@@ -5310,9 +5547,8 @@ void AllocatorPimpl::RegisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_T
     const UINT heapTypeIndex = HeapTypeToIndex(heapType);
 
     MutexLockWrite lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
-    AllocationVectorType* const committedAllocations = m_pCommittedAllocations[heapTypeIndex];
-    D3D12MA_ASSERT(committedAllocations);
-    committedAllocations->InsertSorted(alloc, PointerLess());
+    CommittedAllocationList& committedAllocations = m_CommittedAllocations[heapTypeIndex];
+    committedAllocations.PushBack(alloc);
 }
 
 void AllocatorPimpl::UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP_TYPE heapType)
@@ -5320,10 +5556,8 @@ void AllocatorPimpl::UnregisterCommittedAllocation(Allocation* alloc, D3D12_HEAP
     const UINT heapTypeIndex = HeapTypeToIndex(heapType);
     
     MutexLockWrite lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
-    AllocationVectorType* const committedAllocations = m_pCommittedAllocations[heapTypeIndex];
-    D3D12MA_ASSERT(committedAllocations);
-    bool success = committedAllocations->RemoveSorted(alloc, PointerLess());
-    D3D12MA_ASSERT(success);
+    CommittedAllocationList& committedAllocations = m_CommittedAllocations[heapTypeIndex];
+    committedAllocations.Remove(alloc);
 }
 
 void AllocatorPimpl::RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
@@ -5448,11 +5682,11 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     {
         StatInfo& heapStatInfo = outStats.HeapType[heapTypeIndex];
         MutexLockRead lock(m_CommittedAllocationsMutex[heapTypeIndex], m_UseMutex);
-        const AllocationVectorType* const allocationVector = m_pCommittedAllocations[heapTypeIndex];
-        D3D12MA_ASSERT(allocationVector);
-        for(size_t allocIndex = 0, count = allocationVector->size(); allocIndex < count; ++allocIndex)
+        CommittedAllocationList& committedAllocations = m_CommittedAllocations[heapTypeIndex];
+        for(Allocation* alloc = committedAllocations.Front();
+            alloc != NULL; alloc = committedAllocations.GetNext(alloc))
         {
-            UINT64 size = (*allocationVector)[allocIndex]->GetSize();
+            UINT64 size = alloc->GetSize();
             StatInfo statInfo = {};
             statInfo.BlockCount = 1;
             statInfo.AllocationCount = 1;
@@ -5694,13 +5928,11 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
                 MutexLockRead lock(m_CommittedAllocationsMutex[heapType], m_UseMutex);
 
                 json.BeginArray();
-                const AllocationVectorType* const allocationVector = m_pCommittedAllocations[heapType];
-                D3D12MA_ASSERT(allocationVector);
-                for (size_t i = 0, count = allocationVector->size(); i < count; ++i)
+                CommittedAllocationList& committedAllocations = m_CommittedAllocations[heapType];
+                for(Allocation* alloc = committedAllocations.Front();
+                    alloc != NULL; alloc = committedAllocations.GetNext(alloc))
                 {
-                    Allocation* alloc = (*allocationVector)[i];
                     D3D12MA_ASSERT(alloc);
-
                     json.BeginObject(true);
                     json.AddAllocationToObject(*alloc);
                     json.EndObject();
@@ -5980,6 +6212,8 @@ void Allocation::InitCommitted(D3D12_HEAP_TYPE heapType)
 {
     m_PackedData.SetType(TYPE_COMMITTED);
     m_Committed.heapType = heapType;
+    m_Committed.prev = NULL;
+    m_Committed.next = NULL;
 }
 
 void Allocation::InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block)
@@ -5993,6 +6227,8 @@ void Allocation::InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap)
 {
     m_PackedData.SetType(TYPE_HEAP);
     m_Heap.heapType = heapType;
+    m_Committed.prev = NULL;
+    m_Committed.next = NULL;
     m_Heap.heap = heap;
 }
 
