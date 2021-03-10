@@ -1448,8 +1448,74 @@ void EndCommandList(ID3D12GraphicsCommandList* cmdList)
     WaitGPUIdle(g_FrameIndex);
 }
 
-int main()
+struct CommandLineParameters
 {
+    bool m_Help;
+    bool m_List;
+    UINT32 m_GPUIndex = UINT32_MAX;
+    std::wstring m_GPUSubstring;
+
+    bool Parse(int argc, wchar_t** argv)
+    {
+        for(int i = 1; i < argc; ++i)
+        {
+            if(_wcsicmp(argv[i], L"-h") == 0 || _wcsicmp(argv[i], L"--Help") == 0)
+            {
+                m_Help = true;
+            }
+            else if(_wcsicmp(argv[i], L"-l") == 0 || _wcsicmp(argv[i], L"--List") == 0)
+            {
+                m_List = true;
+            }
+            else if((_wcsicmp(argv[i], L"-g") == 0 || _wcsicmp(argv[i], L"--GPU") == 0) && i + 1 < argc)
+            {
+                m_GPUSubstring = argv[i + 1];
+            }
+            else if((_wcsicmp(argv[i], L"-i") == 0 || _wcsicmp(argv[i], L"--GPUIndex") == 0) && i + 1 < argc)
+            {
+                m_GPUIndex = _wtoi(argv[i + 1]);
+            }
+            else
+                return false;
+        }
+        return true;
+    }
+};
+
+static void PrintLogo()
+{
+    wprintf(L"%s\n", WINDOW_TITLE);
+}
+
+static void PrintHelp()
+{
+    wprintf(
+        L"Command line syntax:\n"
+        L"-h, --Help   Print this information\n"
+        L"-l, --List   Print list of GPUs\n"
+        L"-g S, --GPU S   Select GPU with name containing S\n"
+        L"-i N, --GPUIndex N   Select GPU index N\n"
+    );
+}
+
+int main2(int argc, wchar_t** argv)
+{
+    CommandLineParameters cmdLineParams;
+    if(!cmdLineParams.Parse(argc, argv))
+    {
+        wprintf(L"ERROR: Invalid command line syntax.\n");
+        PrintLogo();
+        PrintHelp();
+        return -1;
+    }
+
+    if(cmdLineParams.m_Help)
+    {
+        PrintLogo();
+        PrintHelp();
+        return 0;
+    }
+
     g_Instance = (HINSTANCE)GetModuleHandle(NULL);
 
     CoInitialize(NULL);
@@ -1508,4 +1574,22 @@ int main()
         }
     }
     return (int)msg.wParam;
+}
+
+int wmain(int argc, wchar_t** argv)
+{
+    try
+    {
+        return main2(argc, argv);
+    }
+    catch(const std::exception& ex)
+    {
+        fwprintf(stderr, L"ERROR: %hs\n", ex.what());
+        return -1;
+    }
+    catch(...)
+    {
+        fwprintf(stderr, L"UNKNOWN ERROR.\n");
+        return -1;
+    }
 } 
