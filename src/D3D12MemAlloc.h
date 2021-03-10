@@ -637,6 +637,13 @@ Features deliberately excluded from the scope of this library:
   are not going to be included into this repository.
 */
 
+// If using this library on a platform different than Windows PC, you should
+// include D3D12-compatible header before this library on your own and define this macro.
+#ifndef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
+    #include <d3d12.h>
+    #include <dxgi1_6.h>
+#endif
+
 // Define this macro to 0 to disable usage of DXGI 1.4 (needed for IDXGIAdapter3 and query for memory budget).
 #ifndef D3D12MA_DXGI_1_4
     #ifdef __IDXGIAdapter3_INTERFACE_DEFINED__
@@ -644,13 +651,6 @@ Features deliberately excluded from the scope of this library:
     #else
         #define D3D12MA_DXGI_1_4 0
     #endif
-#endif
-
-// If using this library on a platform different than Windows PC, you should
-// include D3D12-compatible header before this library on your own and define this macro.
-#ifndef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
-    #include <d3d12.h>
-    #include <dxgi.h>
 #endif
 
 /*
@@ -970,11 +970,12 @@ private:
 /// \brief Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.
 struct POOL_DESC
 {
-    /** \brief The type of memory heap where allocations of this pool should be placed.
+    /** \brief The parameters of memory heap where allocations of this pool should be placed.
 
-    It must be one of: `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`.
+    In the simplest case, just fill it with zeros and set `Type` to one of: `D3D12_HEAP_TYPE_DEFAULT`,
+    `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`. Additional parameters can be used e.g. to utilize UMA.
     */
-    D3D12_HEAP_TYPE HeapType;
+    D3D12_HEAP_PROPERTIES HeapProperties;
     /** \brief Heap flags to be used when allocating heaps of this pool.
 
     It should contain one of these values, depending on type of resources you are going to create in this heap:
@@ -1128,7 +1129,7 @@ struct ALLOCATOR_DESC
 /**
 \brief Number of D3D12 memory heap types supported.
 */
-const UINT HEAP_TYPE_COUNT = 3;
+const UINT HEAP_TYPE_COUNT = 4;
 
 /**
 \brief Calculated statistics of memory usage in entire allocator.
@@ -1162,7 +1163,7 @@ struct Stats
     StatInfo Total;
     /**
     One StatInfo for each type of heap located at the following indices:
-    0 - DEFAULT, 1 - UPLOAD, 2 - READBACK.
+    0 - DEFAULT, 1 - UPLOAD, 2 - READBACK, 3 - CUSTOM.
     */
     StatInfo HeapType[HEAP_TYPE_COUNT];
 };

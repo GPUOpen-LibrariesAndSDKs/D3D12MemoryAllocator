@@ -572,7 +572,7 @@ static void TestCustomPools(const TestContext& ctx)
     // # Create pool, 1..2 blocks of 11 MB
     
     D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
     poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
     poolDesc.BlockSize = 11 * MEGABYTE;
     poolDesc.MinBlockCount = 1;
