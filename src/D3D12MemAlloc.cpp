@@ -735,6 +735,12 @@ static D3D12_HEAP_FLAGS GetExtraHeapFlagsToIgnore()
     return result;
 }
 
+static inline bool IsHeapTypeStandard(D3D12_HEAP_TYPE type)
+{
+    return type == D3D12_HEAP_TYPE_DEFAULT ||
+        type == D3D12_HEAP_TYPE_UPLOAD ||
+        type == D3D12_HEAP_TYPE_READBACK;
+}
 ////////////////////////////////////////////////////////////////////////////////
 // Private class Vector
 
@@ -2634,7 +2640,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Private class AllocatorPimpl definition
 
-static const UINT DEFAULT_POOL_HEAP_TYPE_COUNT = 3; // Only DEFAULT, UPLOAD, READBACK.
+static const UINT STANDARD_HEAP_TYPE_COUNT = 3; // Only DEFAULT, UPLOAD, READBACK.
 static const UINT DEFAULT_POOL_MAX_COUNT = 9;
 
 struct CurrentBudgetData
@@ -3820,7 +3826,7 @@ HRESULT BlockVector::AllocatePage(
     }
 
     UINT64 freeMemory = UINT64_MAX;
-    if(m_HeapProps.Type != D3D12_HEAP_TYPE_CUSTOM)
+    if(IsHeapTypeStandard(m_HeapProps.Type))
     {
         Budget budget = {};
         m_hAllocator->GetBudgetForHeapType(budget, m_HeapProps.Type);
@@ -3935,7 +3941,7 @@ void BlockVector::Free(Allocation* hAllocation)
     NormalBlock* pBlockToDelete = NULL;
 
     bool budgetExceeded = false;
-    if(m_HeapProps.Type != D3D12_HEAP_TYPE_CUSTOM)
+    if(IsHeapTypeStandard(m_HeapProps.Type))
     {
         Budget budget = {};
         m_hAllocator->GetBudgetForHeapType(budget, m_HeapProps.Type);
@@ -4171,10 +4177,7 @@ HRESULT BlockVector::AllocateFromBlock(
         pBlock->m_pMetadata->Alloc(currRequest, size, *pAllocation);
         (*pAllocation)->InitPlaced(currRequest.offset, alignment, pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
-        if(m_HeapProps.Type != D3D12_HEAP_TYPE_CUSTOM)
-        {
-            m_hAllocator->m_Budget.AddAllocation(HeapTypeToIndex(m_HeapProps.Type), size);
-        }
+        m_hAllocator->m_Budget.AddAllocation(HeapTypeToIndex(m_HeapProps.Type), size);
         return S_OK;
     }
     return E_OUTOFMEMORY;
@@ -4619,6 +4622,10 @@ HRESULT AllocatorPimpl::CreateResource(
         *ppvResource = NULL;
     }
 
+    if(pAllocDesc->CustomPool == NULL && !IsHeapTypeStandard(pAllocDesc->HeapType))
+    {
+        return E_INVALIDARG;
+    }
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
 
     D3D12_RESOURCE_DESC finalResourceDesc = *pResourceDesc;
@@ -4792,6 +4799,10 @@ HRESULT AllocatorPimpl::CreateResource2(
         return E_NOINTERFACE;
     }
 
+    if(pAllocDesc->CustomPool == NULL && !IsHeapTypeStandard(pAllocDesc->HeapType))
+    {
+        return E_INVALIDARG;
+    }
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
 
     D3D12_RESOURCE_DESC1 finalResourceDesc = *pResourceDesc;
@@ -4922,6 +4933,10 @@ HRESULT AllocatorPimpl::AllocateMemory(
     }
     else
     {
+        if(!IsHeapTypeStandard(pAllocDesc->HeapType))
+        {
+            return E_INVALIDARG;
+        }
         ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
 
         const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc);
@@ -4989,6 +5004,10 @@ HRESULT AllocatorPimpl::AllocateMemory1(
         return E_INVALIDARG;
     }
 
+    if(!IsHeapTypeStandard(pAllocDesc->HeapType))
+    {
+        return E_INVALIDARG;
+    }
     return AllocateHeap1(pAllocDesc, *pAllocInfo, pProtectedSession, ppAllocation);
 }
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
@@ -5037,7 +5056,7 @@ HRESULT AllocatorPimpl::SetDefaultHeapMinBytes(
     D3D12_HEAP_FLAGS heapFlags,
     UINT64 minBytes)
 {
-    if(heapType != D3D12_HEAP_TYPE_DEFAULT && heapType != D3D12_HEAP_TYPE_UPLOAD && heapType != D3D12_HEAP_TYPE_READBACK)
+    if(!IsHeapTypeStandard(heapType))
     {
         D3D12MA_ASSERT(0 && "Allocator::SetDefaultHeapMinBytes: Invalid heapType passed.");
         return E_INVALIDARG;
@@ -5617,7 +5636,7 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     
     if(SupportsResourceHeapTier2())
     {
-        for(size_t heapTypeIndex = 0; heapTypeIndex < DEFAULT_POOL_HEAP_TYPE_COUNT; ++heapTypeIndex)
+        for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
         {
             BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex];
             D3D12MA_ASSERT(pBlockVector);
@@ -5626,7 +5645,7 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     }
     else
     {
-        for(size_t heapTypeIndex = 0; heapTypeIndex < DEFAULT_POOL_HEAP_TYPE_COUNT; ++heapTypeIndex)
+        for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
         {
             for(size_t heapSubType = 0; heapSubType < 3; ++heapSubType)
             {
@@ -5693,6 +5712,7 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
         outCpuBudget->BlockBytes = m_Budget.m_BlockBytes[1] + m_Budget.m_BlockBytes[2];
         outCpuBudget->AllocationBytes = m_Budget.m_AllocationBytes[1] + m_Budget.m_AllocationBytes[2];
     }
+    // TODO: What to do with CUSTOM?
 
 #if D3D12MA_DXGI_1_4
     if(m_Adapter3)
@@ -5846,7 +5866,7 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
 
             if (SupportsResourceHeapTier2())
             {
-                for (size_t heapType = 0; heapType < DEFAULT_POOL_HEAP_TYPE_COUNT; ++heapType)
+                for (size_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
                 {
                     json.WriteString(HeapTypeNames[heapType]);
                     json.BeginObject();
@@ -5862,7 +5882,7 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
             }
             else
             {
-                for (size_t heapType = 0; heapType < DEFAULT_POOL_HEAP_TYPE_COUNT; ++heapType)
+                for (size_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
                 {
                     for (size_t heapSubType = 0; heapSubType < 3; ++heapSubType)
                     {
