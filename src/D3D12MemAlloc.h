@@ -637,11 +637,11 @@ Features deliberately excluded from the scope of this library:
   are not going to be included into this repository.
 */
 
-// If using this library on a platform different than Windows PC, you should
-// include D3D12-compatible header before this library on your own and define this macro.
+// If using this library on a platform different than Windows PC or want to use different version of DXGI,
+// you should include D3D12-compatible headers before this library on your own and define this macro.
 #ifndef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
     #include <d3d12.h>
-    #include <dxgi1_6.h>
+    #include <dxgi1_4.h>
 #endif
 
 // Define this macro to 0 to disable usage of DXGI 1.4 (needed for IDXGIAdapter3 and query for memory budget).
