@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2021-02-16)
+<b>Version 2.0.0-development</b> (2021-03-11)
 
 Copyright (c) 2019-2021 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -1227,6 +1227,22 @@ public:
     
     /// Returns cached options retrieved from D3D12 device.
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const;
+    /** \brief Returns true if `D3D12_FEATURE_DATA_ARCHITECTURE1::UMA` was found to be true.
+    
+    For more information about how to use it, see articles in Microsoft Docs:
+    - https://docs.microsoft.com/en-us/windows/win32/direct3d12/default-texture-mapping
+    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_architecture
+    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties
+    */
+    BOOL IsUMA() const;
+    /** \brief Returns true if `D3D12_FEATURE_DATA_ARCHITECTURE1::CacheCoherentUMA` was found to be true.
+
+    For more information about how to use it, see articles in Microsoft Docs:
+    - https://docs.microsoft.com/en-us/windows/win32/direct3d12/default-texture-mapping
+    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_architecture
+    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties
+    */
+    BOOL IsCacheCoherentUMA() const;
 
     /** \brief Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation function.
 

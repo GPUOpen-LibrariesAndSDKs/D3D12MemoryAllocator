@@ -2768,6 +2768,8 @@ public:
     // Shortcut for "Allocation Callbacks", because this function is called so often.
     const ALLOCATION_CALLBACKS& GetAllocs() const { return m_AllocationCallbacks; }
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const { return m_D3D12Options; }
+    BOOL IsUMA() const { return m_D3D12Architecture.UMA; }
+    BOOL IsCacheCoherentUMA() const { return m_D3D12Architecture.CacheCoherentUMA; }
     bool SupportsResourceHeapTier2() const { return m_D3D12Options.ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2; }
     bool UseMutex() const { return m_UseMutex; }
     AllocationObjectAllocator& GetAllocationObjectAllocator() { return m_AllocationObjectAllocator; }
@@ -2885,6 +2887,7 @@ private:
     D3D12MA_ATOMIC_UINT32 m_CurrentFrameIndex;
     DXGI_ADAPTER_DESC m_AdapterDesc;
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
+    D3D12_FEATURE_DATA_ARCHITECTURE m_D3D12Architecture;
     AllocationObjectAllocator m_AllocationObjectAllocator;
 
     typedef IntrusiveLinkedList<CommittedAllocationListItemTraits> CommittedAllocationList;
@@ -4485,6 +4488,7 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
 {
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
+    ZeroMemory(&m_D3D12Architecture, sizeof(m_D3D12Architecture));
 
     ZeroMemory(m_BlockVectors, sizeof(m_BlockVectors));
     ZeroMemory(m_DefaultPoolTier1MinBytes, sizeof(m_DefaultPoolTier1MinBytes));
@@ -4526,6 +4530,13 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 #ifdef D3D12MA_FORCE_RESOURCE_HEAP_TIER
     m_D3D12Options.ResourceHeapTier = (D3D12MA_FORCE_RESOURCE_HEAP_TIER);
 #endif
+
+    hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE, &m_D3D12Architecture, sizeof(m_D3D12Architecture));
+    if(FAILED(hr))
+    {
+        m_D3D12Architecture.UMA = FALSE;
+        m_D3D12Architecture.CacheCoherentUMA = FALSE;
+    }
 
     D3D12_HEAP_PROPERTIES heapProps = {};
     const UINT defaultPoolCount = CalcDefaultPoolCount();
@@ -6290,6 +6301,14 @@ void Allocator::Release()
 const D3D12_FEATURE_DATA_D3D12_OPTIONS& Allocator::GetD3D12Options() const
 {
     return m_Pimpl->GetD3D12Options();
+}
+BOOL Allocator::IsUMA() const
+{
+    return m_Pimpl->IsUMA();
+}
+BOOL Allocator::IsCacheCoherentUMA() const
+{
+    return m_Pimpl->IsCacheCoherentUMA();
 }
 
 HRESULT Allocator::CreateResource(

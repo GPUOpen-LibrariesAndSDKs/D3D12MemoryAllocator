@@ -1422,11 +1422,22 @@ static void TestDevice4(const TestContext& ctx)
     wprintf(L"Test ID3D12Device4\n");
 
     CComPtr<ID3D12Device4> dev4;
-    CHECK_HR(ctx.device->QueryInterface(&dev4));
+    HRESULT hr = ctx.device->QueryInterface(&dev4);
+    if(FAILED(hr))
+    {
+        wprintf(L"QueryInterface for ID3D12Device4 FAILED.\n");
+        return;
+    }
 
     D3D12_PROTECTED_RESOURCE_SESSION_DESC sessionDesc = {};
     CComPtr<ID3D12ProtectedResourceSession> session;
-    CHECK_HR(dev4->CreateProtectedResourceSession(&sessionDesc, IID_PPV_ARGS(&session)));
+    // This fails on the SOFTWARE adapter.
+    hr = dev4->CreateProtectedResourceSession(&sessionDesc, IID_PPV_ARGS(&session));
+    if(FAILED(hr))
+    {
+        wprintf(L"ID3D12Device4::CreateProtectedResourceSession FAILED.\n");
+        return;
+    }
 
     // Create a buffer
 
