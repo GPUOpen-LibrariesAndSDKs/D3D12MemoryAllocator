@@ -120,6 +120,14 @@ static bool ValidateDataZero(const void* ptr, const UINT64 sizeInBytes)
     return true;
 }
 
+static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFilePath)
+{
+    WCHAR* s = nullptr;
+    ctx.allocator->BuildStatsString(&s, TRUE);
+    SaveFile(dstFilePath, s, wcslen(s) * sizeof(WCHAR));
+    ctx.allocator->FreeStatsString(s);
+}
+
 static void TestVirtualBlocks(const TestContext& ctx)
 {
     wprintf(L"Test virtual blocks\n");
