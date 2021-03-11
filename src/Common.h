@@ -55,13 +55,14 @@ typedef std::chrono::high_resolution_clock::duration duration;
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
 #define LINE_STRING STRINGIZE(__LINE__)
-#define FAIL(msg) do { \
-        assert(0 && msg); \
-        throw std::runtime_error(msg); \
-    } while(false)
-
-#define CHECK_BOOL(expr)  do { if(!(expr)) FAIL(__FILE__ "(" LINE_STRING "): !( " #expr " )"); } while(false)
-#define CHECK_HR(expr)  do { if(FAILED(expr)) FAIL(__FILE__ "(" LINE_STRING "): FAILED( " #expr " )"); } while(false)
+#define CHECK_BOOL(expr)  do { if(!(expr)) { \
+        assert(0 && #expr); \
+        throw std::runtime_error(__FILE__ "(" LINE_STRING "): ( " #expr " ) == false"); \
+    } } while(false)
+#define CHECK_HR(expr)  do { if(FAILED(expr)) { \
+        assert(0 && #expr); \
+        throw std::runtime_error(__FILE__ "(" LINE_STRING "): FAILED( " #expr " )"); \
+    } } while(false)
 
 template <typename T>
 inline constexpr T CeilDiv(T x, T y)

@@ -98,7 +98,7 @@ static bool ValidateData(const void* ptr, const UINT64 sizeInBytes, UINT seed)
     {
         if(values[i] != value++)
         {
-            //FAIL("ValidateData failed.");
+            //CHECK_BOOL(0 && "ValidateData failed.");
             return false;
         }
     }
@@ -113,7 +113,7 @@ static bool ValidateDataZero(const void* ptr, const UINT64 sizeInBytes)
     {
         if(values[i] != 0)
         {
-            //FAIL("ValidateData failed.");
+            //CHECK_BOOL(0 && "ValidateData failed.");
             return false;
         }
     }
