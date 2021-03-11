@@ -264,7 +264,7 @@ static void TestFrameIndexAndJson(const TestContext& ctx)
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
             &alloc,
-            __uuidof(ID3D12Resource),
+            IID_NULL,
             NULL));
 
         WCHAR* statsString;

@@ -38,6 +38,7 @@ Documentation of all members: D3D12MemAlloc.h
         - [Project setup](@ref quick_start_project_setup)
         - [Creating resources](@ref quick_start_creating_resources)
         - [Mapping memory](@ref quick_start_mapping_memory)
+    - \subpage custom_pools
     - \subpage resource_aliasing
     - \subpage reserving_memory
     - \subpage virtual_allocator
@@ -236,6 +237,66 @@ memcpy(mappedPtr, bufData, bufSize);
 
 resource->Unmap(0, NULL);
 \endcode
+
+
+\page custom_pools Custom memory pools
+
+A "pool" is a collection of memory blocks that share certain properties.
+Allocator creates 3 default pools: for `D3D12_HEAP_TYPE_DEFAULT`, `UPLOAD`, `READBACK`.
+A default pool automatically grows in size. Size of allocated blocks is also variable and managed automatically.
+Typical allocations are created in these pools. You can also create custom pools.
+
+\section custom_pools_usage Usage
+
+To create a custom pool, fill in structure D3D12MA::POOL_DESC and call function D3D12MA::Allocator::CreatePool
+to obtain object D3D12MA::Pool. Example:
+
+\code
+POOL_DESC poolDesc = {};
+poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+Pool* pool;
+HRESULT hr = allocator->CreatePool(&poolDesc, &pool);
+\endcode
+
+To allocate resources out of a custom pool, only set member D3D12MA::ALLOCATION_DESC::CustomPool.
+Other members of this structure are then ignored. Example:
+
+\code
+ALLOCATION_DESC allocDesc = {};
+allocDesc.CustomPool = pool;
+
+D3D12_RESOURCE_DESC resDesc = ...
+Allocation* alloc;
+hr = allocator->CreateResource(&allocDesc, &resDesc,
+    D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &alloc, IID_NULL, NULL);
+\endcode
+
+Currently all allocations from custom pools are created as Placed, never as Committed.
+
+All allocations must be released before releasing the pool.
+The pool must be released before relasing the allocator.
+
+\code
+alloc->Release();
+pool->Release();
+\endcode
+
+\section custom_pools_features_and_benefits Features and benefits
+
+While it is recommended to use default pools whenever possible for simplicity and to give the allocator
+more opportunities for internal optimizations, custom pools may be useful in following cases:
+
+- To keep some resources separate from others in memory.
+- To use specific size of a memory block (`ID3D12Heap`). To set it, use member D3D12MA::POOL_DESC::BlockSize.
+  When set to 0, the library uses automatically determined, increasing block sizes.
+- To reserve some minimum amount of memory allocated. To use it, set member D3D12MA::POOL_DESC::MinBlockCount.
+- To limit maximum amount of memory allocated. To use it, set member D3D12MA::POOL_DESC::MaxBlockCount.
+- To use extended parameters of the D3D12 memory allocation. While resources created from default pools
+  can only specify `D3D12_HEAP_TYPE_DEFAULT`, `UPLOAD`, `READBACK`, a custom pool may use non-standard
+  `D3D12_HEAP_PROPERTIES` (member D3D12MA::POOL_DESC::HeapProperties) and `D3D12_HEAP_FLAGS`
+  (D3D12MA::POOL_DESC::HeapFlags), which is useful e.g. for cross-adapter sharing or UMA
+  (see also D3D12MA::Allocator::IsUMA).
 
 
 \page resource_aliasing Resource aliasing (overlap)
