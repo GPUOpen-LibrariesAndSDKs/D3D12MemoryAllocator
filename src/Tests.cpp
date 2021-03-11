@@ -717,6 +717,87 @@ static void TestCustomPools(const TestContext& ctx)
         IID_PPV_ARGS(&res)) );
 }
 
+static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIES& heapProps)
+{
+    D3D12MA::Stats globalStatsBeg = {};
+    ctx.allocator->CalculateStats(&globalStatsBeg);
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties = heapProps;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.BlockSize = 10 * MEGABYTE;
+    poolDesc.MinBlockCount = 1;
+    poolDesc.MaxBlockCount = 1;
+
+    const UINT64 BUFFER_SIZE = 1 * MEGABYTE;
+
+    D3D12MA::Pool* poolPtr;
+    HRESULT hr = ctx.allocator->CreatePool(&poolDesc, &poolPtr);
+    PoolUniquePtr pool{poolPtr};
+    if(SUCCEEDED(hr))
+    {
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.CustomPool = pool.get();
+
+        D3D12_RESOURCE_DESC resDesc;
+        FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
+
+        // Pool already allocated a block. We don't expect CreatePlacedResource to fail.
+        D3D12MA::Allocation* allocPtr;
+        CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            NULL, // pOptimizedClearValue
+            &allocPtr,
+            __uuidof(ID3D12Resource), NULL) ); // riidResource, ppvResource
+        AllocationUniquePtr alloc{allocPtr};
+
+        D3D12MA::Stats globalStatsCurr = {};
+        ctx.allocator->CalculateStats(&globalStatsCurr);
+
+        // Make sure it is accounted only in CUSTOM heap not any of the standard heaps.
+        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[0], &globalStatsBeg.HeapType[0], sizeof(D3D12MA::StatInfo)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[1], &globalStatsBeg.HeapType[1], sizeof(D3D12MA::StatInfo)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[2], &globalStatsBeg.HeapType[2], sizeof(D3D12MA::StatInfo)) == 0);
+        CHECK_BOOL( globalStatsCurr.HeapType[3].AllocationCount == globalStatsBeg.HeapType[3].AllocationCount + 1 );
+        CHECK_BOOL( globalStatsCurr.HeapType[3].BlockCount == globalStatsBeg.HeapType[3].BlockCount + 1 );
+        CHECK_BOOL( globalStatsCurr.HeapType[3].UsedBytes == globalStatsBeg.HeapType[3].UsedBytes + BUFFER_SIZE );
+        CHECK_BOOL( globalStatsCurr.Total.AllocationCount == globalStatsBeg.Total.AllocationCount + 1 );
+        CHECK_BOOL( globalStatsCurr.Total.BlockCount == globalStatsBeg.Total.BlockCount + 1 );
+        CHECK_BOOL( globalStatsCurr.Total.UsedBytes == globalStatsBeg.Total.UsedBytes + BUFFER_SIZE );
+
+        // Map and write some data.
+        if(heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE ||
+            heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_BACK)
+        {
+            ID3D12Resource* const res = alloc->GetResource();
+
+            UINT* mappedPtr = nullptr;
+            const D3D12_RANGE readRange = {0, 0};
+            CHECK_HR(res->Map(0, &readRange, (void**)&mappedPtr));
+            
+            *mappedPtr = 0xDEADC0DE;
+            
+            res->Unmap(0, nullptr);
+        }
+    }
+
+    return hr;
+}
+
+static void TestCustomHeaps(const TestContext& ctx)
+{
+    wprintf(L"Test custom heap\n");
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+
+    // Use custom pool but the same as READBACK, which should be always available.
+    heapProps.Type = D3D12_HEAP_TYPE_CUSTOM;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_L0; // System memory
+    HRESULT hr = TestCustomHeap(ctx, heapProps);
+    CHECK_HR(hr);
+}
+
 static void TestDefaultPoolMinBytes(const TestContext& ctx)
 {
     D3D12MA::Stats stats;
@@ -1425,6 +1506,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestPlacedResources(ctx);
     TestOtherComInterface(ctx);
     TestCustomPools(ctx);
+    TestCustomHeaps(ctx);
     TestDefaultPoolMinBytes(ctx);
     TestAliasingMemory(ctx);
     TestMapping(ctx);
