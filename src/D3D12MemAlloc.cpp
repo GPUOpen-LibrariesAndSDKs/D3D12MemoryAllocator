@@ -2557,7 +2557,7 @@ class CommittedAllocationList
 {
 public:
     CommittedAllocationList();
-    void Init(bool useMutex, D3D12_HEAP_TYPE heapType);
+    void Init(bool useMutex, D3D12_HEAP_TYPE heapType, PoolPimpl* pool);
     ~CommittedAllocationList();
 
     D3D12_HEAP_TYPE GetHeapType() const { return m_HeapType; }
@@ -2572,6 +2572,7 @@ public:
 private:
     bool m_UseMutex = true;
     D3D12_HEAP_TYPE m_HeapType = D3D12_HEAP_TYPE_CUSTOM;
+    PoolPimpl* m_Pool = NULL;
 
     D3D12MA_RW_MUTEX m_Mutex;
     typedef IntrusiveLinkedList<CommittedAllocationListItemTraits> CommittedAllocationLinkedList;
@@ -2765,6 +2766,7 @@ private:
     AllocatorPimpl* m_Allocator; // Externally owned object.
     POOL_DESC m_Desc;
     BlockVector* m_BlockVector; // Owned object.
+    CommittedAllocationList m_CommittedAllocations;
     wchar_t* m_Name;
     PoolPimpl* m_PrevPool = NULL;
     PoolPimpl* m_NextPool = NULL;
@@ -2978,6 +2980,12 @@ private:
     // Creates and returns Allocation object.
     HRESULT AllocateHeap(
         const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
+        Allocation** ppAllocation);
+    HRESULT AllocateHeap_Impl(
+        CommittedAllocationList& allocList,
+        const D3D12_HEAP_PROPERTIES& heapProperties,
+        D3D12_HEAP_FLAGS heapFlags,
         const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
         Allocation** ppAllocation);
 
@@ -3757,10 +3765,11 @@ CommittedAllocationList::CommittedAllocationList()
 {
 }
 
-void CommittedAllocationList::Init(bool useMutex, D3D12_HEAP_TYPE heapType)
+void CommittedAllocationList::Init(bool useMutex, D3D12_HEAP_TYPE heapType, PoolPimpl* pool)
 {
     m_UseMutex = useMutex;
     m_HeapType = heapType;
+    m_Pool = pool;
 }
 
 CommittedAllocationList::~CommittedAllocationList()
@@ -3773,17 +3782,9 @@ CommittedAllocationList::~CommittedAllocationList()
 
 void CommittedAllocationList::CalculateStats(StatInfo& outStats)
 {
-    outStats.BlockCount = 0;
-    outStats.AllocationCount = 0;
-    outStats.UnusedRangeCount = 0;
-    outStats.UsedBytes = 0;
-    outStats.UnusedBytes = 0;
+    ZeroMemory(&outStats, sizeof(outStats));
     outStats.AllocationSizeMin = UINT64_MAX;
-    outStats.AllocationSizeAvg = 0;
-    outStats.AllocationSizeMax = 0;
     outStats.UnusedRangeSizeMin = UINT64_MAX;
-    outStats.UnusedRangeSizeAvg = 0;
-    outStats.UnusedRangeSizeMax = 0;
 
     MutexLockRead lock(m_Mutex, m_UseMutex);
 
@@ -4477,6 +4478,7 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
 
 HRESULT PoolPimpl::Init()
 {
+    m_CommittedAllocations.Init(m_Allocator->UseMutex(), m_Desc.HeapProperties.Type, this);
     return m_BlockVector->CreateMinBlocks();
 }
 
@@ -4494,6 +4496,12 @@ void PoolPimpl::CalculateStats(StatInfo& outStats)
     outStats.UnusedRangeSizeMin = UINT64_MAX;
 
     m_BlockVector->AddStats(outStats);
+
+    {
+        StatInfo committedStatInfo; // Uninitialized.
+        m_CommittedAllocations.CalculateStats(committedStatInfo);
+        AddStatInfo(outStats, committedStatInfo);
+    }
 
     PostProcessStatInfo(outStats);
 }
@@ -4603,7 +4611,10 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
 
     for(UINT i = 0; i < STANDARD_HEAP_TYPE_COUNT; ++i)
     {
-        m_CommittedAllocations[i].Init(m_UseMutex, (D3D12_HEAP_TYPE)(D3D12_HEAP_TYPE_DEFAULT + i));
+        m_CommittedAllocations[i].Init(
+            m_UseMutex,
+            (D3D12_HEAP_TYPE)(D3D12_HEAP_TYPE_DEFAULT + i),
+            NULL); // pool
     }
 
     m_Device->AddRef();
@@ -5451,11 +5462,23 @@ HRESULT AllocatorPimpl::AllocateHeap(
         return E_OUTOFMEMORY;
     }
 
-    D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
+    const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
+    CommittedAllocationList& allocList = m_CommittedAllocations[heapTypeIndex];
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = pAllocDesc->HeapType;
+    return AllocateHeap_Impl(allocList, heapProps, pAllocDesc->ExtraHeapFlags, allocInfo, ppAllocation);
+}
 
+HRESULT AllocatorPimpl::AllocateHeap_Impl(
+    CommittedAllocationList& allocList,
+    const D3D12_HEAP_PROPERTIES& heapProperties,
+    D3D12_HEAP_FLAGS heapFlags,
+    const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
+    Allocation** ppAllocation)
+{
     D3D12_HEAP_DESC heapDesc = {};
     heapDesc.SizeInBytes = allocInfo.SizeInBytes;
-    heapDesc.Properties.Type = pAllocDesc->HeapType;
+    heapDesc.Properties = heapProperties;
     heapDesc.Alignment = allocInfo.Alignment;
     heapDesc.Flags = heapFlags;
 
@@ -5463,14 +5486,12 @@ HRESULT AllocatorPimpl::AllocateHeap(
     HRESULT hr = m_Device->CreateHeap(&heapDesc, __uuidof(*heap), (void**)&heap);
     if(SUCCEEDED(hr))
     {
-        CommittedAllocationList& allocList = m_CommittedAllocations[HeapTypeToIndex(pAllocDesc->HeapType)];
-
         const BOOL wasZeroInitialized = TRUE;
         (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes, wasZeroInitialized);
         (*ppAllocation)->InitHeap(&allocList, heap);
         allocList.Register(*ppAllocation);
 
-        const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
+        const UINT heapTypeIndex = HeapTypeToIndex(heapProperties.Type);
         m_Budget.AddAllocation(heapTypeIndex, allocInfo.SizeInBytes);
         m_Budget.m_BlockBytes[heapTypeIndex] += allocInfo.SizeInBytes;
     }
@@ -5502,26 +5523,24 @@ HRESULT AllocatorPimpl::AllocateHeap1(
         return E_OUTOFMEMORY;
     }
 
-    D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
-
     D3D12_HEAP_DESC heapDesc = {};
     heapDesc.SizeInBytes = allocInfo.SizeInBytes;
     heapDesc.Properties.Type = pAllocDesc->HeapType;
     heapDesc.Alignment = allocInfo.Alignment;
-    heapDesc.Flags = heapFlags;
+    heapDesc.Flags = pAllocDesc->ExtraHeapFlags;
 
     ID3D12Heap* heap = nullptr;
     HRESULT hr = m_Device4->CreateHeap1(&heapDesc, pProtectedSession, __uuidof(*heap), (void**)&heap);
     if(SUCCEEDED(hr))
     {
-        CommittedAllocationList& allocList = m_CommittedAllocations[HeapTypeToIndex(pAllocDesc->HeapType)];
+        const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
+        CommittedAllocationList& allocList = m_CommittedAllocations[heapTypeIndex];
 
         const BOOL wasZeroInitialized = TRUE;
         (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes, wasZeroInitialized);
         (*ppAllocation)->InitHeap(&allocList, heap);
         allocList.Register(*ppAllocation);
 
-        const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
         m_Budget.AddAllocation(heapTypeIndex, allocInfo.SizeInBytes);
         m_Budget.m_BlockBytes[heapTypeIndex] += allocInfo.SizeInBytes;
     }
