@@ -757,6 +757,7 @@ class AllocatorPimpl;
 class PoolPimpl;
 class NormalBlock;
 class BlockVector;
+class CommittedAllocationList;
 class JsonWriter;
 class VirtualBlockPimpl;
 /// \endcond
@@ -946,6 +947,7 @@ public:
 private:
     friend class AllocatorPimpl;
     friend class BlockVector;
+    friend class CommittedAllocationList;
     friend class JsonWriter;
     friend struct CommittedAllocationListItemTraits;
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
@@ -969,7 +971,7 @@ private:
     {
         struct
         {
-            D3D12_HEAP_TYPE heapType;
+            CommittedAllocationList* list;
             Allocation* prev;
             Allocation* next;
         } m_Committed;
@@ -983,7 +985,7 @@ private:
         struct
         {
             // Beginning must be compatible with m_Committed.
-            D3D12_HEAP_TYPE heapType;
+            CommittedAllocationList* list;
             Allocation* prev;
             Allocation* next;
             ID3D12Heap* heap;
@@ -1018,9 +1020,9 @@ private:
 
     Allocation(AllocatorPimpl* allocator, UINT64 size, BOOL wasZeroInitialized);
     ~Allocation();
-    void InitCommitted(D3D12_HEAP_TYPE heapType);
+    void InitCommitted(CommittedAllocationList* list);
     void InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block);
-    void InitHeap(D3D12_HEAP_TYPE heapType, ID3D12Heap* heap);
+    void InitHeap(CommittedAllocationList* list, ID3D12Heap* heap);
     template<typename D3D12_RESOURCE_DESC_T>
     void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc);
     void FreeName();
