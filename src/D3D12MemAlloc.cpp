@@ -2744,6 +2744,8 @@ struct CurrentBudgetData
 class PoolPimpl
 {
 public:
+    CommittedAllocationList m_CommittedAllocations;
+
     PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc);
     HRESULT Init();
     ~PoolPimpl();
@@ -2766,7 +2768,6 @@ private:
     AllocatorPimpl* m_Allocator; // Externally owned object.
     POOL_DESC m_Desc;
     BlockVector* m_BlockVector; // Owned object.
-    CommittedAllocationList m_CommittedAllocations;
     wchar_t* m_Name;
     PoolPimpl* m_PrevPool = NULL;
     PoolPimpl* m_NextPool = NULL;
@@ -2995,7 +2996,19 @@ private:
         const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
         ID3D12ProtectedResourceSession *pProtectedSession,
         Allocation** ppAllocation);
+    HRESULT AllocateHeap1_Impl(
+        CommittedAllocationList& allocList,
+        const D3D12_HEAP_PROPERTIES& heapProperties,
+        D3D12_HEAP_FLAGS heapFlags,
+        const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
+        ID3D12ProtectedResourceSession *pProtectedSession,
+        Allocation** ppAllocation);
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
+
+    template<typename D3D12_RESOURCE_DESC_T>
+    HRESULT CalcAllocationParams(const ALLOCATION_DESC& allocDesc, UINT64 allocSize,
+        const D3D12_RESOURCE_DESC_T* resDesc, // Optional
+        BlockVector*& outBlockVector, CommittedAllocationList*& outCommittedAllocationList, bool& outPreferCommitted);
 
     /*
     If SupportsResourceHeapTier2():
@@ -4749,7 +4762,6 @@ HRESULT AllocatorPimpl::CreateResource(
         return E_INVALIDARG;
     }
     ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
-
     D3D12_RESOURCE_DESC finalResourceDesc = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
     resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
@@ -4781,7 +4793,7 @@ HRESULT AllocatorPimpl::CreateResource(
         const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, finalResourceDesc);
         const bool requireCommittedMemory = defaultPoolIndex == UINT32_MAX;
         if(requireCommittedMemory)
-        {
+    {
             return AllocateCommittedResource(
                 &finalAllocDesc,
                 &finalResourceDesc,
@@ -4800,16 +4812,15 @@ HRESULT AllocatorPimpl::CreateResource(
         bool preferCommittedMemory =
             m_AlwaysCommitted ||
             PrefersCommittedAllocation(finalResourceDesc) ||
-            // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
             resAllocInfo.SizeInBytes > preferredBlockSize / 2;
         if(preferCommittedMemory &&
             (finalAllocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
         {
             finalAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
-        }
+    }
 
         if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
-        {
+    {
             return AllocateCommittedResource(
                 &finalAllocDesc,
                 &finalResourceDesc,
@@ -4819,7 +4830,7 @@ HRESULT AllocatorPimpl::CreateResource(
                 ppAllocation,
                 riidResource,
                 ppvResource);
-        }
+    }
         else
         {
             HRESULT hr = blockVector->CreateResource(
@@ -4832,10 +4843,10 @@ HRESULT AllocatorPimpl::CreateResource(
                 ppAllocation,
                 riidResource,
                 ppvResource);
-            if(SUCCEEDED(hr))
+        if(SUCCEEDED(hr))
             {
-                return hr;
-            }
+            return hr;
+    }
 
             return AllocateCommittedResource(
                 &finalAllocDesc,
@@ -5042,66 +5053,36 @@ HRESULT AllocatorPimpl::AllocateMemory(
 {
     *ppAllocation = NULL;
 
-    if(pAllocDesc->CustomPool != NULL)
+    BlockVector* blockVector = NULL;
+    CommittedAllocationList* committedAllocationList = NULL;
+    bool preferCommitted = false;
+    HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, pAllocInfo->SizeInBytes,
+        NULL, // pResDesc
+        blockVector, committedAllocationList, preferCommitted);
+    if(FAILED(hr))
+        return hr;
+    
+    hr = E_INVALIDARG;
+    if(committedAllocationList != NULL && preferCommitted)
     {
-        BlockVector* const blockVector = pAllocDesc->CustomPool->m_Pimpl->GetBlockVector();
-        D3D12MA_ASSERT(blockVector);
-        return blockVector->Allocate(
-            pAllocInfo->SizeInBytes,
-            pAllocInfo->Alignment,
-            *pAllocDesc,
-            1,
-            (Allocation**)ppAllocation);
+        hr = AllocateHeap(pAllocDesc, *pAllocInfo, ppAllocation);
+        if(SUCCEEDED(hr))
+            return hr;
     }
-    else
+    if(blockVector != NULL)
     {
-        if(!IsHeapTypeStandard(pAllocDesc->HeapType))
-        {
-            return E_INVALIDARG;
-        }
-        ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
-
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc);
-        bool requireCommittedMemory = (defaultPoolIndex == UINT32_MAX);
-        if(requireCommittedMemory)
-        {
-            return AllocateHeap(&finalAllocDesc, *pAllocInfo, ppAllocation);
-        }
-
-        BlockVector* blockVector = m_BlockVectors[defaultPoolIndex];
-        D3D12MA_ASSERT(blockVector);
-
-        const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
-        const bool preferCommittedMemory =
-            m_AlwaysCommitted ||
-            // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
-            pAllocInfo->SizeInBytes > preferredBlockSize / 2;
-        if(preferCommittedMemory &&
-            (finalAllocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
-        {
-            finalAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
-        }
-
-        if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
-        {
-            return AllocateHeap(&finalAllocDesc, *pAllocInfo, ppAllocation);
-        }
-        else
-        {
-            HRESULT hr = blockVector->Allocate(
-                pAllocInfo->SizeInBytes,
-                pAllocInfo->Alignment,
-                finalAllocDesc,
-                1,
-                (Allocation**)ppAllocation);
-            if(SUCCEEDED(hr))
-            {
-                return hr;
-            }
-
-            return AllocateHeap(&finalAllocDesc, *pAllocInfo, ppAllocation);
-        }
+        hr = blockVector->Allocate(pAllocInfo->SizeInBytes, pAllocInfo->Alignment,
+            *pAllocDesc, 1, (Allocation**)ppAllocation);
+        if(SUCCEEDED(hr))
+            return hr;
     }
+    if(committedAllocationList != NULL && !preferCommitted)
+    {
+        hr = AllocateHeap(pAllocDesc, *pAllocInfo, ppAllocation);
+        if(SUCCEEDED(hr))
+            return hr;
+    }
+    return hr;
 }
 
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
@@ -5523,30 +5504,94 @@ HRESULT AllocatorPimpl::AllocateHeap1(
         return E_OUTOFMEMORY;
     }
 
+    const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
+    CommittedAllocationList& allocList = m_CommittedAllocations[heapTypeIndex];
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = pAllocDesc->HeapType;
+    return AllocateHeap1_Impl(allocList, heapProps, pAllocDesc->ExtraHeapFlags, allocInfo, pProtectedSession, ppAllocation);
+}
+
+HRESULT AllocatorPimpl::AllocateHeap1_Impl(
+    CommittedAllocationList& allocList,
+    const D3D12_HEAP_PROPERTIES& heapProperties,
+    D3D12_HEAP_FLAGS heapFlags,
+    const D3D12_RESOURCE_ALLOCATION_INFO& allocInfo,
+    ID3D12ProtectedResourceSession *pProtectedSession,
+    Allocation** ppAllocation)
+{
     D3D12_HEAP_DESC heapDesc = {};
     heapDesc.SizeInBytes = allocInfo.SizeInBytes;
-    heapDesc.Properties.Type = pAllocDesc->HeapType;
+    heapDesc.Properties = heapProperties;
     heapDesc.Alignment = allocInfo.Alignment;
-    heapDesc.Flags = pAllocDesc->ExtraHeapFlags;
+    heapDesc.Flags = heapFlags;
 
     ID3D12Heap* heap = nullptr;
     HRESULT hr = m_Device4->CreateHeap1(&heapDesc, pProtectedSession, __uuidof(*heap), (void**)&heap);
     if(SUCCEEDED(hr))
     {
-        const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
-        CommittedAllocationList& allocList = m_CommittedAllocations[heapTypeIndex];
-
         const BOOL wasZeroInitialized = TRUE;
         (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes, wasZeroInitialized);
         (*ppAllocation)->InitHeap(&allocList, heap);
         allocList.Register(*ppAllocation);
 
+        const UINT heapTypeIndex = HeapTypeToIndex(heapProperties.Type);
         m_Budget.AddAllocation(heapTypeIndex, allocInfo.SizeInBytes);
         m_Budget.m_BlockBytes[heapTypeIndex] += allocInfo.SizeInBytes;
     }
     return hr;
 }
 #endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
+
+template<typename D3D12_RESOURCE_DESC_T>
+HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, UINT64 allocSize,
+    const D3D12_RESOURCE_DESC_T* resDesc,
+    BlockVector*& outBlockVector, CommittedAllocationList*& outCommittedAllocationList, bool& outPreferCommitted)
+{
+    outBlockVector = NULL;
+    outCommittedAllocationList = NULL;
+    outPreferCommitted = false;
+
+    if(allocDesc.CustomPool != NULL)
+    {
+        if((allocDesc.Flags & ALLOCATION_FLAG_COMMITTED) == 0)
+        {
+            outBlockVector = allocDesc.CustomPool->m_Pimpl->GetBlockVector();
+        }
+    }
+    else
+    {
+        if(!IsHeapTypeStandard(allocDesc.HeapType))
+        {
+            return E_INVALIDARG;
+        }
+        if((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
+        {
+            outCommittedAllocationList = &m_CommittedAllocations[HeapTypeToIndex(allocDesc.HeapType)];
+        }
+        if(!m_AlwaysCommitted &&
+            (allocDesc.Flags & ALLOCATION_FLAG_COMMITTED) == 0)
+        {
+            const UINT defaultPoolIndex = CalcDefaultPoolIndex(allocDesc);
+            if(defaultPoolIndex != UINT32_MAX)
+            {
+                outBlockVector = m_BlockVectors[defaultPoolIndex];
+                const UINT64 preferredBlockSize = outBlockVector->GetPreferredBlockSize();
+                if(allocSize > preferredBlockSize)
+                {
+                    outBlockVector = NULL;
+                }
+                else if(allocSize > preferredBlockSize / 2)
+                {
+                    // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
+                    outPreferCommitted = true;
+                }
+            }
+        }
+    }
+    if(resDesc != NULL && PrefersCommittedAllocation(*resDesc))
+        outPreferCommitted = true;
+    return S_OK;
+}
 
 UINT AllocatorPimpl::CalcDefaultPoolCount() const
 {
