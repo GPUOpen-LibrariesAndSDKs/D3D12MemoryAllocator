@@ -809,6 +809,13 @@ static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
 
     std::vector<AllocationUniquePtr> allocations;
     
+    D3D12MA::Stats statsBeg = {};
+    D3D12MA::StatInfo poolStatInfoBeg = {};
+    ctx.allocator->CalculateStats(&statsBeg);
+    pool->CalculateStats(&poolStatInfoBeg);
+
+    size_t poolAllocCount = 0;
+
     D3D12_RESOURCE_DESC resDesc = {};
     FillResourceDescForBuffer(resDesc, bufferSize);
 
@@ -839,13 +846,30 @@ static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
                 D3D12_RESOURCE_STATE_COMMON,
                 NULL, // pOptimizedClearValue
                 &allocPtr, IID_NULL, NULL);
+            CHECK_BOOL(SUCCEEDED(hr) == (allocPtr != NULL));
             if(allocPtr)
+            {
                 allocations.push_back(AllocationUniquePtr{allocPtr});
+                if(useCustomPool)
+                    ++poolAllocCount;
+            }
 
             bool expectSuccess = !neverAllocate; // NEVER_ALLOCATE should always fail with COMMITTED.
             CHECK_BOOL(expectSuccess == SUCCEEDED(hr));
         }
     }
+
+    D3D12MA::Stats statsEnd = {};
+    D3D12MA::StatInfo poolStatInfoEnd = {};
+    ctx.allocator->CalculateStats(&statsEnd);
+    pool->CalculateStats(&poolStatInfoEnd);
+
+    CHECK_BOOL(statsEnd.Total.AllocationCount == statsBeg.Total.AllocationCount + allocations.size());
+    CHECK_BOOL(statsEnd.Total.UsedBytes >= statsBeg.Total.UsedBytes + allocations.size() * bufferSize);
+    CHECK_BOOL(statsEnd.HeapType[0].AllocationCount == statsBeg.HeapType[0].AllocationCount + allocations.size());
+    CHECK_BOOL(statsEnd.HeapType[0].UsedBytes >= statsBeg.HeapType[0].UsedBytes + allocations.size() * bufferSize);
+    CHECK_BOOL(poolStatInfoEnd.AllocationCount == poolStatInfoBeg.AllocationCount + poolAllocCount);
+    CHECK_BOOL(poolStatInfoEnd.UsedBytes >= poolStatInfoBeg.UsedBytes + poolAllocCount * bufferSize);
 }
 
 static void TestAliasingMemory(const TestContext& ctx)

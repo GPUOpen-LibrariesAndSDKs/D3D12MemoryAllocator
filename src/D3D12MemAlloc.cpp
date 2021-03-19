@@ -2800,6 +2800,7 @@ public:
     CommittedAllocationList* GetCommittedAllocationList() { return SupportsCommittedAllocations() ? &m_CommittedAllocations : NULL; }
 
     void CalculateStats(StatInfo& outStats);
+    void AddStats(Stats& inoutStats);
 
     void SetName(LPCWSTR Name);
     LPCWSTR GetName() const { return m_Name; }
@@ -4444,6 +4445,15 @@ void PoolPimpl::CalculateStats(StatInfo& outStats)
     PostProcessStatInfo(outStats);
 }
 
+void PoolPimpl::AddStats(Stats& inoutStats)
+{
+    StatInfo poolStatInfo = {};
+    CalculateStats(poolStatInfo);
+
+    AddStatInfo(inoutStats.Total, poolStatInfo);
+    AddStatInfo(inoutStats.HeapType[HeapTypeToIndex(m_Desc.HeapProperties.Type)], poolStatInfo);
+}
+
 void PoolPimpl::SetName(LPCWSTR Name)
 {
     FreeName();
@@ -5448,7 +5458,6 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
     }
 
     // Process deafult pools.
-    
     if(SupportsResourceHeapTier2())
     {
         for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
@@ -5478,7 +5487,7 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
         PoolList& poolList = m_Pools[heapTypeIndex];
         for(PoolPimpl* pool = poolList.Front(); pool != NULL; pool = poolList.GetNext(pool))
         {
-            pool->GetBlockVector()->AddStats(outStats);
+            pool->AddStats(outStats);
         }
     }
 
