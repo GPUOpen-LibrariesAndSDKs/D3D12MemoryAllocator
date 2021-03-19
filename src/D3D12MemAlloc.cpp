@@ -4985,7 +4985,9 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
 
     ID3D12Resource* res = NULL;
     HRESULT hr = m_Device->CreateCommittedResource(
-        &committedAllocParams.m_HeapProperties, committedAllocParams.m_HeapFlags, pResourceDesc, InitialResourceState,
+        &committedAllocParams.m_HeapProperties,
+        committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
+        pResourceDesc, InitialResourceState,
         pOptimizedClearValue, IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
@@ -5039,7 +5041,9 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
 
     ID3D12Resource* res = NULL;
     HRESULT hr = m_Device4->CreateCommittedResource1(
-        &committedAllocParams.m_HeapProperties, committedAllocParams.m_HeapFlags, pResourceDesc, InitialResourceState,
+        &committedAllocParams.m_HeapProperties,
+        committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
+        pResourceDesc, InitialResourceState,
         pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
@@ -5094,7 +5098,9 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
 
     ID3D12Resource* res = NULL;
     HRESULT hr = m_Device8->CreateCommittedResource2(
-        &committedAllocParams.m_HeapProperties, committedAllocParams.m_HeapFlags, pResourceDesc, InitialResourceState,
+        &committedAllocParams.m_HeapProperties,
+        committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
+        pResourceDesc, InitialResourceState,
         pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
@@ -5222,7 +5228,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
 
         outCommittedAllocationParams.m_HeapProperties = pool->GetDesc().HeapProperties;
         outCommittedAllocationParams.m_HeapFlags = pool->GetDesc().HeapFlags;
-        //outCommittedAllocationParams.m_List = pool->GetCommittedAllocationList(); // TODO
+        outCommittedAllocationParams.m_List = pool->GetCommittedAllocationList();
     }
     else
     {

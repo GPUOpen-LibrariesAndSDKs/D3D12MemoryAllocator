@@ -602,6 +602,7 @@ static void TestCustomPools(const TestContext& ctx)
     CHECK_BOOL( poolStats.UnusedBytes == poolStats.BlockCount * poolDesc.BlockSize );
 
     // # SetName and GetName
+
     static const wchar_t* NAME = L"Custom pool name 1";
     pool->SetName(NAME);
     CHECK_BOOL( wcscmp(pool->GetName(), NAME) == 0 );
@@ -646,6 +647,7 @@ static void TestCustomPools(const TestContext& ctx)
     CHECK_BOOL( globalStatsCurr.Total.UsedBytes == globalStatsBeg.Total.UsedBytes + poolStats.UsedBytes );
 
     // # NEVER_ALLOCATE and COMMITTED should fail
+    // (Committed allocations not allowed in this pool because BlockSize != 0.)
 
     for(uint32_t i = 0; i < 2; ++i)
     {
@@ -788,6 +790,62 @@ static void TestCustomHeaps(const TestContext& ctx)
     heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_L0; // System memory
     HRESULT hr = TestCustomHeap(ctx, heapProps);
     CHECK_HR(hr);
+}
+
+static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
+{
+    wprintf(L"Test standard, custom, committed, placed\n");
+
+    static const D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
+    static const UINT64 bufferSize = 1024;
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = heapType;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+
+    D3D12MA::Pool* poolPtr;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &poolPtr));
+    PoolUniquePtr pool{poolPtr};
+
+    std::vector<AllocationUniquePtr> allocations;
+    
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForBuffer(resDesc, bufferSize);
+
+    for(uint32_t standardCustomI = 0; standardCustomI < 2; ++standardCustomI)
+    {
+        const bool useCustomPool = standardCustomI > 0;
+        for(uint32_t flagsI = 0; flagsI < 3; ++flagsI)
+        {
+            const bool useCommitted = flagsI > 0;
+            const bool neverAllocate = flagsI > 1;
+
+            D3D12MA::ALLOCATION_DESC allocDesc = {};
+            if(useCustomPool)
+            {
+                allocDesc.CustomPool = pool.get();
+                allocDesc.HeapType = (D3D12_HEAP_TYPE)0xCDCDCDCD; // Should be ignored.
+                allocDesc.ExtraHeapFlags = (D3D12_HEAP_FLAGS)0xCDCDCDCD; // Should be ignored.
+            }
+            else
+                allocDesc.HeapType = heapType;
+            if(useCommitted)
+                allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_COMMITTED;
+            if(neverAllocate)
+                allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
+
+            D3D12MA::Allocation* allocPtr = NULL;
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
+                D3D12_RESOURCE_STATE_COMMON,
+                NULL, // pOptimizedClearValue
+                &allocPtr, IID_NULL, NULL);
+            if(allocPtr)
+                allocations.push_back(AllocationUniquePtr{allocPtr});
+
+            bool expectSuccess = !neverAllocate; // NEVER_ALLOCATE should always fail with COMMITTED.
+            CHECK_BOOL(expectSuccess == SUCCEEDED(hr));
+        }
+    }
 }
 
 static void TestAliasingMemory(const TestContext& ctx)
@@ -1490,6 +1548,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestOtherComInterface(ctx);
     TestCustomPools(ctx);
     TestCustomHeaps(ctx);
+    TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
     TestMapping(ctx);
     TestStats(ctx);
