@@ -770,6 +770,15 @@ static inline bool IsHeapTypeStandard(D3D12_HEAP_TYPE type)
         type == D3D12_HEAP_TYPE_UPLOAD ||
         type == D3D12_HEAP_TYPE_READBACK;
 }
+
+static inline D3D12_HEAP_PROPERTIES StandardHeapTypeToHeapProperties(D3D12_HEAP_TYPE type)
+{
+    D3D12MA_ASSERT(IsHeapTypeStandard(type));
+    D3D12_HEAP_PROPERTIES result = {};
+    result.Type = type;
+    return result;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Private class Vector
 
@@ -2770,15 +2779,16 @@ struct CurrentBudgetData
 class PoolPimpl
 {
 public:
-    CommittedAllocationList m_CommittedAllocations;
-
     PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc);
     HRESULT Init();
     ~PoolPimpl();
 
     AllocatorPimpl* GetAllocator() const { return m_Allocator; }
     const POOL_DESC& GetDesc() const { return m_Desc; }
+    bool SupportsCommittedAllocations() const { return m_Desc.BlockSize == 0; }
+
     BlockVector* GetBlockVector() { return m_BlockVector; }
+    CommittedAllocationList* GetCommittedAllocationList() { return SupportsCommittedAllocations() ? &m_CommittedAllocations : NULL; }
 
     void CalculateStats(StatInfo& outStats);
 
@@ -2792,6 +2802,7 @@ private:
     AllocatorPimpl* m_Allocator; // Externally owned object.
     POOL_DESC m_Desc;
     BlockVector* m_BlockVector; // Owned object.
+    CommittedAllocationList m_CommittedAllocations;
     wchar_t* m_Name;
     PoolPimpl* m_PrevPool = NULL;
     PoolPimpl* m_NextPool = NULL;
@@ -4966,9 +4977,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         return E_OUTOFMEMORY;
     }
 
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = pAllocDesc->HeapType;
-
+    const D3D12_HEAP_PROPERTIES heapProps = StandardHeapTypeToHeapProperties(pAllocDesc->HeapType);
     const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
 
     ID3D12Resource* res = NULL;
@@ -5034,9 +5043,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
         return E_OUTOFMEMORY;
     }
 
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = pAllocDesc->HeapType;
-
+    const D3D12_HEAP_PROPERTIES heapProps = StandardHeapTypeToHeapProperties(pAllocDesc->HeapType);
     const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
 
     ID3D12Resource* res = NULL;
@@ -5103,9 +5110,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
         return E_OUTOFMEMORY;
     }
 
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = pAllocDesc->HeapType;
-
+    const D3D12_HEAP_PROPERTIES heapProps = StandardHeapTypeToHeapProperties(pAllocDesc->HeapType);
     const D3D12_HEAP_FLAGS heapFlags = pAllocDesc->ExtraHeapFlags;
 
     ID3D12Resource* res = NULL;
@@ -5164,8 +5169,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
 
     const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
     CommittedAllocationList& allocList = m_CommittedAllocations[heapTypeIndex];
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = pAllocDesc->HeapType;
+    const D3D12_HEAP_PROPERTIES heapProps = StandardHeapTypeToHeapProperties(pAllocDesc->HeapType);
     return AllocateHeap_Impl(allocList, heapProps, pAllocDesc->ExtraHeapFlags, allocInfo, ppAllocation);
 }
 
@@ -5225,8 +5229,7 @@ HRESULT AllocatorPimpl::AllocateHeap1(
 
     const UINT heapTypeIndex = HeapTypeToIndex(pAllocDesc->HeapType);
     CommittedAllocationList& allocList = m_CommittedAllocations[heapTypeIndex];
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = pAllocDesc->HeapType;
+    const D3D12_HEAP_PROPERTIES heapProps = StandardHeapTypeToHeapProperties(pAllocDesc->HeapType);
     return AllocateHeap1_Impl(allocList, heapProps, pAllocDesc->ExtraHeapFlags, allocInfo, pProtectedSession, ppAllocation);
 }
 
@@ -5274,8 +5277,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     {
         PoolPimpl* const pool = allocDesc.CustomPool->m_Pimpl;
         outBlockVector = pool->GetBlockVector();
-        // TODO!
-        //outCommittedAllocationList = &pool->m_CommittedAllocations;
+        //outCommittedAllocationList = pool->GetCommittedAllocationList(); // TODO
     }
     else
     {
@@ -5326,7 +5328,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         outPreferCommitted = true;
     }
 
-    return S_OK;
+    return (outBlockVector != NULL || outCommittedAllocationList != NULL) ? S_OK : E_INVALIDARG;
 }
 
 UINT AllocatorPimpl::CalcDefaultPoolCount() const
