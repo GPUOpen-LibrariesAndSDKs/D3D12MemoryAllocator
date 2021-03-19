@@ -606,22 +606,6 @@ static void TestCustomPools(const TestContext& ctx)
     pool->SetName(NAME);
     CHECK_BOOL( wcscmp(pool->GetName(), NAME) == 0 );
 
-    // # SetMinBytes
-
-    CHECK_HR( pool->SetMinBytes(15 * MEGABYTE) );
-    pool->CalculateStats(&poolStats);
-    CHECK_BOOL( poolStats.BlockCount == 2 );
-    CHECK_BOOL( poolStats.AllocationCount == 0 );
-    CHECK_BOOL( poolStats.UsedBytes == 0 );
-    CHECK_BOOL( poolStats.UnusedBytes == poolStats.BlockCount * poolDesc.BlockSize );
-
-    CHECK_HR( pool->SetMinBytes(0) );
-    pool->CalculateStats(&poolStats);
-    CHECK_BOOL( poolStats.BlockCount == 1 );
-    CHECK_BOOL( poolStats.AllocationCount == 0 );
-    CHECK_BOOL( poolStats.UsedBytes == 0 );
-    CHECK_BOOL( poolStats.UnusedBytes == poolStats.BlockCount * poolDesc.BlockSize );
-
     // # Create buffers 2x 5 MB
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -804,26 +788,6 @@ static void TestCustomHeaps(const TestContext& ctx)
     heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_L0; // System memory
     HRESULT hr = TestCustomHeap(ctx, heapProps);
     CHECK_HR(hr);
-}
-
-static void TestDefaultPoolMinBytes(const TestContext& ctx)
-{
-    D3D12MA::Stats stats;
-    ctx.allocator->CalculateStats(&stats);
-    const UINT64 gpuAllocatedBefore = stats.HeapType[0].UsedBytes + stats.HeapType[0].UnusedBytes;
-
-    const UINT64 gpuAllocatedMin = gpuAllocatedBefore * 105 / 100;
-    CHECK_HR( ctx.allocator->SetDefaultHeapMinBytes(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,            CeilDiv(gpuAllocatedMin, 3ull)) );
-    CHECK_HR( ctx.allocator->SetDefaultHeapMinBytes(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, CeilDiv(gpuAllocatedMin, 3ull)) );
-    CHECK_HR( ctx.allocator->SetDefaultHeapMinBytes(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES,     CeilDiv(gpuAllocatedMin, 3ull)) );
-
-    ctx.allocator->CalculateStats(&stats);
-    const UINT64 gpuAllocatedAfter = stats.HeapType[0].UsedBytes + stats.HeapType[0].UnusedBytes;
-    CHECK_BOOL(gpuAllocatedAfter >= gpuAllocatedMin);
-
-    CHECK_HR( ctx.allocator->SetDefaultHeapMinBytes(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,            0) );
-    CHECK_HR( ctx.allocator->SetDefaultHeapMinBytes(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, 0) );
-    CHECK_HR( ctx.allocator->SetDefaultHeapMinBytes(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES,     0) );
 }
 
 static void TestAliasingMemory(const TestContext& ctx)
@@ -1526,7 +1490,6 @@ static void TestGroupBasics(const TestContext& ctx)
     TestOtherComInterface(ctx);
     TestCustomPools(ctx);
     TestCustomHeaps(ctx);
-    TestDefaultPoolMinBytes(ctx);
     TestAliasingMemory(ctx);
     TestMapping(ctx);
     TestStats(ctx);

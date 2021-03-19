@@ -40,7 +40,6 @@ Documentation of all members: D3D12MemAlloc.h
         - [Mapping memory](@ref quick_start_mapping_memory)
     - \subpage custom_pools
     - \subpage resource_aliasing
-    - \subpage reserving_memory
     - \subpage virtual_allocator
 - \subpage configuration
   - [Custom CPU memory allocator](@ref custom_memory_allocator)
@@ -411,43 +410,6 @@ Additional considerations:
 - Resources of the three categories: buffers, textures with `RENDER_TARGET` or `DEPTH_STENCIL` flags, and all other textures,
   can be placed in the same memory only when `allocator->GetD3D12Options().ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2`.
   Otherwise they must be placed in different memory heap types, and thus aliasing them is not possible.
-
-
-\page reserving_memory Reserving minimum amount of memory
-
-The library automatically allocates and frees memory heaps.
-It also applies some hysteresis so that it doesn't allocate and free entire heap
-when you repeatedly create and release a single resource.
-However, if you want to make sure certain number of bytes is always allocated as heaps in a specific pool,
-you can use functions designed for this purpose:
-
-- For default heaps use D3D12MA::Allocator::SetDefaultHeapMinBytes.
-- For custom heaps use D3D12MA::Pool::SetMinBytes.
-
-Default is 0. You can change this parameter any time.
-Setting it to higher value may cause new heaps to be allocated.
-If this allocation fails, the function returns appropriate error code, but the parameter remains set to the new value.
-Setting it to lower value may cause some empty heaps to be released.
-
-You can always call D3D12MA::Allocator::SetDefaultHeapMinBytes for 3 sets of heap flags separately:
-`D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`, `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`, `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`.
-When ResourceHeapTier = 2, so that all types of resourced are kept together,
-these 3 values as simply summed up to calculate minimum amount of bytes for default pool with certain heap type.
-Alternatively, when ResourceHeapTier = 2, you can call this function with
-`D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES` = 0. This will set a single value for the default pool and
-will override the sum of those three.
-
-Reservation of minimum number of bytes interacts correctly with
-D3D12MA::POOL_DESC::MinBlockCount and D3D12MA::POOL_DESC::MaxBlockCount.
-For example, free blocks (heaps) of a custom pool will be released only when
-their number doesn't fall below `MinBlockCount` and their sum size doesn't fall below `MinBytes`.
-
-Some restrictions apply:
-
-- Setting `MinBytes` doesn't interact with memory budget. The allocator tries
-  to create additional heaps when necessary without checking if they will exceed the budget.
-- Resources created as committed don't count into the number of bytes compared with `MinBytes` set.
-  Only placed resources are considered.
 
 
 \page virtual_allocator Virtual allocator
@@ -1096,12 +1058,6 @@ public:
     */
     POOL_DESC GetDesc() const;
 
-    /** \brief Sets the minimum number of bytes that should always be allocated (reserved) in this pool.
-
-    See also: \subpage reserving_memory.
-    */
-    HRESULT SetMinBytes(UINT64 minBytes);
-
     /** \brief Retrieves statistics from the current state of this pool.
     */
     void CalculateStats(StatInfo* pStats);
@@ -1456,20 +1412,6 @@ public:
     HRESULT CreatePool(
         const POOL_DESC* pPoolDesc,
         Pool** ppPool);
-
-    /** \brief Sets the minimum number of bytes that should always be allocated (reserved) in a specific default pool.
-
-    \param heapType Must be one of: `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`.
-    \param heapFlags Must be one of: `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`, `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
-        `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`. If ResourceHeapTier = 2, it can also be `D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES`.
-    \param minBytes Minimum number of bytes to keep allocated.
-
-    See also: \subpage reserving_memory.
-    */
-    HRESULT SetDefaultHeapMinBytes(
-        D3D12_HEAP_TYPE heapType,
-        D3D12_HEAP_FLAGS heapFlags,
-        UINT64 minBytes);
 
     /** \brief Sets the index of the current frame.
 

@@ -687,6 +687,42 @@ static UINT GetBitsPerPixel(DXGI_FORMAT format)
     }
 }
 
+static const D3D12_HEAP_FLAGS RESOURCE_CLASS_HEAP_FLAGS =
+    D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES;
+
+enum class ResourceClass
+{
+    Unknown, Buffer, Non_RT_DS_Texture, RT_DS_Texture
+};
+
+template<typename D3D12_RESOURCE_DESC_T>
+static inline ResourceClass ResourceDescToResourceClass(const D3D12_RESOURCE_DESC_T& resDesc)
+{
+    if(resDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+        return ResourceClass::Buffer;
+    // Else: it's surely a texture.
+    const bool isRenderTargetOrDepthStencil =
+        (resDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0;
+    return isRenderTargetOrDepthStencil ? ResourceClass::RT_DS_Texture : ResourceClass::Non_RT_DS_Texture;
+}
+
+static inline ResourceClass HeapFlagsToResourceClass(D3D12_HEAP_FLAGS heapFlags)
+{
+    const bool allowBuffers         = (heapFlags & D3D12_HEAP_FLAG_DENY_BUFFERS           ) == 0;
+    const bool allowRtDsTextures    = (heapFlags & D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES    ) == 0;
+    const bool allowNonRtDsTextures = (heapFlags & D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES) == 0;
+
+    const uint8_t allowedGroupCount = (allowBuffers ? 1 : 0) + (allowRtDsTextures ? 1 : 0) + (allowNonRtDsTextures ? 1 : 0);
+    if(allowedGroupCount != 1)
+        return ResourceClass::Unknown;
+    
+    if(allowRtDsTextures)
+        return ResourceClass::RT_DS_Texture;
+    if(allowNonRtDsTextures)
+        return ResourceClass::Non_RT_DS_Texture;
+    return ResourceClass::Buffer;
+}
+
 // This algorithm is overly conservative.
 template<typename D3D12_RESOURCE_DESC_T>
 static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
@@ -726,13 +762,6 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
 
     const UINT tileCount = DivideRoudingUp(sizeX, tileSizeX) * DivideRoudingUp(sizeY, tileSizeY);
     return tileCount <= 16;
-}
-
-static D3D12_HEAP_FLAGS GetExtraHeapFlagsToIgnore()
-{
-    D3D12_HEAP_FLAGS result =
-        D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES;
-    return result;
 }
 
 static inline bool IsHeapTypeStandard(D3D12_HEAP_TYPE type)
@@ -2644,8 +2673,6 @@ public:
         void** ppvResource);
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
-    HRESULT SetMinBytes(UINT64 minBytes);
-
     void AddStats(StatInfo& outStats);
     void AddStats(Stats& outStats);
 
@@ -2659,7 +2686,6 @@ private:
     const size_t m_MinBlockCount;
     const size_t m_MaxBlockCount;
     const bool m_ExplicitBlockSize;
-    UINT64 m_MinBytes;
     /* There can be at most one allocation that is completely empty - a
     hysteresis to avoid pessimistic case of alternating creation and destruction
     of a VkDeviceMemory. */
@@ -2753,8 +2779,6 @@ public:
     AllocatorPimpl* GetAllocator() const { return m_Allocator; }
     const POOL_DESC& GetDesc() const { return m_Desc; }
     BlockVector* GetBlockVector() { return m_BlockVector; }
-
-    HRESULT SetMinBytes(UINT64 minBytes) { return m_BlockVector->SetMinBytes(minBytes); }
 
     void CalculateStats(StatInfo& outStats);
 
@@ -2865,11 +2889,6 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
-    HRESULT SetDefaultHeapMinBytes(
-        D3D12_HEAP_TYPE heapType,
-        D3D12_HEAP_FLAGS heapFlags,
-        UINT64 minBytes);
-
     // Unregisters allocation from the collection of dedicated allocations.
     // Allocation object must be deleted externally afterwards.
     void FreeCommittedMemory(Allocation* allocation);
@@ -2933,11 +2952,6 @@ private:
     BlockVector* m_BlockVectors[DEFAULT_POOL_MAX_COUNT];
 
     CommittedAllocationList m_CommittedAllocations[STANDARD_HEAP_TYPE_COUNT];
-
-    // # Used only when ResourceHeapTier = 1
-    UINT64 m_DefaultPoolTier1MinBytes[DEFAULT_POOL_MAX_COUNT]; // Default 0
-    UINT64 m_DefaultPoolHeapTypeMinBytes[HEAP_TYPE_COUNT]; // Default UINT64_MAX, meaning not set
-    D3D12MA_RW_MUTEX m_DefaultPoolMinBytesMutex;
 
     // Allocates and registers new committed resource with implicit heap, as dedicated allocation.
     // Creates and returns Allocation object.
@@ -3027,18 +3041,8 @@ private:
         8: D3D12_HEAP_TYPE_READBACK + texture RT or DS
     */
     UINT CalcDefaultPoolCount() const;
-    template<typename D3D12_RESOURCE_DESC_T>
-    UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC_T& resourceDesc) const;
-    // This one returns UINT32_MAX if nonstandard heap flags are used and index cannot be calculcated.
-    static UINT CalcDefaultPoolIndex(D3D12_HEAP_TYPE heapType, D3D12_HEAP_FLAGS heapFlags, bool supportsResourceHeapTier2);
-    UINT CalcDefaultPoolIndex(D3D12_HEAP_TYPE heapType, D3D12_HEAP_FLAGS heapFlags) const
-    {
-        return CalcDefaultPoolIndex(heapType, heapFlags, SupportsResourceHeapTier2());
-    }
-    UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc) const
-    {
-        return CalcDefaultPoolIndex(allocDesc.HeapType, allocDesc.ExtraHeapFlags);
-    }
+    // Returns UINT32_MAX if index cannot be calculcated.
+    UINT CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, ResourceClass resourceClass) const;
     void CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_HEAP_FLAGS& outHeapFlags, UINT index) const;
 
     // Registers Pool object in m_Pools.
@@ -3860,7 +3864,6 @@ BlockVector::BlockVector(
     m_MinBlockCount(minBlockCount),
     m_MaxBlockCount(maxBlockCount),
     m_ExplicitBlockSize(explicitBlockSize),
-    m_MinBytes(0),
     m_HasEmptyBlock(false),
     m_Blocks(hAllocator->GetAllocs()),
     m_NextBlockId(0)
@@ -4084,8 +4087,7 @@ void BlockVector::Free(Allocation* hAllocation)
         {
             // Already has empty Allocation. We don't want to have two, so delete this one.
             if((m_HasEmptyBlock || budgetExceeded) &&
-                blockCount > m_MinBlockCount &&
-                sumBlockSize - pBlock->m_pMetadata->GetSize() >= m_MinBytes)
+                blockCount > m_MinBlockCount)
             {
                 pBlockToDelete = pBlock;
                 Remove(pBlock);
@@ -4101,8 +4103,7 @@ void BlockVector::Free(Allocation* hAllocation)
         else if(m_HasEmptyBlock && blockCount > m_MinBlockCount)
         {
             NormalBlock* pLastBlock = m_Blocks.back();
-            if(pLastBlock->m_pMetadata->IsEmpty() &&
-                sumBlockSize - pLastBlock->m_pMetadata->GetSize() >= m_MinBytes)
+            if(pLastBlock->m_pMetadata->IsEmpty())
             {
                 pBlockToDelete = pLastBlock;
                 m_Blocks.pop_back();
@@ -4328,89 +4329,6 @@ HRESULT BlockVector::CreateBlock(UINT64 blockSize, size_t* pNewBlockIndex)
     return hr;
 }
 
-HRESULT BlockVector::SetMinBytes(UINT64 minBytes)
-{
-    MutexLockWrite lock(m_Mutex, m_hAllocator->UseMutex());
-
-    if(minBytes == m_MinBytes)
-    {
-        return S_OK;
-    }
-
-    HRESULT hr = S_OK;
-    UINT64 sumBlockSize = CalcSumBlockSize();
-    size_t blockCount = m_Blocks.size();
-
-    // New minBytes is smaller - may be able to free some blocks.
-    if(minBytes < m_MinBytes)
-    {
-        m_HasEmptyBlock = false; // Will recalculate this value from scratch.
-        for(size_t blockIndex = blockCount; blockIndex--; )
-        {
-            NormalBlock* const block = m_Blocks[blockIndex];
-            const UINT64 size = block->m_pMetadata->GetSize();
-            const bool isEmpty = block->m_pMetadata->IsEmpty();
-            if(isEmpty &&
-                sumBlockSize - size >= minBytes &&
-                blockCount - 1 >= m_MinBlockCount)
-            {
-                D3D12MA_DELETE(m_hAllocator->GetAllocs(), block);
-                m_Blocks.remove(blockIndex);
-                sumBlockSize -= size;
-                --blockCount;
-            }
-            else
-            {
-                if(isEmpty)
-                {
-                    m_HasEmptyBlock = true;
-                }
-            }
-        }
-    }
-    // New minBytes is larger - may need to allocate some blocks.
-    else
-    {
-        const UINT64 minBlockSize = m_PreferredBlockSize >> NEW_BLOCK_SIZE_SHIFT_MAX;
-        while(SUCCEEDED(hr) && sumBlockSize < minBytes)
-        {
-            if(blockCount < m_MaxBlockCount)
-            {
-                UINT64 newBlockSize = m_PreferredBlockSize;
-                if(!m_ExplicitBlockSize)
-                {
-                    if(sumBlockSize + newBlockSize > minBytes)
-                    {
-                        newBlockSize = minBytes - sumBlockSize;
-                    }
-                    // Next one would be the last block to create and its size would be smaller than
-                    // the smallest block size we want to use here, so make this one smaller.
-                    else if(blockCount + 1 < m_MaxBlockCount &&
-                        sumBlockSize + newBlockSize + minBlockSize > minBytes)
-                    {
-                        newBlockSize -= minBlockSize + sumBlockSize + m_PreferredBlockSize - minBytes;
-                    }
-                }
-
-                hr = CreateBlock(newBlockSize, NULL);
-                if(SUCCEEDED(hr))
-                {
-                    m_HasEmptyBlock = true;
-                    sumBlockSize += newBlockSize;
-                    ++blockCount;
-                }
-            }
-            else
-            {
-                hr = E_INVALIDARG;
-            }
-        }
-    }
-
-    m_MinBytes = minBytes;
-    return hr;
-}
-
 void BlockVector::AddStats(StatInfo& outStats)
 {
     MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
@@ -4561,11 +4479,6 @@ POOL_DESC Pool::GetDesc() const
     return m_Pimpl->GetDesc();
 }
 
-HRESULT Pool::SetMinBytes(UINT64 minBytes)
-{
-    return m_Pimpl->SetMinBytes(minBytes);
-}
-
 void Pool::CalculateStats(StatInfo* pStats)
 {
     D3D12MA_ASSERT(pStats);
@@ -4615,12 +4528,6 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     ZeroMemory(&m_D3D12Architecture, sizeof(m_D3D12Architecture));
 
     ZeroMemory(m_BlockVectors, sizeof(m_BlockVectors));
-    ZeroMemory(m_DefaultPoolTier1MinBytes, sizeof(m_DefaultPoolTier1MinBytes));
-
-    for(UINT i = 0; i < HEAP_TYPE_COUNT; ++i)
-    {
-        m_DefaultPoolHeapTypeMinBytes[i] = UINT64_MAX;
-    }
 
     for(UINT i = 0; i < STANDARD_HEAP_TYPE_COUNT; ++i)
     {
@@ -4790,7 +4697,8 @@ HRESULT AllocatorPimpl::CreateResource(
     }
     else
     {
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, finalResourceDesc);
+        const ResourceClass resourceClass = ResourceDescToResourceClass(finalResourceDesc);
+        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, resourceClass);
         const bool requireCommittedMemory = defaultPoolIndex == UINT32_MAX;
         if(requireCommittedMemory)
     {
@@ -4969,7 +4877,8 @@ HRESULT AllocatorPimpl::CreateResource2(
     }
     else
     {
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, finalResourceDesc);
+        const ResourceClass resourceClass = ResourceDescToResourceClass(finalResourceDesc);
+        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, resourceClass);
         requireCommittedMemory = requireCommittedMemory || defaultPoolIndex == UINT32_MAX;
         if(requireCommittedMemory)
         {
@@ -5152,71 +5061,6 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
         pOptimizedClearValue,
         riidResource,
         ppvResource);
-}
-
-HRESULT AllocatorPimpl::SetDefaultHeapMinBytes(
-    D3D12_HEAP_TYPE heapType,
-    D3D12_HEAP_FLAGS heapFlags,
-    UINT64 minBytes)
-{
-    if(!IsHeapTypeStandard(heapType))
-    {
-        D3D12MA_ASSERT(0 && "Allocator::SetDefaultHeapMinBytes: Invalid heapType passed.");
-        return E_INVALIDARG;
-    }
-
-    if(SupportsResourceHeapTier2())
-    {
-        if(heapFlags != D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES &&
-            heapFlags != D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS &&
-            heapFlags != D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES &&
-            heapFlags != D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES)
-        {
-            D3D12MA_ASSERT(0 && "Allocator::SetDefaultHeapMinBytes: Invalid heapFlags passed.");
-            return E_INVALIDARG;
-        }
-
-        UINT64 newMinBytes = UINT64_MAX;
-
-        {
-            MutexLockWrite lock(m_DefaultPoolMinBytesMutex, m_UseMutex);
-
-            if(heapFlags == D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES)
-            {
-                m_DefaultPoolHeapTypeMinBytes[HeapTypeToIndex(heapType)] = minBytes;
-                newMinBytes = minBytes;
-            }
-            else
-            {
-                const UINT defaultPoolTier1Index = CalcDefaultPoolIndex(heapType, heapFlags, false);
-                m_DefaultPoolTier1MinBytes[defaultPoolTier1Index] = minBytes;
-
-                newMinBytes = m_DefaultPoolHeapTypeMinBytes[HeapTypeToIndex(heapType)];
-                if(newMinBytes == UINT64_MAX)
-                {
-                    newMinBytes = m_DefaultPoolTier1MinBytes[CalcDefaultPoolIndex(heapType, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS, false)] +
-                        m_DefaultPoolTier1MinBytes[CalcDefaultPoolIndex(heapType, D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, false)] +
-                        m_DefaultPoolTier1MinBytes[CalcDefaultPoolIndex(heapType, D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES, false)];
-                }
-            }
-        }
-
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(heapType, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES);
-        return m_BlockVectors[defaultPoolIndex]->SetMinBytes(newMinBytes);
-    }
-    else
-    {
-        if(heapFlags != D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS &&
-            heapFlags != D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES &&
-            heapFlags != D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES)
-        {
-            D3D12MA_ASSERT(0 && "Allocator::SetDefaultHeapMinBytes: Invalid heapFlags passed.");
-            return E_INVALIDARG;
-        }
-        
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(heapType, heapFlags);
-        return m_BlockVectors[defaultPoolIndex]->SetMinBytes(minBytes);
-    }
 }
 
 template<typename D3D12_RESOURCE_DESC_T>
@@ -5553,10 +5397,9 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
 
     if(allocDesc.CustomPool != NULL)
     {
-        if((allocDesc.Flags & ALLOCATION_FLAG_COMMITTED) == 0)
-        {
-            outBlockVector = allocDesc.CustomPool->m_Pimpl->GetBlockVector();
-        }
+        PoolPimpl* const pool = allocDesc.CustomPool->m_Pimpl;
+        outBlockVector = pool->GetBlockVector();
+        outCommittedAllocationList = &pool->m_CommittedAllocations;
     }
     else
     {
@@ -5564,32 +5407,49 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         {
             return E_INVALIDARG;
         }
-        if((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
+
+        outCommittedAllocationList = &m_CommittedAllocations[HeapTypeToIndex(allocDesc.HeapType)];
+        
+        const ResourceClass resourceClass = (resDesc != NULL) ?
+            ResourceDescToResourceClass(*resDesc) : HeapFlagsToResourceClass(allocDesc.ExtraHeapFlags);
+        const UINT defaultPoolIndex = CalcDefaultPoolIndex(allocDesc, resourceClass);
+        if(defaultPoolIndex != UINT32_MAX)
         {
-            outCommittedAllocationList = &m_CommittedAllocations[HeapTypeToIndex(allocDesc.HeapType)];
-        }
-        if(!m_AlwaysCommitted &&
-            (allocDesc.Flags & ALLOCATION_FLAG_COMMITTED) == 0)
-        {
-            const UINT defaultPoolIndex = CalcDefaultPoolIndex(allocDesc);
-            if(defaultPoolIndex != UINT32_MAX)
+            outBlockVector = m_BlockVectors[defaultPoolIndex];
+            const UINT64 preferredBlockSize = outBlockVector->GetPreferredBlockSize();
+            if(allocSize > preferredBlockSize)
             {
-                outBlockVector = m_BlockVectors[defaultPoolIndex];
-                const UINT64 preferredBlockSize = outBlockVector->GetPreferredBlockSize();
-                if(allocSize > preferredBlockSize)
-                {
-                    outBlockVector = NULL;
-                }
-                else if(allocSize > preferredBlockSize / 2)
-                {
-                    // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
-                    outPreferCommitted = true;
-                }
+                outBlockVector = NULL;
+            }
+            else if(allocSize > preferredBlockSize / 2)
+            {
+                // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
+                outPreferCommitted = true;
             }
         }
+        
+        const D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
+        if(outBlockVector != NULL && extraHeapFlags != 0)
+        {
+            outBlockVector = NULL;
+        }
     }
-    if(resDesc != NULL && PrefersCommittedAllocation(*resDesc))
+
+    if((allocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0 ||
+        m_AlwaysCommitted)
+    {
+        outBlockVector = NULL;
+    }
+    if((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) != 0)
+    {
+        outCommittedAllocationList = NULL;
+    }
+
+    if(resDesc != NULL && !outPreferCommitted && PrefersCommittedAllocation(*resDesc))
+    {
         outPreferCommitted = true;
+    }
+
     return S_OK;
 }
 
@@ -5605,10 +5465,9 @@ UINT AllocatorPimpl::CalcDefaultPoolCount() const
     }
 }
 
-template<typename D3D12_RESOURCE_DESC_T>
-UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, const D3D12_RESOURCE_DESC_T& resourceDesc) const
+UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, ResourceClass resourceClass) const
 {
-    const D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~GetExtraHeapFlagsToIgnore();
+    const D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
     if(extraHeapFlags != 0)
     {
         return UINT32_MAX;
@@ -5623,66 +5482,22 @@ UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, cons
     default: D3D12MA_ASSERT(0);
     }
 
-    if(!SupportsResourceHeapTier2())
+    if(SupportsResourceHeapTier2())
+        return poolIndex;
+    else
     {
-        poolIndex *= 3;
-        if(resourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER)
+        switch(resourceClass)
         {
-            ++poolIndex;
-            const bool isRenderTargetOrDepthStencil =
-                (resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0;
-            if(isRenderTargetOrDepthStencil)
-            {
-                ++poolIndex;
-            }
-        }
-    }
-
-    return poolIndex;
-}
-
-UINT AllocatorPimpl::CalcDefaultPoolIndex(D3D12_HEAP_TYPE heapType, D3D12_HEAP_FLAGS heapFlags, bool supportsResourceHeapTier2)
-{
-    const D3D12_HEAP_FLAGS extraHeapFlags = heapFlags & ~GetExtraHeapFlagsToIgnore();
-    if(extraHeapFlags != 0)
-    {
-        return UINT32_MAX;
-    }
-
-    UINT poolIndex = UINT_MAX;
-    switch(heapType)
-    {
-    case D3D12_HEAP_TYPE_DEFAULT:  poolIndex = 0; break;
-    case D3D12_HEAP_TYPE_UPLOAD:   poolIndex = 1; break;
-    case D3D12_HEAP_TYPE_READBACK: poolIndex = 2; break;
-    default: D3D12MA_ASSERT(0);
-    }
-
-    if(!supportsResourceHeapTier2)
-    {
-        poolIndex *= 3;
-
-        const bool allowBuffers = (heapFlags & D3D12_HEAP_FLAG_DENY_BUFFERS) == 0;
-        const bool allowRtDsTextures = (heapFlags & D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES) == 0;
-        const bool allowNonRtDsTextures = (heapFlags & D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES) == 0;
-
-        const uint8_t allowedGroupCount = (allowBuffers ? 1 : 0) + (allowRtDsTextures ? 1 : 0) + (allowNonRtDsTextures ? 1 : 0);
-        if(allowedGroupCount != 1)
-        {
+        case ResourceClass::Buffer:
+            return poolIndex * 3;
+        case ResourceClass::Non_RT_DS_Texture:
+            return poolIndex * 3 + 1;
+        case ResourceClass::RT_DS_Texture:
+            return poolIndex * 3 + 2;
+        default:
             return UINT32_MAX;
         }
-
-        if(!allowBuffers)
-        {
-            ++poolIndex;
-            if(allowRtDsTextures)
-            {
-                ++poolIndex;
-            }
-        }
     }
-
-    return poolIndex;
 }
 
 void AllocatorPimpl::CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_HEAP_FLAGS& outHeapFlags, UINT index) const
@@ -6595,15 +6410,6 @@ HRESULT Allocator::CreatePool(
         *ppPool = NULL;
     }
     return hr;
-}
-
-HRESULT Allocator::SetDefaultHeapMinBytes(
-    D3D12_HEAP_TYPE heapType,
-    D3D12_HEAP_FLAGS heapFlags,
-    UINT64 minBytes)
-{
-    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-    return m_Pimpl->SetDefaultHeapMinBytes(heapType, heapFlags, minBytes);
 }
 
 void Allocator::SetCurrentFrameIndex(UINT frameIndex)
