@@ -2768,11 +2768,20 @@ struct CurrentBudgetData
         m_AllocationBytes[heapTypeIndex] += allocationSize;
         ++m_OperationsSinceBudgetFetch;
     }
-
     void RemoveAllocation(UINT heapTypeIndex, UINT64 allocationSize)
     {
         m_AllocationBytes[heapTypeIndex] -= allocationSize;
         ++m_OperationsSinceBudgetFetch;
+    }
+    void AddCommittedAllocation(UINT heapTypeIndex, UINT64 allocationSize)
+    {
+        AddAllocation(heapTypeIndex, allocationSize);
+        m_BlockBytes[heapTypeIndex] += allocationSize;
+    }
+    void RemoveCommittedAllocation(UINT heapTypeIndex, UINT64 allocationSize)
+    {
+        m_BlockBytes[heapTypeIndex] -= allocationSize;
+        RemoveAllocation(heapTypeIndex, allocationSize);
     }
 };
 
@@ -4996,8 +5005,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
             committedAllocParams.m_List->Register(alloc);
 
             const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-            m_Budget.AddAllocation(heapTypeIndex, resourceSize);
-            m_Budget.m_BlockBytes[heapTypeIndex] += resourceSize;
+            m_Budget.AddCommittedAllocation(heapTypeIndex, resourceSize);
         }
         else
         {
@@ -5051,8 +5059,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
             committedAllocParams.m_List->Register(alloc);
 
             const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-            m_Budget.AddAllocation(heapTypeIndex, resourceSize);
-            m_Budget.m_BlockBytes[heapTypeIndex] += resourceSize;
+            m_Budget.AddCommittedAllocation(heapTypeIndex, resourceSize);
         }
         else
         {
@@ -5107,8 +5114,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
             committedAllocParams.m_List->Register(alloc);
 
             const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-            m_Budget.AddAllocation(heapTypeIndex, resourceSize);
-            m_Budget.m_BlockBytes[heapTypeIndex] += resourceSize;
+            m_Budget.AddCommittedAllocation(heapTypeIndex, resourceSize);
         }
         else
         {
@@ -5150,8 +5156,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
         committedAllocParams.m_List->Register(*ppAllocation);
 
         const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-        m_Budget.AddAllocation(heapTypeIndex, allocInfo.SizeInBytes);
-        m_Budget.m_BlockBytes[heapTypeIndex] += allocInfo.SizeInBytes;
+        m_Budget.AddCommittedAllocation(heapTypeIndex, allocInfo.SizeInBytes);
     }
     return hr;
 }
@@ -5194,8 +5199,7 @@ HRESULT AllocatorPimpl::AllocateHeap1(
         committedAllocParams.m_List->Register(*ppAllocation);
 
         const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-        m_Budget.AddAllocation(heapTypeIndex, allocInfo.SizeInBytes);
-        m_Budget.m_BlockBytes[heapTypeIndex] += allocInfo.SizeInBytes;
+        m_Budget.AddCommittedAllocation(heapTypeIndex, allocInfo.SizeInBytes);
     }
     return hr;
 }
@@ -5385,8 +5389,7 @@ void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
 
     const UINT64 allocationSize = allocation->GetSize();
     const UINT heapTypeIndex = HeapTypeToIndex(allocList->GetHeapType());
-    m_Budget.RemoveAllocation(heapTypeIndex, allocationSize);
-    m_Budget.m_BlockBytes[heapTypeIndex] -= allocationSize;
+    m_Budget.RemoveCommittedAllocation(heapTypeIndex, allocationSize);
 }
 
 void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
@@ -5411,8 +5414,7 @@ void AllocatorPimpl::FreeHeapMemory(Allocation* allocation)
 
     const UINT heapTypeIndex = HeapTypeToIndex(allocList->GetHeapType());
     const UINT64 allocationSize = allocation->GetSize();
-    m_Budget.m_BlockBytes[heapTypeIndex] -= allocationSize;
-    m_Budget.RemoveAllocation(heapTypeIndex, allocationSize);
+    m_Budget.RemoveCommittedAllocation(heapTypeIndex, allocationSize);
 }
 
 void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
