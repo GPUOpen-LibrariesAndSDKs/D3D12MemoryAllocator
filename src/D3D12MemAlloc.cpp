@@ -4658,115 +4658,56 @@ HRESULT AllocatorPimpl::CreateResource(
     REFIID riidResource,
     void** ppvResource)
 {
+    D3D12MA_ASSERT(pAllocDesc && pResourceDesc && ppAllocation);
+
     *ppAllocation = NULL;
     if(ppvResource)
     {
         *ppvResource = NULL;
     }
 
-    if(pAllocDesc->CustomPool == NULL && !IsHeapTypeStandard(pAllocDesc->HeapType))
-    {
-        return E_INVALIDARG;
-    }
-    ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
     D3D12_RESOURCE_DESC finalResourceDesc = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
     resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
-    if(pAllocDesc->CustomPool != NULL)
-    {
-        if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
-        {
-            return E_INVALIDARG;
-        }
+    BlockVector* blockVector = NULL;
+    CommittedAllocationList* committedAllocationList = NULL;
+    bool preferCommitted = false;
+    HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
+        NULL, // pResDesc
+        blockVector, committedAllocationList, preferCommitted);
+    if(FAILED(hr))
+        return hr;
 
-        BlockVector* blockVector = pAllocDesc->CustomPool->m_Pimpl->GetBlockVector();
-        D3D12MA_ASSERT(blockVector);
-        return blockVector->CreateResource(
-            resAllocInfo.SizeInBytes,
-            resAllocInfo.Alignment,
-            finalAllocDesc,
-            finalResourceDesc,
-            InitialResourceState,
-            pOptimizedClearValue,
-            ppAllocation,
-            riidResource,
-            ppvResource);
-    }
-    else
+    hr = E_INVALIDARG;
+    if(committedAllocationList != NULL && preferCommitted)
     {
-        const ResourceClass resourceClass = ResourceDescToResourceClass(finalResourceDesc);
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, resourceClass);
-        const bool requireCommittedMemory = defaultPoolIndex == UINT32_MAX;
-        if(requireCommittedMemory)
-    {
-            return AllocateCommittedResource(
-                &finalAllocDesc,
-                &finalResourceDesc,
-                resAllocInfo,
-                InitialResourceState,
-                pOptimizedClearValue,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-        }
-
-        BlockVector* const blockVector = m_BlockVectors[defaultPoolIndex];
-        D3D12MA_ASSERT(blockVector);
-
-        const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
-        bool preferCommittedMemory =
-            m_AlwaysCommitted ||
-            PrefersCommittedAllocation(finalResourceDesc) ||
-            resAllocInfo.SizeInBytes > preferredBlockSize / 2;
-        if(preferCommittedMemory &&
-            (finalAllocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
-        {
-            finalAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
-    }
-
-        if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
-    {
-            return AllocateCommittedResource(
-                &finalAllocDesc,
-                &finalResourceDesc,
-                resAllocInfo,
-                InitialResourceState,
-                pOptimizedClearValue,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-    }
-        else
-        {
-            HRESULT hr = blockVector->CreateResource(
-                resAllocInfo.SizeInBytes,
-                resAllocInfo.Alignment,
-                finalAllocDesc,
-                finalResourceDesc,
-                InitialResourceState,
-                pOptimizedClearValue,
-                ppAllocation,
-                riidResource,
-                ppvResource);
+        hr = AllocateCommittedResource(pAllocDesc, &finalResourceDesc, resAllocInfo,
+            InitialResourceState, pOptimizedClearValue,
+            ppAllocation, riidResource, ppvResource);
         if(SUCCEEDED(hr))
-            {
             return hr;
     }
-
-            return AllocateCommittedResource(
-                &finalAllocDesc,
-                &finalResourceDesc,
-                resAllocInfo,
-                InitialResourceState,
-                pOptimizedClearValue,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-        }
+    if(blockVector != NULL)
+    {
+        hr = blockVector->CreateResource(resAllocInfo.SizeInBytes, resAllocInfo.Alignment,
+            *pAllocDesc, finalResourceDesc,
+            InitialResourceState, pOptimizedClearValue,
+            ppAllocation, riidResource, ppvResource);
+        if(SUCCEEDED(hr))
+            return hr;
     }
+    if(committedAllocationList != NULL && !preferCommitted)
+    {
+        hr = AllocateCommittedResource(pAllocDesc, &finalResourceDesc, resAllocInfo,
+            InitialResourceState, pOptimizedClearValue,
+            ppAllocation, riidResource, ppvResource);
+        if(SUCCEEDED(hr))
+            return hr;
+    }
+    return hr;
 }
 
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
@@ -4829,22 +4770,17 @@ HRESULT AllocatorPimpl::CreateResource2(
     REFIID riidResource,
     void** ppvResource)
 {
+    D3D12MA_ASSERT(pAllocDesc && pResourceDesc && ppAllocation);
+
     *ppAllocation = NULL;
     if(ppvResource)
     {
         *ppvResource = NULL;
     }
-
     if(m_Device8 == NULL)
     {
         return E_NOINTERFACE;
     }
-
-    if(pAllocDesc->CustomPool == NULL && !IsHeapTypeStandard(pAllocDesc->HeapType))
-    {
-        return E_INVALIDARG;
-    }
-    ALLOCATION_DESC finalAllocDesc = *pAllocDesc;
 
     D3D12_RESOURCE_DESC1 finalResourceDesc = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
@@ -4852,106 +4788,45 @@ HRESULT AllocatorPimpl::CreateResource2(
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
-    bool requireCommittedMemory = pProtectedSession != NULL || (finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0;
+    BlockVector* blockVector = NULL;
+    CommittedAllocationList* committedAllocationList = NULL;
+    bool preferCommitted = false;
+    HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
+        NULL, // pResDesc
+        blockVector, committedAllocationList, preferCommitted);
+    if(FAILED(hr))
+        return hr;
+    
+    if(pProtectedSession != NULL)
+        blockVector = NULL; // Must be committed allocation.
 
-    if(pAllocDesc->CustomPool != NULL)
+    hr = E_INVALIDARG;
+    if(committedAllocationList != NULL && preferCommitted)
     {
-        if(requireCommittedMemory)
-        {
-            return E_INVALIDARG;
-        }
-
-        BlockVector* blockVector = pAllocDesc->CustomPool->m_Pimpl->GetBlockVector();
-        D3D12MA_ASSERT(blockVector);
-        return blockVector->CreateResource2(
-            resAllocInfo.SizeInBytes,
-            resAllocInfo.Alignment,
-            finalAllocDesc,
-            finalResourceDesc,
-            InitialResourceState,
-            pOptimizedClearValue,
-            pProtectedSession,
-            ppAllocation,
-            riidResource,
-            ppvResource);
+        hr = AllocateCommittedResource2(pAllocDesc, &finalResourceDesc, resAllocInfo,
+            InitialResourceState, pOptimizedClearValue, pProtectedSession,
+            ppAllocation, riidResource, ppvResource);
+        if(SUCCEEDED(hr))
+            return hr;
     }
-    else
+    if(blockVector != NULL)
     {
-        const ResourceClass resourceClass = ResourceDescToResourceClass(finalResourceDesc);
-        const UINT defaultPoolIndex = CalcDefaultPoolIndex(*pAllocDesc, resourceClass);
-        requireCommittedMemory = requireCommittedMemory || defaultPoolIndex == UINT32_MAX;
-        if(requireCommittedMemory)
-        {
-            return AllocateCommittedResource2(
-                &finalAllocDesc,
-                &finalResourceDesc,
-                resAllocInfo,
-                InitialResourceState,
-                pOptimizedClearValue,
-                pProtectedSession,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-        }
-
-        BlockVector* const blockVector = m_BlockVectors[defaultPoolIndex];
-        D3D12MA_ASSERT(blockVector);
-
-        const UINT64 preferredBlockSize = blockVector->GetPreferredBlockSize();
-        bool preferCommittedMemory =
-            m_AlwaysCommitted ||
-            PrefersCommittedAllocation(finalResourceDesc) ||
-            // Heuristics: Allocate committed memory if requested size if greater than half of preferred block size.
-            resAllocInfo.SizeInBytes > preferredBlockSize / 2;
-        if(preferCommittedMemory &&
-            (finalAllocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0)
-        {
-            finalAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
-        }
-
-        if((finalAllocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0)
-        {
-            return AllocateCommittedResource2(
-                &finalAllocDesc,
-                &finalResourceDesc,
-                resAllocInfo,
-                InitialResourceState,
-                pOptimizedClearValue,
-                pProtectedSession,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-        }
-        else
-        {
-            HRESULT hr = blockVector->CreateResource2(
-                resAllocInfo.SizeInBytes,
-                resAllocInfo.Alignment,
-                finalAllocDesc,
-                finalResourceDesc,
-                InitialResourceState,
-                pOptimizedClearValue,
-                pProtectedSession,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-            if(SUCCEEDED(hr))
-            {
-                return hr;
-            }
-
-            return AllocateCommittedResource2(
-                &finalAllocDesc,
-                &finalResourceDesc,
-                resAllocInfo,
-                InitialResourceState,
-                pOptimizedClearValue,
-                pProtectedSession,
-                ppAllocation,
-                riidResource,
-                ppvResource);
-        }
+        hr = blockVector->CreateResource2(resAllocInfo.SizeInBytes, resAllocInfo.Alignment,
+            *pAllocDesc, finalResourceDesc,
+            InitialResourceState, pOptimizedClearValue, pProtectedSession,
+            ppAllocation, riidResource, ppvResource);
+        if(SUCCEEDED(hr))
+            return hr;
     }
+    if(committedAllocationList != NULL && !preferCommitted)
+    {
+        hr = AllocateCommittedResource2(pAllocDesc, &finalResourceDesc, resAllocInfo,
+            InitialResourceState, pOptimizedClearValue, pProtectedSession,
+            ppAllocation, riidResource, ppvResource);
+        if(SUCCEEDED(hr))
+            return hr;
+    }
+    return hr;
 }
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
@@ -5399,7 +5274,8 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     {
         PoolPimpl* const pool = allocDesc.CustomPool->m_Pimpl;
         outBlockVector = pool->GetBlockVector();
-        outCommittedAllocationList = &pool->m_CommittedAllocations;
+        // TODO!
+        //outCommittedAllocationList = &pool->m_CommittedAllocations;
     }
     else
     {
