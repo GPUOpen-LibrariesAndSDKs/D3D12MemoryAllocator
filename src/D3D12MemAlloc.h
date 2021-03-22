@@ -259,7 +259,7 @@ HRESULT hr = allocator->CreatePool(&poolDesc, &pool);
 \endcode
 
 To allocate resources out of a custom pool, only set member D3D12MA::ALLOCATION_DESC::CustomPool.
-Other members of this structure are then ignored. Example:
+Example:
 
 \code
 ALLOCATION_DESC allocDesc = {};
@@ -270,8 +270,6 @@ Allocation* alloc;
 hr = allocator->CreateResource(&allocDesc, &resDesc,
     D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &alloc, IID_NULL, NULL);
 \endcode
-
-Currently all allocations from custom pools are created as Placed, never as Committed.
 
 All allocations must be released before releasing the pool.
 The pool must be released before relasing the allocator.
@@ -287,8 +285,10 @@ While it is recommended to use default pools whenever possible for simplicity an
 more opportunities for internal optimizations, custom pools may be useful in following cases:
 
 - To keep some resources separate from others in memory.
+- To keep track of memory usage of just a specific group of resources. Statistics can be queried using
+  D3D12MA::Pool::CalculateStats.
 - To use specific size of a memory block (`ID3D12Heap`). To set it, use member D3D12MA::POOL_DESC::BlockSize.
-  When set to 0, the library uses automatically determined, increasing block sizes.
+  When set to 0, the library uses automatically determined, variable block sizes.
 - To reserve some minimum amount of memory allocated. To use it, set member D3D12MA::POOL_DESC::MinBlockCount.
 - To limit maximum amount of memory allocated. To use it, set member D3D12MA::POOL_DESC::MaxBlockCount.
 - To use extended parameters of the D3D12 memory allocation. While resources created from default pools
@@ -296,6 +296,27 @@ more opportunities for internal optimizations, custom pools may be useful in fol
   `D3D12_HEAP_PROPERTIES` (member D3D12MA::POOL_DESC::HeapProperties) and `D3D12_HEAP_FLAGS`
   (D3D12MA::POOL_DESC::HeapFlags), which is useful e.g. for cross-adapter sharing or UMA
   (see also D3D12MA::Allocator::IsUMA).
+
+New versions of this library support creating **committed allocations in custom pools**.
+It is supported only when D3D12MA::POOL_DESC::BlockSize = 0.
+To use this feature, set D3D12MA::ALLOCATION_DESC::CustomPool to the pointer to your custom pool and
+D3D12MA::ALLOCATION_DESC::Flags to D3D12MA::ALLOCATION_FLAG_COMMITTED. Example:
+
+\code
+ALLOCATION_DESC allocDesc = {};
+allocDesc.CustomPool = pool;
+allocDesc.Flags = ALLOCATION_FLAG_COMMITTED;
+
+D3D12_RESOURCE_DESC resDesc = ...
+Allocation* alloc;
+ID3D12Resource* res;
+hr = allocator->CreateResource(&allocDesc, &resDesc,
+    D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &alloc, IID_PPV_ARGS(&res));
+\endcode
+
+This feature may seem unnecessary, but creating committed allocations from custom pools may be useful
+in some cases, e.g. to have separate memory usage statistics for some group of resources or to use
+extended allocation parameters, like custom `D3D12_HEAP_PROPERTIES`, which are available only in custom pools.
 
 
 \page resource_aliasing Resource aliasing (overlap)

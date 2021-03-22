@@ -856,6 +856,10 @@ static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
 
             bool expectSuccess = !neverAllocate; // NEVER_ALLOCATE should always fail with COMMITTED.
             CHECK_BOOL(expectSuccess == SUCCEEDED(hr));
+            if(SUCCEEDED(hr) && useCommitted)
+            {
+                CHECK_BOOL(allocPtr->GetHeap() == NULL); // Committed allocation has implicit heap.
+            }
         }
     }
 
