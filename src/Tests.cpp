@@ -1475,9 +1475,23 @@ static void TestMultithreading(const TestContext& ctx)
     }
 }
 
+static bool IsProtectedResourceSessionSupported(const TestContext& ctx)
+{
+    D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT support = {};
+    CHECK_HR(ctx.device->CheckFeatureSupport(
+        D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_SUPPORT, &support, sizeof support));
+    return support.Support > D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG_NONE;
+}
+
 static void TestDevice4(const TestContext& ctx)
 {
     wprintf(L"Test ID3D12Device4\n");
+
+    if(!IsProtectedResourceSessionSupported(ctx))
+    {
+        wprintf(L"D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_SUPPORT returned no support for protected resource session.\n");
+        return;
+    }
 
     CComPtr<ID3D12Device4> dev4;
     HRESULT hr = ctx.device->QueryInterface(&dev4);
