@@ -4693,7 +4693,7 @@ HRESULT AllocatorPimpl::CreateResource(
     CommittedAllocationParameters committedAllocationParams = {};
     bool preferCommitted = false;
     HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
-        NULL, // pResDesc
+        pResourceDesc,
         blockVector, committedAllocationParams, preferCommitted);
     if(FAILED(hr))
         return hr;
@@ -4763,7 +4763,7 @@ HRESULT AllocatorPimpl::CreateResource1(
     CommittedAllocationParameters committedAllocationParams = {};
     bool preferCommitted = false;
     HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
-        NULL, // pResDesc
+        pResourceDesc,
         blockVector, committedAllocationParams, preferCommitted);
     if(FAILED(hr))
         return hr;
@@ -4814,8 +4814,8 @@ HRESULT AllocatorPimpl::CreateResource2(
     BlockVector* blockVector = NULL;
     CommittedAllocationParameters committedAllocationParams = {};
     bool preferCommitted = false;
-    HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
-        NULL, // pResDesc
+    HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC1>(*pAllocDesc, resAllocInfo.SizeInBytes,
+        pResourceDesc,
         blockVector, committedAllocationParams, preferCommitted);
     if(FAILED(hr))
         return hr;
