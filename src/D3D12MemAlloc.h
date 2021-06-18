@@ -1053,6 +1053,11 @@ struct POOL_DESC
     throughout whole lifetime of this pool.
     */
     UINT MaxBlockCount;
+    /** \brief Additional minimum alignment to be used for all allocations created from this pool. Can be 0.
+    
+    Leave 0 (default) not to impose any additional alignment. If not 0, it must be a power of two.
+    */
+    UINT64 MinAllocationAlignment;
 };
 
 /** \brief Custom memory pool

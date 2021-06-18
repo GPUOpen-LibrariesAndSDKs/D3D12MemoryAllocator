@@ -711,6 +711,43 @@ static void TestCustomPools(const TestContext& ctx)
         IID_PPV_ARGS(&res)) );
 }
 
+static void TestCustomPool_MinAllocationAlignment(const TestContext& ctx)
+{
+    wprintf(L"Test custom pool MinAllocationAlignment\n");
+
+    const UINT64 BUFFER_SIZE = 32;
+    constexpr size_t BUFFER_COUNT = 4;
+    const UINT64 MIN_ALIGNMENT = 128 * 1024;
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.MinAllocationAlignment = MIN_ALIGNMENT;
+
+    D3D12MA::Pool* poolPtr;
+    CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &poolPtr) );
+    PoolUniquePtr pool{poolPtr};
+
+    D3D12MA::Allocation* allocPtr;
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.get();
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
+
+    AllocationUniquePtr allocs[BUFFER_COUNT];
+    for(size_t i = 0; i < BUFFER_COUNT; ++i)
+    {
+        CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            NULL, // pOptimizedClearValue
+            &allocPtr,
+            IID_NULL, NULL) ); // riidResource, ppvResource
+        allocs[i].reset(allocPtr);
+        CHECK_BOOL(allocPtr->GetOffset() % MIN_ALIGNMENT == 0);
+    }
+}
+
 static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIES& heapProps)
 {
     D3D12MA::Stats globalStatsBeg = {};
@@ -1589,6 +1626,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestPlacedResources(ctx);
     TestOtherComInterface(ctx);
     TestCustomPools(ctx);
+    TestCustomPool_MinAllocationAlignment(ctx);
     TestCustomHeaps(ctx);
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);

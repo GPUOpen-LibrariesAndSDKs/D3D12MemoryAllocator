@@ -2637,7 +2637,8 @@ public:
         UINT64 preferredBlockSize,
         size_t minBlockCount,
         size_t maxBlockCount,
-        bool explicitBlockSize);
+        bool explicitBlockSize,
+        UINT64 minAllocationAlignment);
     ~BlockVector();
 
     HRESULT CreateMinBlocks();
@@ -2695,6 +2696,7 @@ private:
     const size_t m_MinBlockCount;
     const size_t m_MaxBlockCount;
     const bool m_ExplicitBlockSize;
+    const UINT64 m_MinAllocationAlignment;
     /* There can be at most one allocation that is completely empty - a
     hysteresis to avoid pessimistic case of alternating creation and destruction
     of a VkDeviceMemory. */
@@ -3864,7 +3866,8 @@ BlockVector::BlockVector(
     UINT64 preferredBlockSize,
     size_t minBlockCount,
     size_t maxBlockCount,
-    bool explicitBlockSize) :
+    bool explicitBlockSize,
+    UINT64 minAllocationAlignment) :
     m_hAllocator(hAllocator),
     m_HeapProps(heapProps),
     m_HeapFlags(heapFlags),
@@ -3872,6 +3875,7 @@ BlockVector::BlockVector(
     m_MinBlockCount(minBlockCount),
     m_MaxBlockCount(maxBlockCount),
     m_ExplicitBlockSize(explicitBlockSize),
+    m_MinAllocationAlignment(minAllocationAlignment),
     m_HasEmptyBlock(false),
     m_Blocks(hAllocator->GetAllocs()),
     m_NextBlockId(0)
@@ -4290,6 +4294,8 @@ HRESULT BlockVector::AllocateFromBlock(
     ALLOCATION_FLAGS allocFlags,
     Allocation** pAllocation)
 {
+    alignment = D3D12MA_MAX(alignment, m_MinAllocationAlignment);
+
     AllocationRequest currRequest = {};
     if(pBlock->m_pMetadata->CreateAllocationRequest(
         size,
@@ -4412,7 +4418,8 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc) :
         allocator, desc.HeapProperties, heapFlags,
         preferredBlockSize,
         desc.MinBlockCount, maxBlockCount,
-        explicitBlockSize);
+        explicitBlockSize,
+        D3D12MA_MAX(desc.MinAllocationAlignment, (UINT64)D3D12MA_DEBUG_ALIGNMENT));
 }
 
 HRESULT PoolPimpl::Init()
@@ -4608,7 +4615,8 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             m_PreferredBlockSize,
             0, // minBlockCount
             SIZE_MAX, // maxBlockCount
-            false); // explicitBlockSize
+            false, // explicitBlockSize
+            D3D12MA_DEBUG_ALIGNMENT); // minAllocationAlignment
         // No need to call m_pBlockVectors[i]->CreateMinBlocks here, becase minBlockCount is 0.
     }
 
@@ -4685,7 +4693,6 @@ HRESULT AllocatorPimpl::CreateResource(
 
     D3D12_RESOURCE_DESC finalResourceDesc = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
-    resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
@@ -4755,7 +4762,6 @@ HRESULT AllocatorPimpl::CreateResource1(
 
     D3D12_RESOURCE_DESC finalResourceDesc = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
-    resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
@@ -4807,7 +4813,6 @@ HRESULT AllocatorPimpl::CreateResource2(
 
     D3D12_RESOURCE_DESC1 finalResourceDesc = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
-    resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
@@ -4945,7 +4950,6 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
 
     D3D12_RESOURCE_DESC resourceDesc2 = *pResourceDesc;
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfo(resourceDesc2);
-    resAllocInfo.Alignment = D3D12MA_MAX<UINT64>(resAllocInfo.Alignment, D3D12MA_DEBUG_ALIGNMENT);
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
@@ -6225,7 +6229,8 @@ HRESULT Allocator::CreatePool(
     Pool** ppPool)
 {
     if(!pPoolDesc || !ppPool ||
-        (pPoolDesc->MaxBlockCount > 0 && pPoolDesc->MaxBlockCount < pPoolDesc->MinBlockCount))
+        (pPoolDesc->MaxBlockCount > 0 && pPoolDesc->MaxBlockCount < pPoolDesc->MinBlockCount) ||
+        (pPoolDesc->MinAllocationAlignment > 0 && !IsPow2(pPoolDesc->MinAllocationAlignment)))
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreatePool.");
         return E_INVALIDARG;
