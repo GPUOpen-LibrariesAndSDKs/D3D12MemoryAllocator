@@ -2,6 +2,8 @@
 
 Easy to integrate memory allocation library for Direct3D 12.
 
+**Documentation:** See [D3D12 Memory Allocator](https://gpuopen-librariesandsdks.github.io/D3D12MemoryAllocator/html/) (generated from Doxygen-style comments in [src/D3D12MemAlloc.h](src/D3D12MemAlloc.h))
+
 **License:** MIT. See [LICENSE.txt](LICENSE.txt)
 
 **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
@@ -86,15 +88,6 @@ With this one function call:
 # Binaries
 
 The release comes with precompiled binary executable for "D3D12Sample" application which contains test suite. It is compiled using Visual Studio 2019, so it requires appropriate libraries to work, including "MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll". If its launch fails with error message telling about those files missing, please download and install [Microsoft Visual C++ Redistributable for Visual Studio 2015, 2017 and 2019](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads), "x64" version.
-
-# Documentation
-
-Documentation is provided together with the library in form of Doxygen-style comments inside the code, in file "src/D3D12MemAlloc.h". They can be read directly or turned into HTML and other convenient to read formats. Unfortunately we can't provide pregenerated version browseable online. You can generate it on your own by following these steps:
-
-1. Install [Doxygen](http://www.doxygen.nl/).
-2. Open command line and enter "src" directory.
-3. Type command: `doxygen`
-4. Open following file in a web browser: "docs/html/index.html".
 
 # Copyright notice
 
