@@ -664,8 +664,6 @@ Features deliberately excluded from the scope of this library:
 
 - Descriptor allocation. Although also called "heaps", objects that represent
   descriptors are separate part of the D3D12 API from buffers and textures.
-- Support for `D3D12_HEAP_TYPE_CUSTOM`. Only the default heap types are supported:
-  `UPLOAD`, `DEFAULT`, `READBACK`.
 - Support for reserved (tiled) resources. We don't recommend using them.
 - Support for `ID3D12Device::Evict` and `MakeResident`. We don't recommend using them.
 - Handling CPU memory allocation failures. When dynamically creating small C++
