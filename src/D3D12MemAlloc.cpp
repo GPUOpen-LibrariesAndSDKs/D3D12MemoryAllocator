@@ -1762,6 +1762,9 @@ public:
     const_iterator cbegin() const { return const_iterator(this, Front()); }
     const_iterator cend() const { return const_iterator(this, NULL); }
 
+    const_iterator begin() const { return cbegin(); }
+    const_iterator end() const { return cend(); }
+
     void clear() { Clear(); }
     void push_back(const T& value) { PushBack(value); }
     void erase(iterator it) { Remove(it.m_pItem); }
@@ -3141,12 +3144,8 @@ bool BlockMetadata_Generic::Validate() const
     // True if previous visited suballocation was free.
     bool prevFree = false;
 
-    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
-        suballocItem != m_Suballocations.cend();
-        ++suballocItem)
+    for(const auto& subAlloc : m_Suballocations)
     {
-        const Suballocation& subAlloc = *suballocItem;
-
         // Actual offset of this suballocation doesn't match expected one.
         D3D12MA_VALIDATE(subAlloc.offset == calculatedOffset);
 
@@ -3233,11 +3232,8 @@ bool BlockMetadata_Generic::IsEmpty() const
 
 void BlockMetadata_Generic::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const
 {
-    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
-        suballocItem != m_Suballocations.cend();
-        ++suballocItem)
+    for(const auto& suballoc : m_Suballocations)
     {
-        const Suballocation& suballoc = *suballocItem;
         if(suballoc.offset == offset)
         {
             outInfo.size = suballoc.size;
@@ -3590,11 +3586,8 @@ void BlockMetadata_Generic::UnregisterFreeSuballocation(SuballocationList::itera
 
 void BlockMetadata_Generic::SetAllocationUserData(UINT64 offset, void* userData)
 {
-    for(SuballocationList::iterator suballocItem = m_Suballocations.begin();
-        suballocItem != m_Suballocations.end();
-        ++suballocItem)
+    for(auto& suballoc : m_Suballocations)
     {
-        Suballocation& suballoc = *suballocItem;
         if(suballoc.offset == offset)
         {
             suballoc.userData = userData;
@@ -3620,11 +3613,8 @@ void BlockMetadata_Generic::CalcAllocationStatInfo(StatInfo& outInfo) const
     outInfo.UnusedRangeSizeMin = UINT64_MAX;
     outInfo.UnusedRangeSizeMax = 0;
 
-    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
-        suballocItem != m_Suballocations.cend();
-        ++suballocItem)
+    for(const auto& suballoc : m_Suballocations)
     {
-        const Suballocation& suballoc = *suballocItem;
         if(suballoc.type == SUBALLOCATION_TYPE_FREE)
         {
             outInfo.UnusedRangeSizeMin = D3D12MA_MIN(suballoc.size, outInfo.UnusedRangeSizeMin);
@@ -3651,11 +3641,8 @@ void BlockMetadata_Generic::WriteAllocationInfoToJson(JsonWriter& json) const
     json.WriteNumber(m_FreeCount);
     json.WriteString(L"Suballocations");
     json.BeginArray();
-    for(SuballocationList::const_iterator suballocItem = m_Suballocations.cbegin();
-        suballocItem != m_Suballocations.cend();
-        ++suballocItem)
+    for(const auto& suballoc : m_Suballocations)
     {
-        const Suballocation& suballoc = *suballocItem;
         json.BeginObject(true);
         json.WriteString(L"Offset");
         json.WriteNumber(suballoc.offset);
