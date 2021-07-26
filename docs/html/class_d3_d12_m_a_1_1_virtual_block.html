@@ -77,12 +77,15 @@ $(function() {
  <a href="class_d3_d12_m_a_1_1_virtual_block.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_d3_d12_mem_alloc_8h_source.html">D3D12MemAlloc.h</a>&gt;</code></p>
+<div class="dynheader">
+Inheritance diagram for D3D12MA::VirtualBlock:</div>
+<div class="dyncontent">
+ <div class="center">
+  <img src="class_d3_d12_m_a_1_1_virtual_block.png" alt=""/>
+ </div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a24111ca907ad9efae25cf4858ff6b0b0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a24111ca907ad9efae25cf4858ff6b0b0">Release</a> ()</td></tr>
-<tr class="memdesc:a24111ca907ad9efae25cf4858ff6b0b0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Destroys this object and frees it from memory.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a24111ca907ad9efae25cf4858ff6b0b0">More...</a><br /></td></tr>
-<tr class="separator:a24111ca907ad9efae25cf4858ff6b0b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7b23fd2da6f0343095fb14b31395678b"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a7b23fd2da6f0343095fb14b31395678b">IsEmpty</a> () const</td></tr>
 <tr class="memdesc:a7b23fd2da6f0343095fb14b31395678b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if the block is empty - contains 0 allocations.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a7b23fd2da6f0343095fb14b31395678b">More...</a><br /></td></tr>
 <tr class="separator:a7b23fd2da6f0343095fb14b31395678b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -114,7 +117,7 @@ Public Member Functions</h2></td></tr>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Represents pure allocation algorithm and a data structure with allocations in some memory block, without actually allocating any GPU memory. </p>
 <p>This class allows to use the core algorithm of the library custom allocations e.g. CPU memory or sub-allocation regions inside a single GPU buffer.</p>
-<p>To create this object, fill in <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a> and call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ab8bb16e20c691720aad26ecbf105aa6f" title="Creates new D3D12MA::VirtualBlock object and returns it through ppVirtualBlock.">CreateVirtualBlock()</a>. To destroy it, call its method <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a24111ca907ad9efae25cf4858ff6b0b0" title="Destroys this object and frees it from memory.">VirtualBlock::Release()</a>. </p>
+<p>To create this object, fill in <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a> and call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ab8bb16e20c691720aad26ecbf105aa6f" title="Creates new D3D12MA::VirtualBlock object and returns it through ppVirtualBlock.">CreateVirtualBlock()</a>. To destroy it, call its method <code>VirtualBlock::Release()</code>. You need to free all the allocations within this block or call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189" title="Frees all the allocations.">Clear()</a> before destroying it. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="aa57575f1af18461012bde8c4b6f3c56c"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa57575f1af18461012bde8c4b6f3c56c">&#9670;&nbsp;</a></span>Allocate()</h2>
@@ -305,26 +308,6 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Returns true if the block is empty - contains 0 allocations. </p>
-
-</div>
-</div>
-<a id="a24111ca907ad9efae25cf4858ff6b0b0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a24111ca907ad9efae25cf4858ff6b0b0">&#9670;&nbsp;</a></span>Release()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void D3D12MA::VirtualBlock::Release </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Destroys this object and frees it from memory. </p>
-<p>You need to free all the allocations within this block or call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189" title="Frees all the allocations.">Clear()</a> before destroying it. </p>
 
 </div>
 </div>

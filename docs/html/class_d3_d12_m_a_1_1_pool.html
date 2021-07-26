@@ -77,12 +77,15 @@ $(function() {
  <a href="class_d3_d12_m_a_1_1_pool.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_d3_d12_mem_alloc_8h_source.html">D3D12MemAlloc.h</a>&gt;</code></p>
+<div class="dynheader">
+Inheritance diagram for D3D12MA::Pool:</div>
+<div class="dyncontent">
+ <div class="center">
+  <img src="class_d3_d12_m_a_1_1_pool.png" alt=""/>
+ </div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a5e6fe1e7fbe0ebe394d63d22715535c6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#a5e6fe1e7fbe0ebe394d63d22715535c6">Release</a> ()</td></tr>
-<tr class="memdesc:a5e6fe1e7fbe0ebe394d63d22715535c6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deletes pool object, frees D3D12 heaps (memory blocks) managed by it. Allocations and resources must already be released!  <a href="class_d3_d12_m_a_1_1_pool.html#a5e6fe1e7fbe0ebe394d63d22715535c6">More...</a><br /></td></tr>
-<tr class="separator:a5e6fe1e7fbe0ebe394d63d22715535c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aaab59af46d922d6b81fce8d8be987028"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html">POOL_DESC</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#aaab59af46d922d6b81fce8d8be987028">GetDesc</a> () const</td></tr>
 <tr class="memdesc:aaab59af46d922d6b81fce8d8be987028"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns copy of parameters of the pool.  <a href="class_d3_d12_m_a_1_1_pool.html#aaab59af46d922d6b81fce8d8be987028">More...</a><br /></td></tr>
 <tr class="separator:aaab59af46d922d6b81fce8d8be987028"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -159,26 +162,6 @@ Public Member Functions</h2></td></tr>
 <p>Returns the name associated with the pool object. </p>
 <p>Returned string points to an internal copy.</p>
 <p>If no name was associated with the allocation, returns NULL. </p>
-
-</div>
-</div>
-<a id="a5e6fe1e7fbe0ebe394d63d22715535c6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5e6fe1e7fbe0ebe394d63d22715535c6">&#9670;&nbsp;</a></span>Release()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void D3D12MA::Pool::Release </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Deletes pool object, frees D3D12 heaps (memory blocks) managed by it. Allocations and resources must already be released! </p>
-<p>It doesn't delete allocations and resources created in this pool. They must be all released before calling this function! </p>
 
 </div>
 </div>

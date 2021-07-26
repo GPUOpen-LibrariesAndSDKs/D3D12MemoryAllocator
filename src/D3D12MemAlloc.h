@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2021-06-18)
+<b>Version 2.0.0-development</b> (2021-07-26)
 
 Copyright (c) 2019-2021 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -59,7 +59,7 @@ Documentation of all members: D3D12MemAlloc.h
 \section quick_start_project_setup Project setup and initialization
 
 This is a small, standalone C++ library. It consists of a pair of 2 files:
-"%D3D12MemAlloc.h" header file with public interface and "D3D12MemAlloc.cpp" with
+"D3D12MemAlloc.h" header file with public interface and "D3D12MemAlloc.cpp" with
 internal implementation. The only external dependencies are WinAPI, Direct3D 12,
 and parts of C/C++ standard library (but STL containers, exceptions, or RTTI are
 not used).
@@ -99,8 +99,12 @@ HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
 
 (5.) Right before destroying the D3D12 device, destroy the allocator object.
 
-Please note that objects of this library must be destroyed by calling `Release`
-method (despite they are not COM interfaces and no reference counting is involved).
+Objects of this library must be destroyed by calling `Release` method.
+They are somewhat compatible with COM: they implement `IUnknown` interface with its virtual methods: `AddRef`, `Release`, `QueryInterface`,
+and they are reference-counted internally.
+You can use smart pointers designed for COM with objects of this library - e.g. `CComPtr` or `Microsoft::WRL::ComPtr`.
+The reference counter is thread-safe.
+`QueryInterface` method supports only `IUnknown`, as classes of this library don't define their own GUIDs.
 
 \code
 allocator->Release();
@@ -1275,7 +1279,7 @@ struct Budget
 \brief Represents main object of this library initialized for particular `ID3D12Device`.
 
 Fill structure D3D12MA::ALLOCATOR_DESC and call function CreateAllocator() to create it.
-Call method Allocator::Release to destroy it.
+Call method `Release()` to destroy it.
 
 It is recommended to create just one object of this type per `ID3D12Device` object,
 right after Direct3D 12 is initialized and keep it alive until before Direct3D device is destroyed.
@@ -1557,7 +1561,7 @@ This class allows to use the core algorithm of the library custom allocations e.
 sub-allocation regions inside a single GPU buffer.
 
 To create this object, fill in D3D12MA::VIRTUAL_BLOCK_DESC and call CreateVirtualBlock().
-To destroy it, call its method VirtualBlock::Release().
+To destroy it, call its method `VirtualBlock::Release()`.
 You need to free all the allocations within this block or call Clear() before destroying it.
 */
 class VirtualBlock : public IUnknownImpl

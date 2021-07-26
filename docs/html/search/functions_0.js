@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['allocate_131',['Allocate',['../class_d3_d12_m_a_1_1_virtual_block.html#aa57575f1af18461012bde8c4b6f3c56c',1,'D3D12MA::VirtualBlock']]],
-  ['allocatememory_132',['AllocateMemory',['../class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2',1,'D3D12MA::Allocator']]],
-  ['allocatememory1_133',['AllocateMemory1',['../class_d3_d12_m_a_1_1_allocator.html#a6c1fbc673e2559ead34dbf039dd47d60',1,'D3D12MA::Allocator']]]
+  ['allocate_130',['Allocate',['../class_d3_d12_m_a_1_1_virtual_block.html#aa57575f1af18461012bde8c4b6f3c56c',1,'D3D12MA::VirtualBlock']]],
+  ['allocatememory_131',['AllocateMemory',['../class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2',1,'D3D12MA::Allocator']]],
+  ['allocatememory1_132',['AllocateMemory1',['../class_d3_d12_m_a_1_1_allocator.html#a6c1fbc673e2559ead34dbf039dd47d60',1,'D3D12MA::Allocator']]]
 ];

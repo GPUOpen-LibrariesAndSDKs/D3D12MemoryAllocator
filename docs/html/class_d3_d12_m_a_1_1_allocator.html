@@ -77,12 +77,15 @@ $(function() {
  <a href="class_d3_d12_m_a_1_1_allocator.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="_d3_d12_mem_alloc_8h_source.html">D3D12MemAlloc.h</a>&gt;</code></p>
+<div class="dynheader">
+Inheritance diagram for D3D12MA::Allocator:</div>
+<div class="dyncontent">
+ <div class="center">
+  <img src="class_d3_d12_m_a_1_1_allocator.png" alt=""/>
+ </div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aefff328977ae1030a2ac6db5a148294b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aefff328977ae1030a2ac6db5a148294b">Release</a> ()</td></tr>
-<tr class="memdesc:aefff328977ae1030a2ac6db5a148294b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deletes this object.  <a href="class_d3_d12_m_a_1_1_allocator.html#aefff328977ae1030a2ac6db5a148294b">More...</a><br /></td></tr>
-<tr class="separator:aefff328977ae1030a2ac6db5a148294b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8ce95f85e5f2a1d41b81d676b21c04ae"><td class="memItemLeft" align="right" valign="top">const D3D12_FEATURE_DATA_D3D12_OPTIONS &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a8ce95f85e5f2a1d41b81d676b21c04ae">GetD3D12Options</a> () const</td></tr>
 <tr class="memdesc:a8ce95f85e5f2a1d41b81d676b21c04ae"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns cached options retrieved from D3D12 device.  <a href="class_d3_d12_m_a_1_1_allocator.html#a8ce95f85e5f2a1d41b81d676b21c04ae">More...</a><br /></td></tr>
 <tr class="separator:a8ce95f85e5f2a1d41b81d676b21c04ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -131,7 +134,7 @@ Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Represents main object of this library initialized for particular <code>ID3D12Device</code>. </p>
-<p>Fill structure <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html" title="Parameters of created Allocator object. To be used with CreateAllocator().">D3D12MA::ALLOCATOR_DESC</a> and call function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a7cc10fd0b328a512165cf636cb795090" title="Creates new main D3D12MA::Allocator object and returns it through ppAllocator.">CreateAllocator()</a> to create it. Call method <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aefff328977ae1030a2ac6db5a148294b" title="Deletes this object.">Allocator::Release</a> to destroy it.</p>
+<p>Fill structure <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html" title="Parameters of created Allocator object. To be used with CreateAllocator().">D3D12MA::ALLOCATOR_DESC</a> and call function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a7cc10fd0b328a512165cf636cb795090" title="Creates new main D3D12MA::Allocator object and returns it through ppAllocator.">CreateAllocator()</a> to create it. Call method <code>Release()</code> to destroy it.</p>
 <p>It is recommended to create just one object of this type per <code>ID3D12Device</code> object, right after Direct3D 12 is initialized and keep it alive until before Direct3D device is destroyed. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="acb8a10a5ea30171ce60128286aec5ee2"></a>
@@ -713,26 +716,6 @@ Public Member Functions</h2></td></tr>
 <li><a href="https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_architecture">https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_architecture</a></li>
 <li><a href="https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties">https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties</a> </li>
 </ul>
-
-</div>
-</div>
-<a id="aefff328977ae1030a2ac6db5a148294b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aefff328977ae1030a2ac6db5a148294b">&#9670;&nbsp;</a></span>Release()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void D3D12MA::Allocator::Release </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Deletes this object. </p>
-<p>This function must be used instead of destructor, which is private. There is no reference counting involved. </p>
 
 </div>
 </div>
