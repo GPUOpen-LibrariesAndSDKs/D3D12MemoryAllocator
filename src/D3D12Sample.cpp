@@ -24,6 +24,7 @@
 #include "Common.h"
 #include "Tests.h"
 #include <atomic>
+#include <Shlwapi.h> // For StrStrI
 
 namespace VS
 {
@@ -73,13 +74,13 @@ class DXGIUsage
 {
 public:
     void Init();
-    IDXGIFactory4* GetDXGIFactory() const { return m_DXGIFactory; }
+    IDXGIFactory4* GetDXGIFactory() const { return m_DXGIFactory.Get(); }
     void PrintAdapterList() const;
     // If failed, returns null pointer.
-    CComPtr<IDXGIAdapter1> CreateAdapter(const GPUSelection& GPUSelection) const;
+    ComPtr<IDXGIAdapter1> CreateAdapter(const GPUSelection& GPUSelection) const;
 
 private:
-    CComPtr<IDXGIFactory4> m_DXGIFactory;
+    ComPtr<IDXGIFactory4> m_DXGIFactory;
 };
 
 static UINT64 g_TimeOffset; // In ms.
@@ -88,33 +89,33 @@ static float g_Time; // g_TimeValue converted to float, in seconds.
 static float g_TimeDelta;
 
 static DXGIUsage* g_DXGIUsage;
-static CComPtr<ID3D12Device> g_Device;
+static ComPtr<ID3D12Device> g_Device;
 static D3D12MA::Allocator* g_Allocator;
 
-static CComPtr<IDXGISwapChain3> g_SwapChain; // swapchain used to switch between render targets
-static CComPtr<ID3D12CommandQueue> g_CommandQueue; // container for command lists
-static CComPtr<ID3D12DescriptorHeap> g_RtvDescriptorHeap; // a descriptor heap to hold resources like the render targets
-static CComPtr<ID3D12Resource> g_RenderTargets[FRAME_BUFFER_COUNT]; // number of render targets equal to buffer count
-static CComPtr<ID3D12CommandAllocator> g_CommandAllocators[FRAME_BUFFER_COUNT]; // we want enough allocators for each buffer * number of threads (we only have one thread)
-static CComPtr<ID3D12GraphicsCommandList> g_CommandList; // a command list we can record commands into, then execute them to render the frame
-static CComPtr<ID3D12Fence> g_Fences[FRAME_BUFFER_COUNT];    // an object that is locked while our command list is being executed by the gpu. We need as many 
+static ComPtr<IDXGISwapChain3> g_SwapChain; // swapchain used to switch between render targets
+static ComPtr<ID3D12CommandQueue> g_CommandQueue; // container for command lists
+static ComPtr<ID3D12DescriptorHeap> g_RtvDescriptorHeap; // a descriptor heap to hold resources like the render targets
+static ComPtr<ID3D12Resource> g_RenderTargets[FRAME_BUFFER_COUNT]; // number of render targets equal to buffer count
+static ComPtr<ID3D12CommandAllocator> g_CommandAllocators[FRAME_BUFFER_COUNT]; // we want enough allocators for each buffer * number of threads (we only have one thread)
+static ComPtr<ID3D12GraphicsCommandList> g_CommandList; // a command list we can record commands into, then execute them to render the frame
+static ComPtr<ID3D12Fence> g_Fences[FRAME_BUFFER_COUNT];    // an object that is locked while our command list is being executed by the gpu. We need as many 
                                                       //as we have allocators (more if we want to know when the gpu is finished with an asset)
 static HANDLE g_FenceEvent; // a handle to an event when our g_Fences is unlocked by the gpu
 static UINT64 g_FenceValues[FRAME_BUFFER_COUNT]; // this value is incremented each frame. each g_Fences will have its own value
 static UINT g_FrameIndex; // current rtv we are on
 static UINT g_RtvDescriptorSize; // size of the rtv descriptor on the g_Device (all front and back buffers will be the same size)
 
-static CComPtr<ID3D12PipelineState> g_PipelineStateObject;
-static CComPtr<ID3D12RootSignature> g_RootSignature;
-static CComPtr<ID3D12Resource> g_VertexBuffer;
+static ComPtr<ID3D12PipelineState> g_PipelineStateObject;
+static ComPtr<ID3D12RootSignature> g_RootSignature;
+static ComPtr<ID3D12Resource> g_VertexBuffer;
 static D3D12MA::Allocation* g_VertexBufferAllocation;
-static CComPtr<ID3D12Resource> g_IndexBuffer;
+static ComPtr<ID3D12Resource> g_IndexBuffer;
 static D3D12MA::Allocation* g_IndexBufferAllocation;
 static D3D12_VERTEX_BUFFER_VIEW g_VertexBufferView;
 static D3D12_INDEX_BUFFER_VIEW g_IndexBufferView;
-static CComPtr<ID3D12Resource> g_DepthStencilBuffer;
+static ComPtr<ID3D12Resource> g_DepthStencilBuffer;
 static D3D12MA::Allocation* g_DepthStencilAllocation;
-static CComPtr<ID3D12DescriptorHeap> g_DepthStencilDescriptorHeap;
+static ComPtr<ID3D12DescriptorHeap> g_DepthStencilDescriptorHeap;
 
 struct Vertex {
     vec3 pos;
@@ -139,16 +140,16 @@ struct ConstantBuffer1_VS
 
 static const size_t ConstantBufferPerObjectAlignedSize = AlignUp<size_t>(sizeof(ConstantBuffer1_VS), 256);
 static D3D12MA::Allocation* g_CbPerObjectUploadHeapAllocations[FRAME_BUFFER_COUNT];
-static CComPtr<ID3D12Resource> g_CbPerObjectUploadHeaps[FRAME_BUFFER_COUNT];
+static ComPtr<ID3D12Resource> g_CbPerObjectUploadHeaps[FRAME_BUFFER_COUNT];
 static void* g_CbPerObjectAddress[FRAME_BUFFER_COUNT];
 static uint32_t g_CubeIndexCount;
 
-static CComPtr<ID3D12DescriptorHeap> g_MainDescriptorHeap[FRAME_BUFFER_COUNT];
-static CComPtr<ID3D12Resource> g_ConstantBufferUploadHeap[FRAME_BUFFER_COUNT];
+static ComPtr<ID3D12DescriptorHeap> g_MainDescriptorHeap[FRAME_BUFFER_COUNT];
+static ComPtr<ID3D12Resource> g_ConstantBufferUploadHeap[FRAME_BUFFER_COUNT];
 static D3D12MA::Allocation* g_ConstantBufferUploadAllocation[FRAME_BUFFER_COUNT];
 static void* g_ConstantBufferAddress[FRAME_BUFFER_COUNT];
 
-static CComPtr<ID3D12Resource> g_Texture;
+static ComPtr<ID3D12Resource> g_Texture;
 static D3D12MA::Allocation* g_TextureAllocation;
 
 static void* const CUSTOM_ALLOCATION_USER_DATA = (void*)(uintptr_t)0xDEADC0DE;
@@ -277,7 +278,7 @@ void WaitForFrame(size_t frameIndex) // wait until gpu is finished with command 
 void WaitGPUIdle(size_t frameIndex)
 {
     g_FenceValues[frameIndex]++;
-    CHECK_HR( g_CommandQueue->Signal(g_Fences[frameIndex], g_FenceValues[frameIndex]) );
+    CHECK_HR( g_CommandQueue->Signal(g_Fences[frameIndex].Get(), g_FenceValues[frameIndex]) );
     WaitForFrame(frameIndex);
 }
 
@@ -444,7 +445,7 @@ void DXGIUsage::Init()
 void DXGIUsage::PrintAdapterList() const
 {
     UINT index = 0;
-    CComPtr<IDXGIAdapter1> adapter;
+    ComPtr<IDXGIAdapter1> adapter;
     while (m_DXGIFactory->EnumAdapters1(index, &adapter) != DXGI_ERROR_NOT_FOUND)
     {
         DXGI_ADAPTER_DESC1 desc;
@@ -454,14 +455,14 @@ void DXGIUsage::PrintAdapterList() const
         const wchar_t* const suffix = isSoftware ? L" (SOFTWARE)" : L"";
         wprintf(L"Adapter %u: %s%s\n", index, desc.Description, suffix);
         
-        adapter.Release();
+        adapter.Reset();
         ++index;
     }
 }
 
-CComPtr<IDXGIAdapter1> DXGIUsage::CreateAdapter(const GPUSelection& GPUSelection) const
+ComPtr<IDXGIAdapter1> DXGIUsage::CreateAdapter(const GPUSelection& GPUSelection) const
 {
-    CComPtr<IDXGIAdapter1> adapter;
+    ComPtr<IDXGIAdapter1> adapter;
 
     if(GPUSelection.Index != UINT32_MAX)
     {
@@ -477,7 +478,7 @@ CComPtr<IDXGIAdapter1> DXGIUsage::CreateAdapter(const GPUSelection& GPUSelection
 
     if(!GPUSelection.Substring.empty())
     {
-        CComPtr<IDXGIAdapter1> tmpAdapter;
+        ComPtr<IDXGIAdapter1> tmpAdapter;
         for(UINT i = 0; m_DXGIFactory->EnumAdapters1(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
         {
             DXGI_ADAPTER_DESC1 desc;
@@ -487,7 +488,7 @@ CComPtr<IDXGIAdapter1> DXGIUsage::CreateAdapter(const GPUSelection& GPUSelection
                 // Second matching adapter found - error.
                 if(adapter)
                 {
-                    adapter.Release();
+                    adapter.Reset();
                     return adapter;
                 }
                 // First matching adapter found.
@@ -495,7 +496,7 @@ CComPtr<IDXGIAdapter1> DXGIUsage::CreateAdapter(const GPUSelection& GPUSelection
             }
             else 
             {
-                tmpAdapter.Release();
+                tmpAdapter.Reset();
             }
         }
         // Found or not, return it.
@@ -588,8 +589,8 @@ static void PrintAdapterInformation(IDXGIAdapter1* adapter)
         assert(0);
     }
 
-    CComPtr<IDXGIAdapter3> adapter3;
-    if(SUCCEEDED(adapter->QueryInterface(&adapter3)))
+    ComPtr<IDXGIAdapter3> adapter3;
+    if(SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(&adapter3))))
     {
         wprintf(L"DXGI_QUERY_VIDEO_MEMORY_INFO:\n");
         for(UINT groupIndex = 0; groupIndex < 2; ++groupIndex)
@@ -621,13 +622,13 @@ static void InitD3D() // initializes direct3d 12
 {
     assert(g_DXGIUsage);
 
-    CComPtr<IDXGIAdapter1> adapter = g_DXGIUsage->CreateAdapter(g_CommandLineParameters.m_GPUSelection);
+    ComPtr<IDXGIAdapter1> adapter = g_DXGIUsage->CreateAdapter(g_CommandLineParameters.m_GPUSelection);
     CHECK_BOOL(adapter);
 
     // Must be done before D3D12 device is created.
     if(ENABLE_DEBUG_LAYER)
     {
-        CComPtr<ID3D12Debug> debug;
+        ComPtr<ID3D12Debug> debug;
         if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
             debug->EnableDebugLayer();
     }
@@ -635,7 +636,7 @@ static void InitD3D() // initializes direct3d 12
     // Create the g_Device
     ID3D12Device* device = nullptr;
     CHECK_HR( D3D12CreateDevice(
-        adapter,
+        adapter.Get(),
         MY_D3D_FEATURE_LEVEL,
         IID_PPV_ARGS(&device)) );
     g_Device.Attach(device);
@@ -646,7 +647,7 @@ static void InitD3D() // initializes direct3d 12
         D3D12MA::ALLOCATOR_DESC desc = {};
         desc.Flags = g_AllocatorFlags;
         desc.pDevice = device;
-        desc.pAdapter = adapter;
+        desc.pAdapter = adapter.Get();
 
         if(ENABLE_CPU_ALLOCATION_CALLBACKS)
         {
@@ -659,7 +660,7 @@ static void InitD3D() // initializes direct3d 12
         CHECK_HR( D3D12MA::CreateAllocator(&desc, &g_Allocator) );
     }
 
-    PrintAdapterInformation(adapter);
+    PrintAdapterInformation(adapter.Get());
     wprintf(L"\n");
     
     // -- Create the Command Queue -- //
@@ -694,7 +695,7 @@ static void InitD3D() // initializes direct3d 12
     IDXGISwapChain* tempSwapChain;
 
     CHECK_HR( g_DXGIUsage->GetDXGIFactory()->CreateSwapChain(
-        g_CommandQueue, // the queue will be flushed once the swap chain is created
+        g_CommandQueue.Get(), // the queue will be flushed once the swap chain is created
         &swapChainDesc, // give it the swap chain description we created above
         &tempSwapChain // store the created swap chain in a temp IDXGISwapChain interface
     ) );
@@ -736,7 +737,7 @@ static void InitD3D() // initializes direct3d 12
         g_RenderTargets[i].Attach(res);
 
         // the we "create" a render target view which binds the swap chain buffer (ID3D12Resource[n]) to the rtv handle
-        g_Device->CreateRenderTargetView(g_RenderTargets[i], nullptr, rtvHandle);
+        g_Device->CreateRenderTargetView(g_RenderTargets[i].Get(), nullptr, rtvHandle);
 
         // we increment the rtv handle by the rtv descriptor size we got above
         rtvHandle.ptr += g_RtvDescriptorSize;
@@ -752,7 +753,7 @@ static void InitD3D() // initializes direct3d 12
     }
 
     // create the command list with the first allocator
-    CHECK_HR( g_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_CommandAllocators[0], NULL, IID_PPV_ARGS(&g_CommandList)) );
+    CHECK_HR( g_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_CommandAllocators[0].Get(), NULL, IID_PPV_ARGS(&g_CommandList)) );
 
     // command lists are created in the recording state. our main loop will set it up for recording again so close it now
     g_CommandList->Close();
@@ -797,7 +798,7 @@ static void InitD3D() // initializes direct3d 12
     depthStencilDesc.Format = DEPTH_STENCIL_FORMAT;
     depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
-    g_Device->CreateDepthStencilView(g_DepthStencilBuffer, &depthStencilDesc, g_DepthStencilDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+    g_Device->CreateDepthStencilView(g_DepthStencilBuffer.Get(), &depthStencilDesc, g_DepthStencilDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
     // -- Create a Fence & Fence Event -- //
 
@@ -870,7 +871,7 @@ static void InitD3D() // initializes direct3d 12
         D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
         D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
-    CComPtr<ID3DBlob> signatureBlob;
+    ComPtr<ID3DBlob> signatureBlob;
     ID3DBlob* signatureBlobPtr;
     CHECK_HR( D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlobPtr, nullptr) );
     signatureBlob.Attach(signatureBlobPtr);
@@ -949,7 +950,7 @@ static void InitD3D() // initializes direct3d 12
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {}; // a structure to define a pso
     psoDesc.InputLayout.NumElements = _countof(inputLayout);
     psoDesc.InputLayout.pInputElementDescs = inputLayout;
-    psoDesc.pRootSignature = g_RootSignature; // the root signature that describes the input data this pso needs
+    psoDesc.pRootSignature = g_RootSignature.Get(); // the root signature that describes the input data this pso needs
     psoDesc.VS.BytecodeLength = sizeof(VS::g_main);
     psoDesc.VS.pShaderBytecode = VS::g_main;
     psoDesc.PS.BytecodeLength = sizeof(PS::g_main);
@@ -1060,7 +1061,7 @@ static void InitD3D() // initializes direct3d 12
     vertexBufferUploadResourceDesc.SampleDesc.Quality = 0;
     vertexBufferUploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     vertexBufferUploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    CComPtr<ID3D12Resource> vBufferUploadHeap;
+    ComPtr<ID3D12Resource> vBufferUploadHeap;
     D3D12MA::Allocation* vBufferUploadHeapAllocation = nullptr;
     CHECK_HR( g_Allocator->CreateResource(
         &vBufferUploadAllocDesc,
@@ -1077,17 +1078,17 @@ static void InitD3D() // initializes direct3d 12
     vertexData.RowPitch = vBufferSize; // size of all our triangle vertex data
     vertexData.SlicePitch = vBufferSize; // also the size of our triangle vertex data
 
-    CHECK_HR( g_CommandList->Reset(g_CommandAllocators[g_FrameIndex], NULL) );
+    CHECK_HR( g_CommandList->Reset(g_CommandAllocators[g_FrameIndex].Get(), NULL) );
 
     // we are now creating a command with the command list to copy the data from
     // the upload heap to the default heap
-    UINT64 r = UpdateSubresources(g_CommandList, g_VertexBuffer, vBufferUploadHeap, 0, 0, 1, &vertexData);
+    UINT64 r = UpdateSubresources(g_CommandList.Get(), g_VertexBuffer.Get(), vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
     assert(r);
 
     // transition the vertex buffer data from copy destination state to vertex buffer state
     D3D12_RESOURCE_BARRIER vbBarrier = {};
     vbBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    vbBarrier.Transition.pResource = g_VertexBuffer;
+    vbBarrier.Transition.pResource = g_VertexBuffer.Get();
     vbBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     vbBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
     vbBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1167,7 +1168,7 @@ static void InitD3D() // initializes direct3d 12
     indexBufferUploadResourceDesc.SampleDesc.Quality = 0;
     indexBufferUploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     indexBufferUploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    CComPtr<ID3D12Resource> iBufferUploadHeap;
+    ComPtr<ID3D12Resource> iBufferUploadHeap;
     D3D12MA::Allocation* iBufferUploadHeapAllocation = nullptr;
     CHECK_HR( g_Allocator->CreateResource(
         &iBufferUploadAllocDesc,
@@ -1186,13 +1187,13 @@ static void InitD3D() // initializes direct3d 12
 
                                         // we are now creating a command with the command list to copy the data from
                                         // the upload heap to the default heap
-    r = UpdateSubresources(g_CommandList, g_IndexBuffer, iBufferUploadHeap, 0, 0, 1, &indexData);
+    r = UpdateSubresources(g_CommandList.Get(), g_IndexBuffer.Get(), iBufferUploadHeap.Get(), 0, 0, 1, &indexData);
     assert(r);
 
     // transition the index buffer data from copy destination state to vertex buffer state
     D3D12_RESOURCE_BARRIER ibBarrier = {};
     ibBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    ibBarrier.Transition.pResource = g_IndexBuffer;
+    ibBarrier.Transition.pResource = g_IndexBuffer.Get();
     ibBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     ibBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_INDEX_BUFFER;
     ibBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1321,7 +1322,7 @@ static void InitD3D() // initializes direct3d 12
     textureUploadResourceDesc.SampleDesc.Quality = 0;
     textureUploadResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     textureUploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    CComPtr<ID3D12Resource> textureUpload;
+    ComPtr<ID3D12Resource> textureUpload;
     D3D12MA::Allocation* textureUploadAllocation;
     CHECK_HR( g_Allocator->CreateResource(
         &textureUploadAllocDesc,
@@ -1337,11 +1338,11 @@ static void InitD3D() // initializes direct3d 12
     textureSubresourceData.RowPitch = imageBytesPerRow;
     textureSubresourceData.SlicePitch = imageBytesPerRow * textureDesc.Height;
 
-    UpdateSubresources(g_CommandList, g_Texture, textureUpload, 0, 0, 1, &textureSubresourceData);
+    UpdateSubresources(g_CommandList.Get(), g_Texture.Get(), textureUpload.Get(), 0, 0, 1, &textureSubresourceData);
 
     D3D12_RESOURCE_BARRIER textureBarrier = {};
     textureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    textureBarrier.Transition.pResource = g_Texture;
+    textureBarrier.Transition.pResource = g_Texture.Get();
     textureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     textureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     textureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1357,14 +1358,14 @@ static void InitD3D() // initializes direct3d 12
         D3D12_CPU_DESCRIPTOR_HANDLE descHandle = {
             g_MainDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart().ptr +
             g_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)};
-        g_Device->CreateShaderResourceView(g_Texture, &srvDesc, descHandle);
+        g_Device->CreateShaderResourceView(g_Texture.Get(), &srvDesc, descHandle);
     }
 
     // # END OF INITIAL COMMAND LIST
 
     // Now we execute the command list to upload the initial assets (triangle data)
     g_CommandList->Close();
-    ID3D12CommandList* ppCommandLists[] = { g_CommandList };
+    ID3D12CommandList* ppCommandLists[] = { g_CommandList.Get() };
     commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
@@ -1439,14 +1440,14 @@ void Render() // execute the command list
     // but in this tutorial we are only clearing the rtv, and do not actually need
     // anything but an initial default pipeline, which is what we get by setting
     // the second parameter to NULL
-    CHECK_HR( g_CommandList->Reset(g_CommandAllocators[g_FrameIndex], NULL) );
+    CHECK_HR( g_CommandList->Reset(g_CommandAllocators[g_FrameIndex].Get(), NULL) );
 
     // here we start recording commands into the g_CommandList (which all the commands will be stored in the g_CommandAllocators)
 
     // transition the "g_FrameIndex" render target from the present state to the render target state so the command list draws to it starting from here
     D3D12_RESOURCE_BARRIER presentToRenderTargetBarrier = {};
     presentToRenderTargetBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    presentToRenderTargetBarrier.Transition.pResource = g_RenderTargets[g_FrameIndex];
+    presentToRenderTargetBarrier.Transition.pResource = g_RenderTargets[g_FrameIndex].Get();
     presentToRenderTargetBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     presentToRenderTargetBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     presentToRenderTargetBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1467,11 +1468,11 @@ void Render() // execute the command list
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     g_CommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-    g_CommandList->SetPipelineState(g_PipelineStateObject);
+    g_CommandList->SetPipelineState(g_PipelineStateObject.Get());
 
-    g_CommandList->SetGraphicsRootSignature(g_RootSignature);
+    g_CommandList->SetGraphicsRootSignature(g_RootSignature.Get());
 
-    ID3D12DescriptorHeap* descriptorHeaps[] = { g_MainDescriptorHeap[g_FrameIndex] };
+    ID3D12DescriptorHeap* descriptorHeaps[] = { g_MainDescriptorHeap[g_FrameIndex].Get() };
     g_CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
     g_CommandList->SetGraphicsRootDescriptorTable(0, g_MainDescriptorHeap[g_FrameIndex]->GetGPUDescriptorHandleForHeapStart());
@@ -1499,7 +1500,7 @@ void Render() // execute the command list
     // warning if present is called on the render target when it's not in the present state
     D3D12_RESOURCE_BARRIER renderTargetToPresentBarrier = {};
     renderTargetToPresentBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    renderTargetToPresentBarrier.Transition.pResource = g_RenderTargets[g_FrameIndex];
+    renderTargetToPresentBarrier.Transition.pResource = g_RenderTargets[g_FrameIndex].Get();
     renderTargetToPresentBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
     renderTargetToPresentBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     renderTargetToPresentBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1510,7 +1511,7 @@ void Render() // execute the command list
     // ================
 
     // create an array of command lists (only one command list here)
-    ID3D12CommandList* ppCommandLists[] = { g_CommandList };
+    ID3D12CommandList* ppCommandLists[] = { g_CommandList.Get() };
 
     // execute the array of command lists
     g_CommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
@@ -1518,7 +1519,7 @@ void Render() // execute the command list
     // this command goes in at the end of our command queue. we will know when our command queue 
     // has finished because the g_Fences value will be set to "g_FenceValues" from the GPU since the command
     // queue is being executed on the GPU
-    CHECK_HR( g_CommandQueue->Signal(g_Fences[g_FrameIndex], g_FenceValues[g_FrameIndex]) );
+    CHECK_HR( g_CommandQueue->Signal(g_Fences[g_FrameIndex].Get(), g_FenceValues[g_FrameIndex]) );
 
     // present the current backbuffer
     CHECK_HR( g_SwapChain->Present(PRESENT_SYNC_INTERVAL, 0) );
@@ -1530,7 +1531,7 @@ void Cleanup() // release com ojects and clean up memory
     for (size_t i = 0; i < FRAME_BUFFER_COUNT; ++i)
     {
         WaitForFrame(i);
-        CHECK_HR( g_CommandQueue->Wait(g_Fences[i], g_FenceValues[i]) );
+        CHECK_HR( g_CommandQueue->Wait(g_Fences[i].Get(), g_FenceValues[i]) );
     }
 
     // get swapchain out of full screen before exiting
@@ -1541,37 +1542,37 @@ void Cleanup() // release com ojects and clean up memory
 
     WaitGPUIdle(0);
 
-    g_Texture.Release();
+    g_Texture.Reset();
     g_TextureAllocation->Release(); g_TextureAllocation = nullptr;
-    g_IndexBuffer.Release();
+    g_IndexBuffer.Reset();
     g_IndexBufferAllocation->Release(); g_IndexBufferAllocation = nullptr;
-    g_VertexBuffer.Release();
+    g_VertexBuffer.Reset();
     g_VertexBufferAllocation->Release(); g_VertexBufferAllocation = nullptr;
-    g_PipelineStateObject.Release();
-    g_RootSignature.Release();
+    g_PipelineStateObject.Reset();
+    g_RootSignature.Reset();
 
     CloseHandle(g_FenceEvent);
-    g_CommandList.Release();
-    g_CommandQueue.Release();
+    g_CommandList.Reset();
+    g_CommandQueue.Reset();
 
     for (size_t i = FRAME_BUFFER_COUNT; i--; )
     {
-        g_CbPerObjectUploadHeaps[i].Release();
+        g_CbPerObjectUploadHeaps[i].Reset();
         g_CbPerObjectUploadHeapAllocations[i]->Release(); g_CbPerObjectUploadHeapAllocations[i] = nullptr;
-        g_MainDescriptorHeap[i].Release();
-        g_ConstantBufferUploadHeap[i].Release();
+        g_MainDescriptorHeap[i].Reset();
+        g_ConstantBufferUploadHeap[i].Reset();
         g_ConstantBufferUploadAllocation[i]->Release(); g_ConstantBufferUploadAllocation[i] = nullptr;
     }
 
-    g_DepthStencilDescriptorHeap.Release();
-    g_DepthStencilBuffer.Release();
+    g_DepthStencilDescriptorHeap.Reset();
+    g_DepthStencilBuffer.Reset();
     g_DepthStencilAllocation->Release(); g_DepthStencilAllocation = nullptr;
-    g_RtvDescriptorHeap.Release();
+    g_RtvDescriptorHeap.Reset();
     for (size_t i = FRAME_BUFFER_COUNT; i--; )
     {
-        g_RenderTargets[i].Release();
-        g_CommandAllocators[i].Release();
-        g_Fences[i].Release();
+        g_RenderTargets[i].Reset();
+        g_CommandAllocators[i].Reset();
+        g_Fences[i].Reset();
     }
     
     g_Allocator->Release(); g_Allocator = nullptr;
@@ -1580,8 +1581,8 @@ void Cleanup() // release com ojects and clean up memory
         assert(g_CpuAllocationCount.load() == 0);
     }
     
-    g_Device.Release();
-    g_SwapChain.Release();
+    g_Device.Reset();
+    g_SwapChain.Reset();
 }
 
 static void ExecuteTests()
@@ -1590,7 +1591,7 @@ static void ExecuteTests()
     {
         TestContext ctx = {};
         ctx.allocationCallbacks = &g_AllocationCallbacks;
-        ctx.device = g_Device;
+        ctx.device = g_Device.Get();
         ctx.allocator = g_Allocator;
         ctx.allocatorFlags = g_AllocatorFlags;
         Test(ctx);
@@ -1673,9 +1674,9 @@ static LRESULT WINAPI WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 ID3D12GraphicsCommandList* BeginCommandList()
 {
-    CHECK_HR( g_CommandList->Reset(g_CommandAllocators[g_FrameIndex], NULL) );
+    CHECK_HR( g_CommandList->Reset(g_CommandAllocators[g_FrameIndex].Get(), NULL) );
 
-    return g_CommandList;
+    return g_CommandList.Get();
 }
 
 void EndCommandList(ID3D12GraphicsCommandList* cmdList)

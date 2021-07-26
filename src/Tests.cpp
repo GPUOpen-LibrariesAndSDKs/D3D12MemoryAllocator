@@ -47,14 +47,14 @@ typedef std::unique_ptr<D3D12MA::VirtualBlock, D3d12maObjDeleter<D3D12MA::Virtua
 
 struct ResourceWithAllocation
 {
-    CComPtr<ID3D12Resource> resource;
+    ComPtr<ID3D12Resource> resource;
     AllocationUniquePtr allocation;
     UINT64 size = UINT64_MAX;
     UINT dataSeed = 0;
 
     void Reset()
     {
-        resource.Release();
+        resource.Reset();
         allocation.reset();
         size = UINT64_MAX;
         dataSeed = 0;
@@ -335,7 +335,7 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
 
         if(receiveExplicitResource)
         {
-            ID3D12Resource* res = resources[i].resource.p;
+            ID3D12Resource* res = resources[i].resource.Get();
             CHECK_BOOL(res && res == resources[i].allocation->GetResource());
             const ULONG refCountAfterAdd = res->AddRef();
             CHECK_BOOL(refCountAfterAdd == 3);
@@ -550,7 +550,7 @@ static void TestOtherComInterface(const TestContext& ctx)
         }
 
         D3D12MA::Allocation* alloc = nullptr;
-        CComPtr<ID3D12Pageable> pageable;
+        ComPtr<ID3D12Pageable> pageable;
         CHECK_HR(ctx.allocator->CreateResource(
             &allocDesc,
             &resDesc,
@@ -560,9 +560,9 @@ static void TestOtherComInterface(const TestContext& ctx)
             IID_PPV_ARGS(&pageable)));
 
         // Do something with the interface to make sure it's valid.
-        CComPtr<ID3D12Device> device;
+        ComPtr<ID3D12Device> device;
         CHECK_HR(pageable->GetDevice(IID_PPV_ARGS(&device)));
-        CHECK_BOOL(device == ctx.device);
+        CHECK_BOOL(device.Get() == ctx.device);
 
         alloc->Release();
     }
@@ -702,7 +702,7 @@ static void TestCustomPools(const TestContext& ctx)
     allocs[0].reset(allocPtr);
 
     resDesc.Width = 1 * MEGABYTE;
-    CComPtr<ID3D12Resource> res;
+    ComPtr<ID3D12Resource> res;
     CHECK_HR( ctx.allocator->CreateAliasingResource(allocs[0].get(),
         0, // AllocationLocalOffset
         &resDesc,
@@ -1201,13 +1201,13 @@ static void TestTransfer(const TestContext& ctx)
     ID3D12GraphicsCommandList* cmdList = BeginCommandList();
     for(UINT i = 0; i < count; ++i)
     {
-        cmdList->CopyBufferRegion(resourcesDefault[i].resource, 0, resourcesUpload[i].resource, 0, bufSize);
+        cmdList->CopyBufferRegion(resourcesDefault[i].resource.Get(), 0, resourcesUpload[i].resource.Get(), 0, bufSize);
     }
     D3D12_RESOURCE_BARRIER barriers[count] = {};
     for(UINT i = 0; i < count; ++i)
     {
         barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barriers[i].Transition.pResource = resourcesDefault[i].resource;
+        barriers[i].Transition.pResource = resourcesDefault[i].resource.Get();
         barriers[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barriers[i].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
         barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -1215,7 +1215,7 @@ static void TestTransfer(const TestContext& ctx)
     cmdList->ResourceBarrier(count, barriers);
     for(UINT i = 0; i < count; ++i)
     {
-        cmdList->CopyBufferRegion(resourcesReadback[i].resource, 0, resourcesDefault[i].resource, 0, bufSize);
+        cmdList->CopyBufferRegion(resourcesReadback[i].resource.Get(), 0, resourcesDefault[i].resource.Get(), 0, bufSize);
     }
     EndCommandList(cmdList);
 
@@ -1289,7 +1289,7 @@ static void TestZeroInitialized(const TestContext& ctx)
 
         {
             ID3D12GraphicsCommandList* cmdList = BeginCommandList();
-            cmdList->CopyBufferRegion(bufReadback.resource, 0, buf.resource, 0, bufSize);
+            cmdList->CopyBufferRegion(bufReadback.resource.Get(), 0, buf.resource.Get(), 0, bufSize);
             EndCommandList(cmdList);
         }
 
@@ -1363,13 +1363,13 @@ static void TestZeroInitialized(const TestContext& ctx)
 
             D3D12_RESOURCE_BARRIER barrier = {};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Transition.pResource = bufDefault.resource;
+            barrier.Transition.pResource = bufDefault.resource.Get();
             barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
             barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
             barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             cmdList->ResourceBarrier(1, &barrier);
 
-            cmdList->CopyBufferRegion(bufDefault.resource, 0, bufUpload.resource, 0, bufSize);
+            cmdList->CopyBufferRegion(bufDefault.resource.Get(), 0, bufUpload.resource.Get(), 0, bufSize);
             
             EndCommandList(cmdList);
         }
@@ -1530,8 +1530,8 @@ static void TestDevice4(const TestContext& ctx)
         return;
     }
 
-    CComPtr<ID3D12Device4> dev4;
-    HRESULT hr = ctx.device->QueryInterface(&dev4);
+    ComPtr<ID3D12Device4> dev4;
+    HRESULT hr = ctx.device->QueryInterface(IID_PPV_ARGS(&dev4));
     if(FAILED(hr))
     {
         wprintf(L"QueryInterface for ID3D12Device4 FAILED.\n");
@@ -1539,7 +1539,7 @@ static void TestDevice4(const TestContext& ctx)
     }
 
     D3D12_PROTECTED_RESOURCE_SESSION_DESC sessionDesc = {};
-    CComPtr<ID3D12ProtectedResourceSession> session;
+    ComPtr<ID3D12ProtectedResourceSession> session;
     // This fails on the SOFTWARE adapter.
     hr = dev4->CreateProtectedResourceSession(&sessionDesc, IID_PPV_ARGS(&session));
     if(FAILED(hr))
@@ -1557,10 +1557,10 @@ static void TestDevice4(const TestContext& ctx)
     allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
     D3D12MA::Allocation* alloc = nullptr;
-    CComPtr<ID3D12Resource> bufRes;
+    ComPtr<ID3D12Resource> bufRes;
     CHECK_HR(ctx.allocator->CreateResource1(&allocDesc, &resourceDesc,
         D3D12_RESOURCE_STATE_COMMON, NULL,
-        session, &alloc, IID_PPV_ARGS(&bufRes)));
+        session.Get(), &alloc, IID_PPV_ARGS(&bufRes)));
     AllocationUniquePtr bufAllocPtr{alloc};
 
     // Create a heap
@@ -1580,8 +1580,8 @@ static void TestDevice8(const TestContext& ctx)
 {
     wprintf(L"Test ID3D12Device8\n");
 
-    CComPtr<ID3D12Device8> dev8;
-    CHECK_HR(ctx.device->QueryInterface(&dev8));
+    ComPtr<ID3D12Device8> dev8;
+    CHECK_HR(ctx.device->QueryInterface(IID_PPV_ARGS(&dev8)));
 
     D3D12_RESOURCE_DESC1 resourceDesc;
     FillResourceDescForBuffer(resourceDesc, 1024 * 1024);
@@ -1593,7 +1593,7 @@ static void TestDevice8(const TestContext& ctx)
     allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
 
     D3D12MA::Allocation* alloc0 = nullptr;
-    CComPtr<ID3D12Resource> res0;
+    ComPtr<ID3D12Resource> res0;
     CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
         D3D12_RESOURCE_STATE_COMMON, NULL, NULL,
         &alloc0, IID_PPV_ARGS(&res0)));
@@ -1605,7 +1605,7 @@ static void TestDevice8(const TestContext& ctx)
     allocDesc.Flags &= ~D3D12MA::ALLOCATION_FLAG_COMMITTED;
 
     D3D12MA::Allocation* alloc1 = nullptr;
-    CComPtr<ID3D12Resource> res1;
+    ComPtr<ID3D12Resource> res1;
     CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
         D3D12_RESOURCE_STATE_COMMON, NULL, NULL,
         &alloc1, IID_PPV_ARGS(&res1)));

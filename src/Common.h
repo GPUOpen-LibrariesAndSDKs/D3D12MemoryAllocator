@@ -29,7 +29,7 @@
 #include <d3d12.h>
 
 #include <Windows.h>
-#include <atlbase.h> // For CComPtr
+#include <wrl/client.h>
 
 #include <iostream>
 #include <fstream>
@@ -43,6 +43,8 @@
 #include <chrono>
 #include <string>
 #include <exception>
+
+using Microsoft::WRL::ComPtr;
 
 #include <cassert>
 #include <cstdlib>
