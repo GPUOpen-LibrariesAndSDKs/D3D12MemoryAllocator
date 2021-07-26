@@ -90,7 +90,7 @@ static float g_TimeDelta;
 
 static DXGIUsage* g_DXGIUsage;
 static ComPtr<ID3D12Device> g_Device;
-static D3D12MA::Allocator* g_Allocator;
+static ComPtr<D3D12MA::Allocator> g_Allocator;
 
 static ComPtr<IDXGISwapChain3> g_SwapChain; // swapchain used to switch between render targets
 static ComPtr<ID3D12CommandQueue> g_CommandQueue; // container for command lists
@@ -1575,7 +1575,7 @@ void Cleanup() // release com ojects and clean up memory
         g_Fences[i].Reset();
     }
     
-    g_Allocator->Release(); g_Allocator = nullptr;
+    g_Allocator.Reset();
     if(ENABLE_CPU_ALLOCATION_CALLBACKS)
     {
         assert(g_CpuAllocationCount.load() == 0);
@@ -1592,7 +1592,7 @@ static void ExecuteTests()
         TestContext ctx = {};
         ctx.allocationCallbacks = &g_AllocationCallbacks;
         ctx.device = g_Device.Get();
-        ctx.allocator = g_Allocator;
+        ctx.allocator = g_Allocator.Get();
         ctx.allocatorFlags = g_AllocatorFlags;
         Test(ctx);
     }

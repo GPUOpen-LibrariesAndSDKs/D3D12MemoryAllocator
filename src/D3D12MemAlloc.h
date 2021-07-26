@@ -728,6 +728,36 @@ may get their alignment 4K and their size a multiply of 4K instead of 64K.
 // To be used with MAKE_HRESULT to define custom error codes.
 #define FACILITY_D3D12MA 3542
 
+/*
+If providing your own implementation, you need to implement a subset of std::atomic.
+*/
+#if !defined(D3D12MA_ATOMIC_UINT32) || !defined(D3D12MA_ATOMIC_UINT64)
+    #include <atomic>
+#endif
+
+#ifndef D3D12MA_ATOMIC_UINT32
+    #define D3D12MA_ATOMIC_UINT32 std::atomic<UINT>
+#endif
+
+#ifndef D3D12MA_ATOMIC_UINT64
+    #define D3D12MA_ATOMIC_UINT64 std::atomic<UINT64>
+#endif
+
+namespace D3D12MA
+{
+class IUnknownImpl : public IUnknown
+{
+public:
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, _COM_Outptr_ void __RPC_FAR *__RPC_FAR *ppvObject);
+    virtual ULONG STDMETHODCALLTYPE AddRef();
+    virtual ULONG STDMETHODCALLTYPE Release();
+protected:
+    virtual void ReleaseThis() { delete this; }
+private:
+    D3D12MA_ATOMIC_UINT32 m_RefCount = 1;
+};
+} // namespace D3D12MA
+
 /// \endcond
 
 namespace D3D12MA
@@ -847,16 +877,9 @@ To retrieve this information, use methods of this class.
 The object also remembers `ID3D12Resource` and "owns" a reference to it,
 so it calls `%Release()` on the resource when destroyed.
 */
-class Allocation
+class Allocation : public IUnknownImpl
 {
 public:
-    /** \brief Deletes this object.
-
-    This function must be used instead of destructor, which is private.
-    There is no reference counting involved.
-    */
-    void Release();
-
     /** \brief Returns offset in bytes from the start of memory heap.
 
     You usually don't need to use this offset. If you create a buffer or a texture together with the allocation using function
@@ -924,6 +947,9 @@ public:
     ["Initializing DX12 Textures After Allocation and Aliasing"](https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing).
     */
     BOOL WasZeroInitialized() const { return m_PackedData.WasZeroInitialized(); }
+
+protected:
+    virtual void ReleaseThis();
 
 private:
     friend class AllocatorPimpl;
@@ -1066,16 +1092,9 @@ pools - creating resources in default pool is sufficient.
 
 To create custom pool, fill D3D12MA::POOL_DESC and call D3D12MA::Allocator::CreatePool.
 */
-class Pool
+class Pool : public IUnknownImpl
 {
 public:
-    /** \brief Deletes pool object, frees D3D12 heaps (memory blocks) managed by it. Allocations and resources must already be released!
-
-    It doesn't delete allocations and resources created in this pool. They must be all
-    released before calling this function!
-    */
-    void Release();
-    
     /** \brief Returns copy of parameters of the pool.
 
     These are the same parameters as passed to D3D12MA::Allocator::CreatePool.
@@ -1102,6 +1121,9 @@ public:
     If no name was associated with the allocation, returns NULL.
     */
     LPCWSTR GetName() const;
+
+protected:
+    virtual void ReleaseThis();
 
 private:
     friend class Allocator;
@@ -1258,16 +1280,9 @@ Call method Allocator::Release to destroy it.
 It is recommended to create just one object of this type per `ID3D12Device` object,
 right after Direct3D 12 is initialized and keep it alive until before Direct3D device is destroyed.
 */
-class Allocator
+class Allocator : public IUnknownImpl
 {
 public:
-    /** \brief Deletes this object.
-    
-    This function must be used instead of destructor, which is private.
-    There is no reference counting involved.
-    */
-    void Release();
-    
     /// Returns cached options retrieved from D3D12 device.
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const;
     /** \brief Returns true if `D3D12_FEATURE_DATA_ARCHITECTURE1::UMA` was found to be true.
@@ -1469,6 +1484,9 @@ public:
     /// Frees memory of a string returned from Allocator::BuildStatsString.
     void FreeStatsString(WCHAR* pStatsString) const;
 
+protected:
+    virtual void ReleaseThis();
+
 private:
     friend HRESULT CreateAllocator(const ALLOCATOR_DESC*, Allocator**);
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
@@ -1540,16 +1558,11 @@ sub-allocation regions inside a single GPU buffer.
 
 To create this object, fill in D3D12MA::VIRTUAL_BLOCK_DESC and call CreateVirtualBlock().
 To destroy it, call its method VirtualBlock::Release().
+You need to free all the allocations within this block or call Clear() before destroying it.
 */
-class VirtualBlock
+class VirtualBlock : public IUnknownImpl
 {
 public:
-    /** \brief Destroys this object and frees it from memory.
-
-    You need to free all the allocations within this block or call Clear() before destroying it.
-    */
-    void Release();
-
     /** \brief Returns true if the block is empty - contains 0 allocations.
     */
     BOOL IsEmpty() const;
@@ -1585,6 +1598,9 @@ public:
     /** \brief Frees memory of a string returned from VirtualBlock::BuildStatsString.
     */
     void FreeStatsString(WCHAR* pStatsString) const;
+   
+protected:
+    virtual void ReleaseThis();
 
 private:
     friend HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC*, VirtualBlock**);

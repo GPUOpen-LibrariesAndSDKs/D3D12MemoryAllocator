@@ -31,7 +31,6 @@
 
 #include <combaseapi.h>
 #include <mutex>
-#include <atomic>
 #include <algorithm>
 #include <utility>
 #include <cstdlib>
@@ -237,17 +236,6 @@ static inline void D3D12MA_SWAP(T& a, T& b)
         SRWLOCK m_Lock;
     };
     #define D3D12MA_RW_MUTEX RWMutex
-#endif
-
-/*
-If providing your own implementation, you need to implement a subset of std::atomic.
-*/
-#ifndef D3D12MA_ATOMIC_UINT32
-    #define D3D12MA_ATOMIC_UINT32 std::atomic<UINT>
-#endif
-
-#ifndef D3D12MA_ATOMIC_UINT64
-    #define D3D12MA_ATOMIC_UINT64 std::atomic<UINT64>
 #endif
 
 /*
@@ -2846,6 +2834,7 @@ struct CommittedAllocationParameters
 class AllocatorPimpl
 {
 public:
+    std::atomic_uint32_t m_RefCount = 1;
     CurrentBudgetData m_Budget;
 
     AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, const ALLOCATOR_DESC& desc);
@@ -4473,7 +4462,7 @@ void PoolPimpl::FreeName()
 ////////////////////////////////////////////////////////////////////////////////
 // Public class Pool implementation
 
-void Pool::Release()
+void Pool::ReleaseThis()
 {
     if(this == NULL)
     {
@@ -5863,6 +5852,38 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Public but internal class IUnknownImpl implementation
+
+HRESULT STDMETHODCALLTYPE IUnknownImpl::QueryInterface(REFIID riid, _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject)
+{
+    if(ppvObject == NULL)
+        return E_POINTER;
+    if(riid == IID_IUnknown)
+    {
+        ++m_RefCount;
+        *ppvObject = this;
+        return S_OK;
+    }
+    *ppvObject = NULL;
+    return E_NOINTERFACE;
+}
+
+ULONG STDMETHODCALLTYPE IUnknownImpl::AddRef()
+{
+    return ++m_RefCount;
+}
+
+ULONG STDMETHODCALLTYPE IUnknownImpl::Release()
+{
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+
+    const uint32_t newRefCount = --m_RefCount;
+    if(newRefCount == 0)
+        ReleaseThis();
+    return newRefCount;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Public class Allocation implementation
 
 void Allocation::PackedData::SetType(Type type)
@@ -5893,7 +5914,7 @@ void Allocation::PackedData::SetTextureLayout(D3D12_TEXTURE_LAYOUT textureLayout
     m_TextureLayout = u;
 }
 
-void Allocation::Release()
+void Allocation::ReleaseThis()
 {
     if(this == NULL)
     {
@@ -6063,7 +6084,7 @@ Allocator::~Allocator()
     D3D12MA_DELETE(m_Pimpl->GetAllocs(), m_Pimpl);
 }
 
-void Allocator::Release()
+void Allocator::ReleaseThis()
 {
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
@@ -6071,8 +6092,6 @@ void Allocator::Release()
     const ALLOCATION_CALLBACKS allocationCallbacksCopy = m_Pimpl->GetAllocs();
     D3D12MA_DELETE(allocationCallbacksCopy, this);
 }
-
-
 
 const D3D12_FEATURE_DATA_D3D12_OPTIONS& Allocator::GetD3D12Options() const
 {
@@ -6325,7 +6344,7 @@ VirtualBlock::~VirtualBlock()
     D3D12MA_DELETE(m_Pimpl->m_AllocationCallbacks, m_Pimpl);
 }
 
-void VirtualBlock::Release()
+void VirtualBlock::ReleaseThis()
 {
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
