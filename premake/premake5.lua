@@ -32,6 +32,7 @@ disablewarnings "4127" -- conditional expression is constant
 disablewarnings "4100" -- unreferenced formal parameter
 disablewarnings "4324" -- structure was padded due to alignment specifier
 disablewarnings "4189" -- local variable is initialized but not referenced
+disablewarnings "4201" -- nonstandard extension used: nameless struct/union
 
 filter "configurations:Debug"
 defines { "_DEBUG", "DEBUG" }
@@ -46,7 +47,7 @@ targetsuffix ("_Release_" .. _SUFFIX)
 
 filter { "platforms:x64" }
 defines { "WIN32", "_CONSOLE", "PROFILE", "_WINDOWS", "_WIN32_WINNT=0x0601" }
-links { "d3d12.lib", "dxgi.lib" }
+links { "d3d12.lib", "dxgi.lib", "shlwapi.lib" }
 
 filter { "configurations:Debug", "platforms:x64" }
 buildoptions { "/MDd" }
