@@ -93,12 +93,12 @@ Future plans</h1>
 Features not supported</h1>
 <p>Features deliberately excluded from the scope of this library:</p>
 <ul>
-<li>Descriptor allocation. Although also called "heaps", objects that represent descriptors are separate part of the D3D12 API from buffers and textures.</li>
-<li>Support for reserved (tiled) resources. We don't recommend using them.</li>
-<li>Support for <code>ID3D12Device::Evict</code> and <code>MakeResident</code>. We don't recommend using them.</li>
-<li>Handling CPU memory allocation failures. When dynamically creating small C++ objects in CPU memory (not the GPU memory), allocation failures are not handled gracefully, because that would complicate code significantly and is usually not needed in desktop PC applications anyway. Success of an allocation is just checked with an assert.</li>
-<li>Code free of any compiler warnings - especially those that would require complicating the code just to please the compiler complaining about unused parameters, variables, or expressions being constant in Relese configuration, e.g. because they are only used inside an assert.</li>
-<li>This is a C++ library. Bindings or ports to any other programming languages are welcomed as external projects and are not going to be included into this repository. </li>
+<li><b>Descriptor allocation.</b> Although also called "heaps", objects that represent descriptors are separate part of the D3D12 API from buffers and textures.</li>
+<li><b>Support for reserved (tiled) resources.</b> We don't recommend using them.</li>
+<li>Support for <code>ID3D12Device::Evict</code> and <code>MakeResident</code>. We don't recommend using them. You can call them on the D3D12 objects manually. Plese keep in mind, however, that eviction happens on the level of entire <code>ID3D12Heap</code> memory blocks and not individual buffers or textures which may be placed inside them.</li>
+<li><b>Handling CPU memory allocation failures.</b> When dynamically creating small C++ objects in CPU memory (not the GPU memory), allocation failures are not handled gracefully, because that would complicate code significantly and is usually not needed in desktop PC applications anyway. Success of an allocation is just checked with an assert.</li>
+<li><b>Code free of any compiler warnings.</b> There are many preprocessor macros that make some variables unused, function parameters unreferenced, or conditional expressions constant in some configurations. The code of this library should not be bigger or more complicated just to silence these warnings. It is recommended to disable such warnings instead.</li>
+<li>This is a C++ library. <b>Bindings or ports to any other programming languages</b> are welcome as external projects but are not going to be included into this repository. </li>
 </ul>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
