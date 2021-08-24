@@ -20,21 +20,29 @@
 // THE SOFTWARE.
 //
 
+#ifdef _GAMING_XBOX_SCARLETT
+#include <d3d12_xs.h>
+#define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
+#endif
+
 #include "D3D12MemAlloc.h"
 
-#ifndef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
+#ifndef _GAMING_XBOX_SCARLETT
+#ifdef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
     #include <dxgi.h>
     #if D3D12MA_DXGI_1_4
         #include <dxgi1_4.h>
     #endif
 #endif
-
 #include <combaseapi.h>
+#define IID_GRAPHICS_PPV_ARGS(ppType) __uuidof(**(ppType)), IID_PPV_ARGS_Helper(ppType)
+#endif
 #include <mutex>
 #include <algorithm>
 #include <utility>
 #include <cstdlib>
 #include <malloc.h> // for _aligned_malloc, _aligned_free
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -4131,7 +4139,7 @@ HRESULT BlockVector::CreateResource(
             &resourceDesc,
             InitialResourceState,
             pOptimizedClearValue,
-            IID_PPV_ARGS(&res));
+            IID_GRAPHICS_PPV_ARGS(&res));
         if(SUCCEEDED(hr))
         {
             if(ppvResource != NULL)
@@ -4187,7 +4195,7 @@ HRESULT BlockVector::CreateResource2(
             &resourceDesc,
             InitialResourceState,
             pOptimizedClearValue,
-            IID_PPV_ARGS(&res));
+            IID_GRAPHICS_PPV_ARGS(&res));
         if(SUCCEEDED(hr))
         {
             if(ppvResource != NULL)
@@ -4978,7 +4986,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, IID_PPV_ARGS(&res));
+        pOptimizedClearValue, IID_GRAPHICS_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -5034,7 +5042,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
+        pOptimizedClearValue, pProtectedSession, IID_GRAPHICS_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -5091,7 +5099,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
+        pOptimizedClearValue, pProtectedSession, IID_GRAPHICS_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -5767,7 +5775,28 @@ HRESULT AllocatorPimpl::UpdateD3D12Budget()
 
 D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC& resourceDesc) const
 {
+    //Ozzy note: i'm assuming we are reaching this function because user has defined his own Alignement value
+    //so forcing alignement value by calling GetResourceAllocationInfo(...) is maybe not what we want and generates this kind of errors on xbox series S|X :
+    // 
+    //D3D12 ERROR: [0x7AE24895] ID312Device::CreatePlacedResource: This resource cannot be created on this heap, due to unsatisfied resource alignment requirements. The resource must be aligned to 65536. The heap must also be aligned to a value greater to or equal than the resource. The heap is aligned to 4194304, and the resource offset in the heap is 5382144. [ STATE_CREATION ERROR #638 ]
+    //
+    //Thus as a user i'm requesting 65536 as an alignement value into resouceDesc(D3D12_RESOURCE_DESC)
+    //using code below to apply the request alignement value as intended. works also on desktop PC
+    //so the code could be shared in all situations (XBOX/Desktop) but i've kept the code separated to avoid compatibility problem.
+
+    #ifdef _GAMING_XBOX
+    D3D12_RESOURCE_ALLOCATION_INFO info = m_Device->GetResourceAllocationInfo(0, 1, &resourceDesc);
+    //we could also force anyway like but keep the size information:
+    //if (resourceDesc.Alignment > 0) {
+    if (info.Alignment < resourceDesc.Alignment && resourceDesc.Alignment > 0) {
+        info.Alignment = resourceDesc.Alignment;
+    }
+    //...
+    return info;
+    #else
+    //original version..
     return m_Device->GetResourceAllocationInfo(0, 1, &resourceDesc);
+    #endif
 }
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
