@@ -3750,7 +3750,7 @@ HRESULT MemoryBlock::Init()
     heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags);
     heapDesc.Flags = m_HeapFlags;
 
-    HRESULT hr = m_Allocator->GetDevice()->CreateHeap(&heapDesc, __uuidof(*m_Heap), (void**)&m_Heap);
+    HRESULT hr = m_Allocator->GetDevice()->CreateHeap(&heapDesc, IID_PPV_ARGS(&m_Heap));
     if(SUCCEEDED(hr))
     {
         m_Allocator->m_Budget.m_BlockBytes[HeapTypeToIndex(m_HeapProps.Type)] += m_Size;
@@ -5140,7 +5140,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
     heapDesc.Flags = committedAllocParams.m_HeapFlags;
 
     ID3D12Heap* heap = nullptr;
-    HRESULT hr = m_Device->CreateHeap(&heapDesc, __uuidof(*heap), (void**)&heap);
+    HRESULT hr = m_Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap));
     if(SUCCEEDED(hr))
     {
         const BOOL wasZeroInitialized = TRUE;
@@ -5183,7 +5183,7 @@ HRESULT AllocatorPimpl::AllocateHeap1(
     heapDesc.Flags = committedAllocParams.m_HeapFlags;
 
     ID3D12Heap* heap = nullptr;
-    HRESULT hr = m_Device4->CreateHeap1(&heapDesc, pProtectedSession, __uuidof(*heap), (void**)&heap);
+    HRESULT hr = m_Device4->CreateHeap1(&heapDesc, pProtectedSession, IID_PPV_ARGS(&heap));
     if(SUCCEEDED(hr))
     {
         const BOOL wasZeroInitialized = TRUE;
