@@ -173,7 +173,7 @@ struct ALLOCATION_CALLBACKS
 };
 
 /// \brief Bit flags to be used with ALLOCATION_DESC::Flags.
-typedef enum ALLOCATION_FLAGS
+enum ALLOCATION_FLAGS
 {
     /// Zero
     ALLOCATION_FLAG_NONE = 0,
@@ -200,7 +200,7 @@ typedef enum ALLOCATION_FLAGS
     memory budget. Otherwise return `E_OUTOFMEMORY`.
     */
     ALLOCATION_FLAG_WITHIN_BUDGET = 0x4,
-} ALLOCATION_FLAGS;
+};
 
 /// \brief Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.
 struct ALLOCATION_DESC
@@ -516,7 +516,7 @@ private:
 };
 
 /// \brief Bit flags to be used with ALLOCATOR_DESC::Flags.
-typedef enum ALLOCATOR_FLAGS
+enum ALLOCATOR_FLAGS
 {
     /// Zero
     ALLOCATOR_FLAG_NONE = 0,
@@ -535,7 +535,7 @@ typedef enum ALLOCATOR_FLAGS
     To be used for debugging purposes.
    */
     ALLOCATOR_FLAG_ALWAYS_COMMITTED = 0x2,
-} ALLOCATOR_FLAGS;
+};
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().
 struct ALLOCATOR_DESC
