@@ -1553,6 +1553,11 @@ public:
 
     // allocationCallbacks externally owned, must outlive this object.
     List(const ALLOCATION_CALLBACKS& allocationCallbacks);
+
+    // Intentionally not calling Clear, because that would be unnecessary
+    // computations to return all items to m_ItemAllocator as free.
+    // ~List() {}
+    
     void Clear();
 
     size_t GetCount() const { return m_Count; }
