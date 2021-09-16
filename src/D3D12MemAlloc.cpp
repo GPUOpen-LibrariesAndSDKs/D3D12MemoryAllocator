@@ -1553,7 +1553,11 @@ public:
 
     // allocationCallbacks externally owned, must outlive this object.
     List(const ALLOCATION_CALLBACKS& allocationCallbacks);
-    ~List();
+
+    // Intentionally not calling Clear, because that would be unnecessary
+    // computations to return all items to m_ItemAllocator as free.
+    // ~List() {}
+    
     void Clear();
 
     size_t GetCount() const { return m_Count; }
@@ -1774,13 +1778,6 @@ List<T>::List(const ALLOCATION_CALLBACKS& allocationCallbacks) :
     m_pBack(NULL),
     m_Count(0)
 {
-}
-
-template<typename T>
-List<T>::~List()
-{
-    // Intentionally not calling Clear, because that would be unnecessary
-    // computations to return all items to m_ItemAllocator as free.
 }
 
 template<typename T>
@@ -6002,11 +5999,6 @@ Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size, BOOL wasZeroIniti
     m_PackedData.SetWasZeroInitialized(wasZeroInitialized);
 }
 
-Allocation::~Allocation()
-{
-    // Nothing here, everything already done in Release.
-}
-
 void Allocation::InitCommitted(CommittedAllocationList* list)
 {
     m_PackedData.SetType(TYPE_COMMITTED);
@@ -6311,7 +6303,6 @@ public:
     BlockMetadata_Generic m_Metadata;
 
     VirtualBlockPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, UINT64 size);
-    ~VirtualBlockPimpl();
 };
 
 VirtualBlockPimpl::VirtualBlockPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, UINT64 size) :
@@ -6321,10 +6312,6 @@ VirtualBlockPimpl::VirtualBlockPimpl(const ALLOCATION_CALLBACKS& allocationCallb
         true) // isVirtual
 {
     m_Metadata.Init(m_Size);
-}
-
-VirtualBlockPimpl::~VirtualBlockPimpl()
-{
 }
 
 ////////////////////////////////////////////////////////////////////////////////

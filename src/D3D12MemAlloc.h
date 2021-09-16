@@ -401,7 +401,9 @@ private:
     } m_PackedData;
 
     Allocation(AllocatorPimpl* allocator, UINT64 size, BOOL wasZeroInitialized);
-    ~Allocation();
+    //  Nothing here, everything already done in Release.
+    // ~Allocation() {}
+    
     void InitCommitted(CommittedAllocationList* list);
     void InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block);
     void InitHeap(CommittedAllocationList* list, ID3D12Heap* heap);
