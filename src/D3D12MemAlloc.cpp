@@ -779,7 +779,7 @@ template<typename T>
 class Vector
 {
 public:
-    typedef T value_type;
+    using value_type = T;
 
     // allocationCallbacks externally owned, must outlive this object.
     Vector(const ALLOCATION_CALLBACKS& allocationCallbacks) :
@@ -967,7 +967,7 @@ public:
         remove(0);
     }
 
-    typedef T* iterator;
+    using iterator = T*;
 
     iterator begin() { return m_pArray; }
     iterator end() { return m_pArray + m_Count; }
@@ -1995,7 +1995,7 @@ typename List<T>::Item* List<T>::InsertAfter(Item* pItem, const T& value)
 Expected interface of ItemTypeTraits:
 struct MyItemTypeTraits
 {
-    typedef MyItem ItemType;
+    using ItemType = MyItem;
     static ItemType* GetPrev(const ItemType* item) { return item->myPrevPtr; }
     static ItemType* GetNext(const ItemType* item) { return item->myNextPtr; }
     static ItemType*& AccessPrev(ItemType* item) { return item->myPrevPtr; }
@@ -2006,7 +2006,7 @@ template<typename ItemTypeTraits>
 class IntrusiveLinkedList
 {
 public:
-    typedef typename ItemTypeTraits::ItemType ItemType;
+    using ItemType = typename ItemTypeTraits::ItemType;
     static ItemType* GetPrev(const ItemType* item) { return ItemTypeTraits::GetPrev(item); }
     static ItemType* GetNext(const ItemType* item) { return ItemTypeTraits::GetNext(item); }
     // Movable, not copyable.
@@ -2261,7 +2261,7 @@ struct SuballocationOffsetGreater
     }
 };
 
-typedef List<Suballocation> SuballocationList;
+using SuballocationList = List<Suballocation>;
 
 struct SuballocationItemSizeLess
 {
@@ -2552,7 +2552,7 @@ private:
 
 struct CommittedAllocationListItemTraits
 {
-    typedef Allocation ItemType;
+    using ItemType = Allocation;
     static ItemType* GetPrev(const ItemType* item)
     {
         D3D12MA_ASSERT(item->m_PackedData.GetType() == Allocation::TYPE_COMMITTED || item->m_PackedData.GetType() == Allocation::TYPE_HEAP);
@@ -2601,7 +2601,7 @@ private:
     PoolPimpl* m_Pool = NULL;
 
     D3D12MA_RW_MUTEX m_Mutex;
-    typedef IntrusiveLinkedList<CommittedAllocationListItemTraits> CommittedAllocationLinkedList;
+    using CommittedAllocationLinkedList = IntrusiveLinkedList<CommittedAllocationListItemTraits>;
     CommittedAllocationLinkedList m_AllocationList;
 };
 
@@ -2812,7 +2812,7 @@ private:
 
 struct PoolListItemTraits
 {
-    typedef PoolPimpl ItemType;
+    using ItemType = PoolPimpl;
     static ItemType* GetPrev(const ItemType* item) { return item->m_PrevPool; }
     static ItemType* GetNext(const ItemType* item) { return item->m_NextPool; }
     static ItemType*& AccessPrev(ItemType* item) { return item->m_PrevPool; }
@@ -2965,7 +2965,7 @@ private:
     D3D12_FEATURE_DATA_ARCHITECTURE m_D3D12Architecture;
     AllocationObjectAllocator m_AllocationObjectAllocator;
 
-    typedef IntrusiveLinkedList<PoolListItemTraits> PoolList;
+    using PoolList = IntrusiveLinkedList<PoolListItemTraits>;
     PoolList m_Pools[HEAP_TYPE_COUNT];
     D3D12MA_RW_MUTEX m_PoolsMutex[HEAP_TYPE_COUNT];
 

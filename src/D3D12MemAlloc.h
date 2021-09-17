@@ -153,13 +153,13 @@ class Allocator;
 struct StatInfo;
 
 /// Pointer to custom callback function that allocates CPU memory.
-typedef void* (*ALLOCATE_FUNC_PTR)(size_t Size, size_t Alignment, void* pUserData);
+using ALLOCATE_FUNC_PTR = void* (*)(size_t Size, size_t Alignment, void* pUserData);
 /**
 \brief Pointer to custom callback function that deallocates CPU memory.
 
 `pMemory = null` should be accepted and ignored.
 */
-typedef void (*FREE_FUNC_PTR)(void* pMemory, void* pUserData);
+using FREE_FUNC_PTR = void (*)(void* pMemory, void* pUserData);
 
 /// Custom callbacks to CPU memory allocation functions.
 struct ALLOCATION_CALLBACKS
