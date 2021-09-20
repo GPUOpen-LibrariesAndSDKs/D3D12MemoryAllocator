@@ -278,59 +278,6 @@ static inline T DivideRoudingUp(T x, T y)
     return (x + y - 1) / y;
 }
 
-// Returns smallest power of 2 greater or equal to v.
-static inline UINT NextPow2(UINT v)
-{
-	v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
-static inline uint64_t NextPow2(uint64_t v)
-{
-	v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v |= v >> 32;
-    v++;
-    return v;
-}
-
-// Returns largest power of 2 less or equal to v.
-static inline UINT PrevPow2(UINT v)
-{
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v = v ^ (v >> 1);
-    return v;
-}
-static inline uint64_t PrevPow2(uint64_t v)
-{
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v |= v >> 32;
-    v = v ^ (v >> 1);
-    return v;
-}
-
-static inline bool StrIsEmpty(const char* pStr)
-{
-    return pStr == NULL || *pStr == '\0';
-}
-
 // Helper RAII class to lock a mutex in constructor and unlock it in destructor (at the end of scope).
 struct MutexLock
 {
