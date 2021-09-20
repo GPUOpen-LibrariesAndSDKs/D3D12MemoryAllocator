@@ -4066,7 +4066,6 @@ void BlockVector::Free(Allocation* hAllocation)
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
 
         const size_t blockCount = m_Blocks.size();
-        const UINT64 sumBlockSize = CalcSumBlockSize();
         // pBlock became empty after this deallocation.
         if(pBlock->m_pMetadata->IsEmpty())
         {
