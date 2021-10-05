@@ -104,6 +104,7 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+#define D3D12MA_IID_PPV_ARGS(ppType)   __uuidof(**(ppType)), reinterpret_cast<void**>(ppType)
 
 namespace D3D12MA
 {
@@ -3725,7 +3726,7 @@ HRESULT MemoryBlock::Init()
     heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags);
     heapDesc.Flags = m_HeapFlags;
 
-    HRESULT hr = m_Allocator->GetDevice()->CreateHeap(&heapDesc, IID_PPV_ARGS(&m_Heap));
+    HRESULT hr = m_Allocator->GetDevice()->CreateHeap(&heapDesc, D3D12MA_IID_PPV_ARGS(&m_Heap));
     if(SUCCEEDED(hr))
     {
         m_Allocator->m_Budget.m_BlockBytes[HeapTypeToIndex(m_HeapProps.Type)] += m_Size;
@@ -4102,7 +4103,7 @@ HRESULT BlockVector::CreateResource(
             &resourceDesc,
             InitialResourceState,
             pOptimizedClearValue,
-            IID_PPV_ARGS(&res));
+            D3D12MA_IID_PPV_ARGS(&res));
         if(SUCCEEDED(hr))
         {
             if(ppvResource != NULL)
@@ -4158,7 +4159,7 @@ HRESULT BlockVector::CreateResource2(
             &resourceDesc,
             InitialResourceState,
             pOptimizedClearValue,
-            IID_PPV_ARGS(&res));
+            D3D12MA_IID_PPV_ARGS(&res));
         if(SUCCEEDED(hr))
         {
             if(ppvResource != NULL)
@@ -4515,15 +4516,15 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
 HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 {
 #if D3D12MA_DXGI_1_4
-    desc.pAdapter->QueryInterface<IDXGIAdapter3>(&m_Adapter3);
+    desc.pAdapter->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Adapter3));
 #endif
 
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
-    m_Device->QueryInterface<ID3D12Device4>(&m_Device4);
+    m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device4));
 #endif
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    m_Device->QueryInterface<ID3D12Device8>(&m_Device8);
+    m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device8));
 #endif
 
     HRESULT hr = m_Adapter->GetDesc(&m_AdapterDesc);
@@ -4949,7 +4950,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, IID_PPV_ARGS(&res));
+        pOptimizedClearValue, D3D12MA_IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -5005,7 +5006,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource1(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
+        pOptimizedClearValue, pProtectedSession, D3D12MA_IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -5062,7 +5063,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, pProtectedSession, IID_PPV_ARGS(&res));
+        pOptimizedClearValue, pProtectedSession, D3D12MA_IID_PPV_ARGS(&res));
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -5114,7 +5115,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
     heapDesc.Flags = committedAllocParams.m_HeapFlags;
 
     ID3D12Heap* heap = nullptr;
-    HRESULT hr = m_Device->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap));
+    HRESULT hr = m_Device->CreateHeap(&heapDesc, D3D12MA_IID_PPV_ARGS(&heap));
     if(SUCCEEDED(hr))
     {
         const BOOL wasZeroInitialized = TRUE;
@@ -5157,7 +5158,7 @@ HRESULT AllocatorPimpl::AllocateHeap1(
     heapDesc.Flags = committedAllocParams.m_HeapFlags;
 
     ID3D12Heap* heap = nullptr;
-    HRESULT hr = m_Device4->CreateHeap1(&heapDesc, pProtectedSession, IID_PPV_ARGS(&heap));
+    HRESULT hr = m_Device4->CreateHeap1(&heapDesc, pProtectedSession, D3D12MA_IID_PPV_ARGS(&heap));
     if(SUCCEEDED(hr))
     {
         const BOOL wasZeroInitialized = TRUE;
