@@ -36,6 +36,10 @@
 #include <cstdlib>
 #include <malloc.h> // for _aligned_malloc, _aligned_free
 
+#ifndef _WIN32
+    #include <shared_mutex>
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -109,11 +113,19 @@ namespace D3D12MA
 
 static void* DefaultAllocate(size_t Size, size_t Alignment, void* /*pUserData*/)
 {
+#ifdef _WIN32
     return _aligned_malloc(Size, Alignment);
+#else
+    return aligned_alloc(Alignment, Size);
+#endif
 }
 static void DefaultFree(void* pMemory, void* /*pUserData*/)
 {
+#ifdef _WIN32
     return _aligned_free(pMemory);
+#else
+    return free(pMemory);
+#endif
 }
 
 static void* Malloc(const ALLOCATION_CALLBACKS& allocs, size_t size, size_t alignment)
@@ -219,11 +231,14 @@ static inline void D3D12MA_SWAP(T& a, T& b)
     #define D3D12MA_MUTEX Mutex
 #endif
 
-#if !defined(_WIN32) || !defined(WINVER) || WINVER < 0x0600
-    #error Required at least WinAPI version supporting: client = Windows Vista, server = Windows Server 2008.
-#endif
+#ifdef _WIN32
+    #if !defined(WINVER) || WINVER < 0x0600
+        #error Required at least WinAPI version supporting: client = Windows Vista, server = Windows Server 2008.
+    #endif
+#endif // #ifdef _WIN32
 
 #ifndef D3D12MA_RW_MUTEX
+#ifdef _WIN32
     class RWMutex
     {
     public:
@@ -235,8 +250,21 @@ static inline void D3D12MA_SWAP(T& a, T& b)
     private:
         SRWLOCK m_Lock;
     };
+#else // #ifdef _WIN32
+    class RWMutex
+    {
+    public:
+        RWMutex() {}
+        void LockRead() { m_Mutex.lock_shared(); }
+        void UnlockRead() { m_Mutex.unlock_shared(); }
+        void LockWrite() { m_Mutex.lock(); }
+        void UnlockWrite() { m_Mutex.unlock(); }
+    private:
+        std::shared_timed_mutex m_Mutex;
+    };
+#endif // #ifdef _WIN32
     #define D3D12MA_RW_MUTEX RWMutex
-#endif
+#endif // #ifndef D3D12MA_RW_MUTEX
 
 /*
 Returns true if given number is a power of two.
