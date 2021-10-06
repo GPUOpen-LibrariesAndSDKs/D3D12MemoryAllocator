@@ -52,11 +52,13 @@ if (D3D12MA_BUILD_SAMPLE)
 		set_source_files_properties( ${VERTEX_SHADERS}
 			PROPERTIES 
 				VS_SHADER_TYPE Vertex
+				VS_SETTINGS "ExcludedFromBuild=true"
 		)
 
 		set_source_files_properties( ${PIXEL_SHADERS}
 			PROPERTIES 
 				VS_SHADER_TYPE Pixel
+				VS_SETTINGS "ExcludedFromBuild=true"
 		)	
 
         add_executable(D3D12Sample ${D3D12_SAMPLE_SOURCE_FILES} ${SHADERS})
@@ -100,8 +102,4 @@ if (D3D12MA_BUILD_SAMPLE)
     else()
         message(STATUS "D3D12Sample application is not supported to Linux")
     endif()
-endif()
-
-if(D3D12MA_BUILD_SAMPLE_SHADERS)
-#    add_subdirectory(Shaders)
 endif()
