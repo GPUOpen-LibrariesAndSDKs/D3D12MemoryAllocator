@@ -24,8 +24,8 @@ else (DOXYGEN_FOUND AND BUILD_DOCUMENTATION)
   message("Doxygen need to be installed to generate the doxygen documentation")
 endif (DOXYGEN_FOUND AND BUILD_DOCUMENTATION)
 
-# VulkanMemoryAllocator contains an sample application and VmaReplay which are not build by default
-option(D3D12MA_BUILD_SAMPLE "Build VulkanMemoryAllocator sample application" OFF)
+# D3D12MemoryAllocator contains an sample application which is not build by default
+option(D3D12MA_BUILD_SAMPLE "Build D3D12MemoryAllocator sample application" OFF)
 
 message(STATUS "D3D12MA_BUILD_SAMPLE = ${D3D12MA_BUILD_SAMPLE}")
 
