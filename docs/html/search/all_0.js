@@ -2,7 +2,7 @@ var searchData=
 [
   ['alignment_0',['Alignment',['../struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aaa95e62f2f399339a09dcbb312a42de0',1,'D3D12MA::VIRTUAL_ALLOCATION_DESC']]],
   ['allocate_1',['Allocate',['../class_d3_d12_m_a_1_1_virtual_block.html#aa57575f1af18461012bde8c4b6f3c56c',1,'D3D12MA::VirtualBlock']]],
-  ['allocate_5ffunc_5fptr_2',['ALLOCATE_FUNC_PTR',['../namespace_d3_d12_m_a.html#a27ddd7db5650bc1d2afa009bebb6a53b',1,'D3D12MA']]],
+  ['allocate_5ffunc_5fptr_2',['ALLOCATE_FUNC_PTR',['../namespace_d3_d12_m_a.html#a1513cdeed760a8a2a6c94fa7cba87616',1,'D3D12MA']]],
   ['allocatememory_3',['AllocateMemory',['../class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2',1,'D3D12MA::Allocator']]],
   ['allocatememory1_4',['AllocateMemory1',['../class_d3_d12_m_a_1_1_allocator.html#a6c1fbc673e2559ead34dbf039dd47d60',1,'D3D12MA::Allocator']]],
   ['allocation_5',['Allocation',['../class_d3_d12_m_a_1_1_allocation.html',1,'D3D12MA']]],
@@ -12,7 +12,7 @@ var searchData=
   ['allocation_5fflag_5fnever_5fallocate_9',['ALLOCATION_FLAG_NEVER_ALLOCATE',['../namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea9a52c6ae694eadcd20896091e77c0628',1,'D3D12MA']]],
   ['allocation_5fflag_5fnone_10',['ALLOCATION_FLAG_NONE',['../namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea0bf578b096d6ea73cea86b031541733e',1,'D3D12MA']]],
   ['allocation_5fflag_5fwithin_5fbudget_11',['ALLOCATION_FLAG_WITHIN_BUDGET',['../namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6',1,'D3D12MA']]],
-  ['allocation_5fflags_12',['ALLOCATION_FLAGS',['../namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e',1,'D3D12MA::ALLOCATION_FLAGS()'],['../namespace_d3_d12_m_a.html#a4dede482eac9111d56d4b1b35eb13ae4',1,'D3D12MA::ALLOCATION_FLAGS()']]],
+  ['allocation_5fflags_12',['ALLOCATION_FLAGS',['../namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e',1,'D3D12MA']]],
   ['allocationbytes_13',['AllocationBytes',['../struct_d3_d12_m_a_1_1_budget.html#abcb043908bd528852f8ef3867ad76099',1,'D3D12MA::Budget']]],
   ['allocationcount_14',['AllocationCount',['../struct_d3_d12_m_a_1_1_stat_info.html#a2f50de812e296b71594174ff67bbac6e',1,'D3D12MA::StatInfo']]],
   ['allocationsizeavg_15',['AllocationSizeAvg',['../struct_d3_d12_m_a_1_1_stat_info.html#acf3339540ff01d93b6a6f5dc68d83f60',1,'D3D12MA::StatInfo']]],
@@ -23,5 +23,5 @@ var searchData=
   ['allocator_5fflag_5falways_5fcommitted_20',['ALLOCATOR_FLAG_ALWAYS_COMMITTED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb',1,'D3D12MA']]],
   ['allocator_5fflag_5fnone_21',['ALLOCATOR_FLAG_NONE',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f',1,'D3D12MA']]],
   ['allocator_5fflag_5fsinglethreaded_22',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]],
-  ['allocator_5fflags_23',['ALLOCATOR_FLAGS',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916',1,'D3D12MA::ALLOCATOR_FLAGS()'],['../namespace_d3_d12_m_a.html#a5d0bdfc28b81b4a1ee40c9c3ae1b1449',1,'D3D12MA::ALLOCATOR_FLAGS()']]]
+  ['allocator_5fflags_23',['ALLOCATOR_FLAGS',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916',1,'D3D12MA']]]
 ];
