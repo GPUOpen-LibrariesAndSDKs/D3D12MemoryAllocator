@@ -95,7 +95,6 @@ This software package uses third party software:
 
 - Parts of the code of [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/) by AMD, license: MIT
 - Parts of the code of [DirectX-Graphics-Samples](https://github.com/microsoft/DirectX-Graphics-Samples) by Microsoft, license: MIT
-- [Premake 5](https://premake.github.io/) binary, license: BSD
 
 For more information see [NOTICES.txt](NOTICES.txt).
 

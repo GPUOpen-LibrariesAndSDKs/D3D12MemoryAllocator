@@ -5,7 +5,7 @@ project(D3D12MemoryAllocator)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 find_package(Doxygen)
-option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen)" OFF)
+option(BUILD_DOCUMENTATION "Create and install the HTML-based API documentation (requires Doxygen)" OFF)
 
 if (DOXYGEN_FOUND AND BUILD_DOCUMENTATION)
     # set input and output files
