@@ -1515,6 +1515,7 @@ static void TestDevice4(const TestContext& ctx)
 #endif
 }
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
 static void TestDevice8(const TestContext& ctx)
 {
     wprintf(L"Test ID3D12Device8\n");
@@ -1549,6 +1550,7 @@ static void TestDevice8(const TestContext& ctx)
         &allocPtr1, IID_PPV_ARGS(&res1)));
     CHECK_BOOL(allocPtr1->GetHeap()!= NULL);
 }
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
 static void TestGroupVirtual(const TestContext& ctx)
 {
@@ -1573,7 +1575,9 @@ static void TestGroupBasics(const TestContext& ctx)
     TestZeroInitialized(ctx);
     TestMultithreading(ctx);
     TestDevice4(ctx);
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
     TestDevice8(ctx);
+#endif
 }
 
 void Test(const TestContext& ctx)
