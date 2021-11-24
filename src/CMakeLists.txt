@@ -16,7 +16,7 @@ set_target_properties(
     CXX_STANDARD 14
     CXX_STANDARD_REQUIRED ON
 
-    OUTPUT_NAME "d3d12ma"
+    OUTPUT_NAME "D3D12MA"
 )
 
 target_link_libraries(D3D12MemoryAllocator PUBLIC
