@@ -5826,7 +5826,7 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
 ////////////////////////////////////////////////////////////////////////////////
 // Public but internal class IUnknownImpl implementation
 
-HRESULT STDMETHODCALLTYPE IUnknownImpl::QueryInterface(REFIID riid, _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject)
+HRESULT STDMETHODCALLTYPE IUnknownImpl::QueryInterface(REFIID riid, void** ppvObject)
 {
     if(ppvObject == NULL)
         return E_POINTER;

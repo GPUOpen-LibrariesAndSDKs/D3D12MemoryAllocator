@@ -712,6 +712,37 @@ static void TestCustomPool_MinAllocationAlignment(const TestContext& ctx)
     }
 }
 
+static void TestCustomPool_Committed(const TestContext& ctx)
+{
+    wprintf(L"Test custom pool committed\n");
+
+    const UINT64 BUFFER_SIZE = 32;
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &pool) );
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
+
+    ComPtr<D3D12MA::Allocation> alloc;
+    CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_COMMON,
+        NULL, // pOptimizedClearValue
+        &alloc,
+        IID_NULL, NULL) ); // riidResource, ppvResource
+    CHECK_BOOL(alloc->GetHeap() == NULL);
+    CHECK_BOOL(alloc->GetResource() != NULL);
+    CHECK_BOOL(alloc->GetOffset() == 0);
+}
+
 static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIES& heapProps)
 {
     D3D12MA::Stats globalStatsBeg = {};
@@ -1515,6 +1546,7 @@ static void TestDevice4(const TestContext& ctx)
 #endif
 }
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
 static void TestDevice8(const TestContext& ctx)
 {
     wprintf(L"Test ID3D12Device8\n");
@@ -1549,6 +1581,7 @@ static void TestDevice8(const TestContext& ctx)
         &allocPtr1, IID_PPV_ARGS(&res1)));
     CHECK_BOOL(allocPtr1->GetHeap()!= NULL);
 }
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
 static void TestGroupVirtual(const TestContext& ctx)
 {
@@ -1564,6 +1597,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestOtherComInterface(ctx);
     TestCustomPools(ctx);
     TestCustomPool_MinAllocationAlignment(ctx);
+    TestCustomPool_Committed(ctx);
     TestCustomHeaps(ctx);
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
@@ -1573,7 +1607,9 @@ static void TestGroupBasics(const TestContext& ctx)
     TestZeroInitialized(ctx);
     TestMultithreading(ctx);
     TestDevice4(ctx);
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
     TestDevice8(ctx);
+#endif
 }
 
 void Test(const TestContext& ctx)

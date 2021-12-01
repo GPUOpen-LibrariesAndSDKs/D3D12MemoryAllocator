@@ -6,6 +6,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 find_package(Doxygen)
 option(BUILD_DOCUMENTATION "Create and install the HTML-based API documentation (requires Doxygen)" OFF)
+option(BUILD_SHARED_LIBS "Build D3D12 Memory Allocator shared library" OFF)
 
 if (DOXYGEN_FOUND AND BUILD_DOCUMENTATION)
     # set input and output files
@@ -29,4 +30,5 @@ option(D3D12MA_BUILD_SAMPLE "Build D3D12MemoryAllocator sample application" OFF)
 
 message(STATUS "D3D12MA_BUILD_SAMPLE = ${D3D12MA_BUILD_SAMPLE}")
 
+include_directories(include)
 add_subdirectory(src)

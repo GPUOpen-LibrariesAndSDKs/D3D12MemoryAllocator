@@ -1,5 +1,5 @@
 set(D3D12MA_LIBRARY_SOURCE_FILES
-    D3D12MemAlloc.h
+    ../include/D3D12MemAlloc.h
     D3D12MemAlloc.cpp
 )
 set(CMAKE_DEBUG_POSTFIX d)
@@ -15,6 +15,8 @@ set_target_properties(
     # Use C++14
     CXX_STANDARD 14
     CXX_STANDARD_REQUIRED ON
+
+    OUTPUT_NAME "D3D12MA"
 )
 
 target_link_libraries(D3D12MemoryAllocator PUBLIC
@@ -22,6 +24,16 @@ target_link_libraries(D3D12MemoryAllocator PUBLIC
     dxgi.lib
     dxguid.lib
 )
+
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(D3D12MemoryAllocator PRIVATE
+        D3D12MA_EXPORTS
+    )
+
+    target_compile_definitions(D3D12MemoryAllocator INTERFACE
+        D3D12MA_IMPORTS
+    )
+endif()
 
 install(TARGETS D3D12MemoryAllocator DESTINATION lib)
 install(FILES D3D12MemAlloc.h DESTINATION include)

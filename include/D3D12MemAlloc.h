@@ -118,12 +118,21 @@ If providing your own implementation, you need to implement a subset of std::ato
     #define D3D12MA_ATOMIC_UINT64 std::atomic<UINT64>
 #endif
 
+#ifdef D3D12MA_EXPORTS
+    #define D3D12MA_API __declspec(dllexport)
+#elif defined(D3D12MA_IMPORTS)
+    #define D3D12MA_API __declspec(dllimport)
+#else
+    #define D3D12MA_API
+#endif
+
 namespace D3D12MA
 {
-class IUnknownImpl : public IUnknown
+class D3D12MA_API IUnknownImpl : public IUnknown
 {
 public:
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, _COM_Outptr_ void __RPC_FAR *__RPC_FAR *ppvObject);
+    virtual ~IUnknownImpl() = default;
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
     virtual ULONG STDMETHODCALLTYPE AddRef();
     virtual ULONG STDMETHODCALLTYPE Release();
 protected:
@@ -252,7 +261,7 @@ To retrieve this information, use methods of this class.
 The object also remembers `ID3D12Resource` and "owns" a reference to it,
 so it calls `%Release()` on the resource when destroyed.
 */
-class Allocation : public IUnknownImpl
+class D3D12MA_API Allocation : public IUnknownImpl
 {
 public:
     /** \brief Returns offset in bytes from the start of memory heap.
@@ -469,7 +478,7 @@ pools - creating resources in default pool is sufficient.
 
 To create custom pool, fill D3D12MA::POOL_DESC and call D3D12MA::Allocator::CreatePool.
 */
-class Pool : public IUnknownImpl
+class D3D12MA_API Pool : public IUnknownImpl
 {
 public:
     /** \brief Returns copy of parameters of the pool.
@@ -657,7 +666,7 @@ Call method `Release()` to destroy it.
 It is recommended to create just one object of this type per `ID3D12Device` object,
 right after Direct3D 12 is initialized and keep it alive until before Direct3D device is destroyed.
 */
-class Allocator : public IUnknownImpl
+class D3D12MA_API Allocator : public IUnknownImpl
 {
 public:
     /// Returns cached options retrieved from D3D12 device.
@@ -865,7 +874,7 @@ protected:
     virtual void ReleaseThis();
 
 private:
-    friend HRESULT CreateAllocator(const ALLOCATOR_DESC*, Allocator**);
+    friend D3D12MA_API HRESULT CreateAllocator(const ALLOCATOR_DESC*, Allocator**);
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
     friend class Pool;
 
@@ -937,7 +946,7 @@ To create this object, fill in D3D12MA::VIRTUAL_BLOCK_DESC and call CreateVirtua
 To destroy it, call its method `VirtualBlock::Release()`.
 You need to free all the allocations within this block or call Clear() before destroying it.
 */
-class VirtualBlock : public IUnknownImpl
+class D3D12MA_API VirtualBlock : public IUnknownImpl
 {
 public:
     /** \brief Returns true if the block is empty - contains 0 allocations.
@@ -980,7 +989,7 @@ protected:
     virtual void ReleaseThis();
 
 private:
-    friend HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC*, VirtualBlock**);
+    friend D3D12MA_API HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC*, VirtualBlock**);
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
 
     VirtualBlockPimpl* m_Pimpl;
@@ -995,13 +1004,13 @@ private:
 
 You normally only need to call it once and keep a single Allocator object for your `ID3D12Device`.
 */
-HRESULT CreateAllocator(const ALLOCATOR_DESC* pDesc, Allocator** ppAllocator);
+D3D12MA_API HRESULT CreateAllocator(const ALLOCATOR_DESC* pDesc, Allocator** ppAllocator);
 
 /** \brief Creates new D3D12MA::VirtualBlock object and returns it through `ppVirtualBlock`.
 
 Note you don't need to create D3D12MA::Allocator to use virtual blocks.
 */
-HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC* pDesc, VirtualBlock** ppVirtualBlock);
+D3D12MA_API HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC* pDesc, VirtualBlock** ppVirtualBlock);
 
 } // namespace D3D12MA
 
