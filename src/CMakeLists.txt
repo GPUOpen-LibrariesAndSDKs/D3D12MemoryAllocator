@@ -1,5 +1,5 @@
 set(D3D12MA_LIBRARY_SOURCE_FILES
-    ../include/D3D12MemAlloc.h
+    "../include/D3D12MemAlloc.h"
     D3D12MemAlloc.cpp
 )
 set(CMAKE_DEBUG_POSTFIX d)
@@ -40,18 +40,20 @@ install(FILES D3D12MemAlloc.h DESTINATION include)
 
 if (D3D12MA_BUILD_SAMPLE)
     if(WIN32)
+        set(SHADER_DIR "Shaders")
+        
         set(D3D12_SAMPLE_SOURCE_FILES
             Common.cpp
             Tests.cpp
             D3D12Sample.cpp
         )
 		
-		set( VERTEX_SHADERS 
-			Shaders/VS.hlsl
+		set(VERTEX_SHADERS 
+			"${SHADER_DIR}/VS.hlsl"
 		)
 				
-		set( PIXEL_SHADERS
-			Shaders/PS.hlsl
+		set(PIXEL_SHADERS
+			"${SHADER_DIR}/PS.hlsl"
 		)
 
 		set( SHADERS
