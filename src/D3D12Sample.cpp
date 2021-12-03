@@ -186,6 +186,7 @@ struct CommandLineParameters
 {
     bool m_Help = false;
     bool m_List = false;
+    bool m_Test = false;
     GPUSelection m_GPUSelection;
 
     bool Parse(int argc, wchar_t** argv)
@@ -209,6 +210,10 @@ struct CommandLineParameters
             {
                 m_GPUSelection.Index = _wtoi(argv[i + 1]);
                 ++i;
+            }
+            else if (_wcsicmp(argv[i], L"-t") == 0 || _wcsicmp(argv[i], L"--Test") == 0)
+            {
+                m_Test = true;
             }
             else
                 return false;
@@ -1641,16 +1646,6 @@ static LRESULT WINAPI WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch(msg)
     {
-    case WM_CREATE:
-        g_Wnd = wnd;
-        try
-        {
-            InitD3D();
-            g_TimeOffset = GetTickCount64();
-        }
-        CATCH_PRINT_ERROR(return -1;)
-        return 0;
-
     case WM_DESTROY:
         try
         {
@@ -1702,6 +1697,7 @@ static void PrintHelp()
         L"-l, --List   Print list of GPUs\n"
         L"-g S, --GPU S   Select GPU with name containing S\n"
         L"-i N, --GPUIndex N   Select GPU index N\n"
+        L"-t, --Test   Run tests and exit\n"
     );
 }
 
@@ -1738,6 +1734,16 @@ int MainWindow()
         g_Instance,
         0);
     assert(g_Wnd);
+
+    InitD3D();
+    g_TimeOffset = GetTickCount64();
+    
+    // Execute tests and close program
+    if (g_CommandLineParameters.m_Test)
+    {
+        ExecuteTests();
+        PostMessage(g_Wnd, WM_CLOSE, 0, 0);
+    }
 
     MSG msg;
     for (;;)
