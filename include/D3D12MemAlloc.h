@@ -945,6 +945,8 @@ sub-allocation regions inside a single GPU buffer.
 To create this object, fill in D3D12MA::VIRTUAL_BLOCK_DESC and call CreateVirtualBlock().
 To destroy it, call its method `VirtualBlock::Release()`.
 You need to free all the allocations within this block or call Clear() before destroying it.
+
+This object is not thread-safe - should not be used from multiple threads simultaneously, must be synchronized externally.
 */
 class D3D12MA_API VirtualBlock : public IUnknownImpl
 {
@@ -1613,6 +1615,7 @@ HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
 - When the allocator is created with D3D12MA::ALLOCATOR_FLAG_SINGLETHREADED,
   calls to methods of D3D12MA::Allocator class must be made from a single thread or synchronized by the user.
   Using this flag may improve performance.
+- D3D12MA::VirtualBlock is not safe to be used from multiple threads simultaneously.
 
 \section general_considerations_future_plans Future plans
 

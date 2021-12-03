@@ -117,7 +117,8 @@ Public Member Functions</h2></td></tr>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Represents pure allocation algorithm and a data structure with allocations in some memory block, without actually allocating any GPU memory. </p>
 <p >This class allows to use the core algorithm of the library custom allocations e.g. CPU memory or sub-allocation regions inside a single GPU buffer.</p>
-<p >To create this object, fill in <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a> and call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ab8bb16e20c691720aad26ecbf105aa6f" title="Creates new D3D12MA::VirtualBlock object and returns it through ppVirtualBlock.">CreateVirtualBlock()</a>. To destroy it, call its method <code>VirtualBlock::Release()</code>. You need to free all the allocations within this block or call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189" title="Frees all the allocations.">Clear()</a> before destroying it. </p>
+<p >To create this object, fill in <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a> and call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a0485028cbe13b5457fe422865f7edf74" title="Creates new D3D12MA::VirtualBlock object and returns it through ppVirtualBlock.">CreateVirtualBlock()</a>. To destroy it, call its method <code>VirtualBlock::Release()</code>. You need to free all the allocations within this block or call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189" title="Frees all the allocations.">Clear()</a> before destroying it.</p>
+<p >This object is not thread-safe - should not be used from multiple threads simultaneously, must be synchronized externally. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="aa57575f1af18461012bde8c4b6f3c56c" name="aa57575f1af18461012bde8c4b6f3c56c"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa57575f1af18461012bde8c4b6f3c56c">&#9670;&nbsp;</a></span>Allocate()</h2>
@@ -342,7 +343,7 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>D:/PROJECTS/D3D12 Memory Allocator/REPO/src/<a class="el" href="_d3_d12_mem_alloc_8h.html">D3D12MemAlloc.h</a></li>
+<li>D:/PROJECTS/D3D12 Memory Allocator/REPO/include/<a class="el" href="_d3_d12_mem_alloc_8h.html">D3D12MemAlloc.h</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
