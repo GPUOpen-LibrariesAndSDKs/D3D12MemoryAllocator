@@ -40,7 +40,7 @@ Additional features:
 
 # Prerequisites
 
-- Self-contained C++ library in single pair of H + CPP files. No external dependencies other than standard C, C++ library and Windows SDK. Some features of C++11 used. STL containers, C++ exceptions, and RTTI are not used.
+- Self-contained C++ library in single pair of H + CPP files. No external dependencies other than standard C, C++ library and Windows SDK. Some features of C++14 used. STL containers, C++ exceptions, and RTTI are not used.
 - Object-oriented interface in a convention similar to D3D12.
 - Error handling implemented by returning `HRESULT` error codes - same way as in D3D12.
 - Interface documented using Doxygen-style comments.

@@ -1561,12 +1561,19 @@ public:
 
     void Remove(Item* pItem);
 
+    class reverse_iterator;
     class iterator
     {
     public:
         iterator() :
             m_pList(NULL),
             m_pItem(NULL)
+        {
+        }
+
+        iterator(const reverse_iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
         {
         }
 
@@ -1636,8 +1643,93 @@ public:
         }
 
         friend class List<T>;
+        friend class const_iterator;
     };
+    
+    class reverse_iterator
+    {
+    public:
+        reverse_iterator() :
+            m_pList(NULL),
+            m_pItem(NULL)
+        {
+        }
 
+        reverse_iterator(const iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
+        {
+        }
+
+        T& operator*() const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pItem != NULL);
+            return m_pItem->Value;
+        }
+        T* operator->() const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pItem != NULL);
+            return &m_pItem->Value;
+        }
+
+        reverse_iterator& operator++()
+        {
+            D3D12MA_HEAVY_ASSERT(m_pItem != NULL);
+            m_pItem = m_pItem->pPrev;
+            return *this;
+        }
+        reverse_iterator& operator--()
+        {
+            if(m_pItem != NULL)
+            {
+                m_pItem = m_pItem->pNext;
+            }
+            else
+            {
+                D3D12MA_HEAVY_ASSERT(!m_pList->IsEmpty());
+                m_pItem = m_pList->Front();
+            }
+            return *this;
+        }
+
+        reverse_iterator operator++(int)
+        {
+            reverse_iterator result = *this;
+            ++*this;
+            return result;
+        }
+        reverse_iterator operator--(int)
+        {
+            reverse_iterator result = *this;
+            --*this;
+            return result;
+        }
+
+        bool operator==(const reverse_iterator& rhs) const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pList == rhs.m_pList);
+            return m_pItem == rhs.m_pItem;
+        }
+        bool operator!=(const reverse_iterator& rhs) const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pList == rhs.m_pList);
+            return m_pItem != rhs.m_pItem;
+        }
+
+    private:
+        List<T>* m_pList;
+        Item* m_pItem;
+
+        reverse_iterator(List<T>* pList, Item* pItem) :
+            m_pList(pList),
+            m_pItem(pItem)
+        {
+        }
+
+        friend class List<T>;
+        friend class const_reverse_iterator;
+    };
+    
     class const_iterator
     {
     public:
@@ -1651,6 +1743,23 @@ public:
             m_pList(src.m_pList),
             m_pItem(src.m_pItem)
         {
+        }
+
+        const_iterator(const reverse_iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
+        {
+        }
+
+        const_iterator(const const_reverse_iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
+        {
+        }
+
+        iterator dropConst() const
+        {
+            return iterator(const_cast<List<T>*>(m_pList), const_cast<Item*>(m_pItem));
         }
 
         const T& operator*() const
@@ -1721,6 +1830,106 @@ public:
         friend class List<T>;
     };
 
+    class const_reverse_iterator
+    {
+    public:
+        const_reverse_iterator() :
+            m_pList(NULL),
+            m_pItem(NULL)
+        {
+        }
+
+        const_reverse_iterator(const iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
+        {
+        }
+
+        const_reverse_iterator(const reverse_iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
+        {
+        }
+
+        const_reverse_iterator(const const_iterator& src) :
+            m_pList(src.m_pList),
+            m_pItem(src.m_pItem)
+        {
+        }
+
+        reverse_iterator dropConst() const
+        {
+            return reverse_iterator(const_cast<List<T>*>(m_pList), const_cast<Item*>(m_pItem));
+        }
+
+        const T& operator*() const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pItem != NULL);
+            return m_pItem->Value;
+        }
+        const T* operator->() const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pItem != NULL);
+            return &m_pItem->Value;
+        }
+
+        const_reverse_iterator& operator++()
+        {
+            D3D12MA_HEAVY_ASSERT(m_pItem != NULL);
+            m_pItem = m_pItem->pPrev;
+            return *this;
+        }
+        const_reverse_iterator& operator--()
+        {
+            if(m_pItem != NULL)
+            {
+                m_pItem = m_pItem->pNext;
+            }
+            else
+            {
+                D3D12MA_HEAVY_ASSERT(!m_pList->IsEmpty());
+                m_pItem = m_pList->Front();
+            }
+            return *this;
+        }
+
+        const_reverse_iterator operator++(int)
+        {
+            const_reverse_iterator result = *this;
+            ++*this;
+            return result;
+        }
+        const_reverse_iterator operator--(int)
+        {
+            const_reverse_iterator result = *this;
+            --*this;
+            return result;
+        }
+
+        bool operator==(const const_reverse_iterator& rhs) const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pList == rhs.m_pList);
+            return m_pItem == rhs.m_pItem;
+        }
+        bool operator!=(const const_reverse_iterator& rhs) const
+        {
+            D3D12MA_HEAVY_ASSERT(m_pList == rhs.m_pList);
+            return m_pItem != rhs.m_pItem;
+        }
+
+    private:
+        const_reverse_iterator(const List<T>* pList, const Item* pItem) :
+            m_pList(pList),
+            m_pItem(pItem)
+        {
+        }
+
+        const List<T>* m_pList;
+        const Item* m_pItem;
+
+        friend class List<T>;
+    };
+
     bool empty() const { return IsEmpty(); }
     size_t size() const { return GetCount(); }
 
@@ -1732,6 +1941,15 @@ public:
 
     const_iterator begin() const { return cbegin(); }
     const_iterator end() const { return cend(); }
+
+    reverse_iterator rbegin() { return reverse_iterator(this, Back()); }
+    reverse_iterator rend() { return reverse_iterator(this, NULL); }
+
+    const_reverse_iterator crbegin() const { return const_reverse_iterator(this, Back()); }
+    const_reverse_iterator crend() const { return const_reverse_iterator(this, NULL); }
+
+    const_reverse_iterator rbegin() const { return crbegin(); }
+    const_reverse_iterator rend() const { return crend(); }
 
     void clear() { Clear(); }
     void push_back(const T& value) { PushBack(value); }
@@ -2420,6 +2638,7 @@ private:
     Vector<SuballocationList::iterator> m_FreeSuballocationsBySize;
     ZeroInitializedRange m_ZeroInitializedRange;
 
+    SuballocationList::const_iterator FindAtOffset(UINT64 offset) const;
     bool ValidateFreeSuballocationList() const;
 
     // Checks if requested suballocation with given parameters can be placed in given pFreeSuballocItem.
@@ -3194,16 +3413,9 @@ bool BlockMetadata_Generic::IsEmpty() const
 
 void BlockMetadata_Generic::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const
 {
-    for(const auto& suballoc : m_Suballocations)
-    {
-        if(suballoc.offset == offset)
-        {
-            outInfo.size = suballoc.size;
-            outInfo.pUserData = suballoc.userData;
-            return;
-        }
-    }
-    D3D12MA_ASSERT(0 && "Not found!");
+    Suballocation& suballoc = *FindAtOffset(offset).dropConst();
+    outInfo.size = suballoc.size;
+    outInfo.pUserData = suballoc.userData;
 }
 
 bool BlockMetadata_Generic::CreateAllocationRequest(
@@ -3319,18 +3531,7 @@ void BlockMetadata_Generic::Alloc(
 
 void BlockMetadata_Generic::FreeAtOffset(UINT64 offset)
 {
-    for(SuballocationList::iterator suballocItem = m_Suballocations.begin();
-        suballocItem != m_Suballocations.end();
-        ++suballocItem)
-    {
-        Suballocation& suballoc = *suballocItem;
-        if(suballoc.offset == offset)
-        {
-            FreeSuballocation(suballocItem);
-            return;
-        }
-    }
-    D3D12MA_ASSERT(0 && "Not found!");
+    FreeSuballocation(FindAtOffset(offset).dropConst());
 }
 
 void BlockMetadata_Generic::Clear()
@@ -3347,6 +3548,38 @@ void BlockMetadata_Generic::Clear()
 
     m_FreeSuballocationsBySize.clear();
     m_FreeSuballocationsBySize.push_back(m_Suballocations.begin());
+}
+
+SuballocationList::const_iterator BlockMetadata_Generic::FindAtOffset(UINT64 offset) const
+{
+    const UINT64 last = m_Suballocations.crbegin()->offset;
+    if (last == offset)
+        return m_Suballocations.crbegin();
+    const UINT64 first = m_Suballocations.cbegin()->offset;
+    if (first == offset)
+        return m_Suballocations.cbegin();
+
+    const size_t suballocCount = m_Suballocations.size();
+    const UINT64 step = (last - first + m_Suballocations.cbegin()->size) / suballocCount;
+    auto findSuballocation = [&](auto begin, auto end) -> SuballocationList::const_iterator
+    {
+        for (auto suballocItem = begin;
+            suballocItem != end;
+            ++suballocItem)
+        {
+            const Suballocation& suballoc = *suballocItem;
+            if (suballoc.offset == offset)
+                return suballocItem;
+        }
+        D3D12MA_ASSERT(false && "Not found!");
+        return m_Suballocations.end();
+    };
+    // If requested offset is closer to the end of range, search from the end
+    if ((offset - first) > suballocCount * step / 2)
+    {
+        return findSuballocation(m_Suballocations.crbegin(), m_Suballocations.crend());
+    }
+    return findSuballocation(m_Suballocations.cbegin(), m_Suballocations.cend());
 }
 
 bool BlockMetadata_Generic::ValidateFreeSuballocationList() const
@@ -3548,15 +3781,8 @@ void BlockMetadata_Generic::UnregisterFreeSuballocation(SuballocationList::itera
 
 void BlockMetadata_Generic::SetAllocationUserData(UINT64 offset, void* userData)
 {
-    for(auto& suballoc : m_Suballocations)
-    {
-        if(suballoc.offset == offset)
-        {
-            suballoc.userData = userData;
-            return;
-        }
-    }
-    D3D12MA_ASSERT(0 && "Not found!");
+    Suballocation& suballoc = *FindAtOffset(offset).dropConst();
+    suballoc.userData = userData;
 }
 
 void BlockMetadata_Generic::CalcAllocationStatInfo(StatInfo& outInfo) const
