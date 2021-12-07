@@ -1,7 +1,12 @@
 set(D3D12MA_LIBRARY_SOURCE_FILES
-    "../include/D3D12MemAlloc.h"
     D3D12MemAlloc.cpp
+    "${PROJECT_SOURCE_DIR}/include/D3D12MemAlloc.h"
 )
+
+if(WIN32 AND ${CMAKE_GENERATOR} MATCHES "Visual Studio.*")
+    set(D3D12MA_LIBRARY_SOURCE_FILES ${D3D12MA_LIBRARY_SOURCE_FILES} D3D12MemAlloc.natvis)
+endif()
+
 set(CMAKE_DEBUG_POSTFIX d)
 set(CMAKE_RELWITHDEBINFO_POSTFIX rd)
 set(CMAKE_MINSIZEREL_POSTFIX s)
@@ -35,16 +40,18 @@ if(BUILD_SHARED_LIBS)
     )
 endif()
 
-install(TARGETS D3D12MemoryAllocator DESTINATION lib)
-install(FILES D3D12MemAlloc.h DESTINATION include)
+install(TARGETS D3D12MemoryAllocator DESTINATION "lib")
+install(FILES "${PROJECT_SOURCE_DIR}/include/D3D12MemAlloc.h" DESTINATION "include")
 
-if (D3D12MA_BUILD_SAMPLE)
+if(D3D12MA_BUILD_SAMPLE)
     if(WIN32)
         set(SHADER_DIR "Shaders")
         
         set(D3D12_SAMPLE_SOURCE_FILES
             Common.cpp
+            Common.h
             Tests.cpp
+            Tests.h
             D3D12Sample.cpp
         )
 		
@@ -61,9 +68,9 @@ if (D3D12MA_BUILD_SAMPLE)
 			${PIXEL_SHADERS}
 		)
 
-		source_group( "Resources\\Shaders" FILES ${SHADERS} )
+		source_group("Resources\\Shaders" FILES ${SHADERS})
 
-		set_source_files_properties( ${VERTEX_SHADERS}
+		set_source_files_properties(${VERTEX_SHADERS}
 			PROPERTIES 
 				VS_SHADER_TYPE Vertex
 				VS_SETTINGS "ExcludedFromBuild=true"
@@ -76,6 +83,8 @@ if (D3D12MA_BUILD_SAMPLE)
 		)	
 
         add_executable(D3D12Sample ${D3D12_SAMPLE_SOURCE_FILES} ${SHADERS})
+
+		add_dependencies(D3D12Sample D3D12MemoryAllocator)
 
         # Visual Studio specific settings
         if(${CMAKE_GENERATOR} MATCHES "Visual Studio.*")
