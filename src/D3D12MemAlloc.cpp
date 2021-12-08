@@ -4667,8 +4667,6 @@ void Pool::ReleaseThis()
         return;
     }
 
-    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-
     D3D12MA_DELETE(m_Pimpl->GetAllocator()->GetAllocs(), this);
 }
 
@@ -6119,8 +6117,6 @@ void Allocation::ReleaseThis()
         return;
     }
 
-    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-
     SAFE_RELEASE(m_Resource);
 
     switch(m_PackedData.GetType())
@@ -6279,8 +6275,6 @@ Allocator::~Allocator()
 
 void Allocator::ReleaseThis()
 {
-    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-
     // Copy is needed because otherwise we would call destructor and invalidate the structure with callbacks before using it to free memory.
     const ALLOCATION_CALLBACKS allocationCallbacksCopy = m_Pimpl->GetAllocs();
     D3D12MA_DELETE(allocationCallbacksCopy, this);
@@ -6534,8 +6528,6 @@ VirtualBlock::~VirtualBlock()
 
 void VirtualBlock::ReleaseThis()
 {
-    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-
     // Copy is needed because otherwise we would call destructor and invalidate the structure with callbacks before using it to free memory.
     const ALLOCATION_CALLBACKS allocationCallbacksCopy = m_Pimpl->m_AllocationCallbacks;
     D3D12MA_DELETE(allocationCallbacksCopy, this);
