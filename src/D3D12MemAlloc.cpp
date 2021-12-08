@@ -1562,6 +1562,7 @@ public:
     void Remove(Item* pItem);
 
     class reverse_iterator;
+    class const_reverse_iterator;
     class iterator
     {
     public:
