@@ -282,3 +282,4 @@ X- Fixed key 'CustomPools'. Value is dictionary.
     - Fixed key 'Algorithm'. Optional. Value is string.
     - Fixed key 'Suballocations'. Value is list of tuples as above.
 """
+
