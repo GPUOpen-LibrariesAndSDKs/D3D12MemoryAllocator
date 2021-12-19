@@ -22,7 +22,7 @@
 
 import argparse
 import json
-from PIL import Image, ImageDraw, ImageFont
+from _json import Image, ImageDraw, ImageFont
 
 
 PROGRAM_VERSION = 'D3D12MA Dump Visualization 1.0.0'
