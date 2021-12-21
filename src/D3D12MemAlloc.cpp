@@ -1046,30 +1046,60 @@ void StringBuilder::AddNumber(UINT64 num)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Private class JsonWriter
+
+/*
+Allows to conveniently build a correct JSON document to be written to the
+StringBuilder passed to the constructor.
+*/
 class JsonWriter
 {
 public:
+    // stringBuilder - string builder to write the document to. Must remain alive for the whole lifetime of this object.
     JsonWriter(const ALLOCATION_CALLBACKS& allocationCallbacks, StringBuilder& stringBuilder);
     ~JsonWriter();
 
+    // Begins object by writing "{".
+    // Inside an object, you must call pairs of WriteString and a value, e.g.:
+    // j.BeginObject(true); j.WriteString("A"); j.WriteNumber(1); j.WriteString("B"); j.WriteNumber(2); j.EndObject();
+    // Will write: { "A": 1, "B": 2 }
     void BeginObject(bool singleLine = false);
+    // Ends object by writing "}".
     void EndObject();
 
+    // Begins array by writing "[".
+    // Inside an array, you can write a sequence of any values.
     void BeginArray(bool singleLine = false);
+    // Ends array by writing "[".
     void EndArray();
 
+    // Writes a string value inside "".
+    // pStr can contain any UTF-16 characters, including '"', new line etc. - they will be properly escaped.
     void WriteString(LPCWSTR pStr);
+
+    // Begins writing a string value.
+    // Call BeginString, ContinueString, ContinueString, ..., EndString instead of
+    // WriteString to conveniently build the string content incrementally, made of
+    // parts including numbers.
     void BeginString(LPCWSTR pStr = NULL);
+    // Posts next part of an open string.
     void ContinueString(LPCWSTR pStr);
+    // Posts next part of an open string. The number is converted to decimal characters.
     void ContinueString(UINT num);
     void ContinueString(UINT64 num);
-    void AddAllocationToObject(const Allocation& alloc);
+    // Posts next part of an open string. Pointer value is converted to characters
+    // using "%p" formatting - shown as hexadecimal number, e.g.: 000000081276Ad00
     // void ContinueString_Pointer(const void* ptr);
+    // Ends writing a string value by writing '"'.
     void EndString(LPCWSTR pStr = NULL);
 
+    void AddAllocationToObject(const Allocation& alloc);
+
+    // Writes a number value.
     void WriteNumber(UINT num);
     void WriteNumber(UINT64 num);
+    // Writes a boolean value - false or true.
     void WriteBool(bool b);
+    // Writes a null value.
     void WriteNull();
 
 private:
@@ -1188,7 +1218,7 @@ void JsonWriter::ContinueString(LPCWSTR pStr)
     for (const WCHAR *p = pStr; *p; ++p)
     {
         // the strings we encode are assumed to be in UTF-16LE format, the native
-        // windows wide character unicode format. In this encoding unicode code
+        // windows wide character Unicode format. In this encoding Unicode code
         // points U+0000 to U+D7FF and U+E000 to U+FFFF are encoded in two bytes,
         // and everything else takes more than two bytes. We will reject any
         // multi wchar character encodings for simplicity.
@@ -1206,7 +1236,7 @@ void JsonWriter::ContinueString(LPCWSTR pStr)
         case L'\r': m_SB.Add(L'\\'); m_SB.Add(L'r');  break;
         case L'\t': m_SB.Add(L'\\'); m_SB.Add(L't');  break;
         default:
-            // conservatively use encoding \uXXXX for any unicode character
+            // conservatively use encoding \uXXXX for any Unicode character
             // requiring more than one byte.
             if (32 <= val && val < 256)
                 m_SB.Add(*p);
