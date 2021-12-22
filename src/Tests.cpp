@@ -678,6 +678,128 @@ static void TestCustomPools(const TestContext& ctx)
         IID_PPV_ARGS(&res)) );
 }
 
+static void TestPoolsAndAllocationParameters(const TestContext& ctx)
+{
+    wprintf(L"Test pools and allocation parameters\n");
+
+    ComPtr<D3D12MA::Pool> pool1, pool2;
+    std::vector<ComPtr<D3D12MA::Allocation>> bufs;
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+
+    uint32_t totalNewAllocCount = 0, totalNewBlockCount = 0;
+    D3D12MA::Stats statsBeg, statsEnd;
+    ctx.allocator->CalculateStats(&statsBeg);
+
+    HRESULT hr;
+    ComPtr<D3D12MA::Allocation> alloc;
+
+    // poolTypeI:
+    // 0 = default pool
+    // 1 = custom pool, default (flexible) block size and block count
+    // 2 = custom pool, fixed block size and limited block count
+    for(size_t poolTypeI = 0; poolTypeI < 3; ++poolTypeI)
+    {
+        if(poolTypeI == 0)
+        {
+            allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+            allocDesc.CustomPool = nullptr;
+        }
+        else if(poolTypeI == 1)
+        {
+            D3D12MA::POOL_DESC poolDesc = {};
+            poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+            poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+            hr = ctx.allocator->CreatePool(&poolDesc, &pool1);
+            CHECK_HR(hr);
+            allocDesc.CustomPool = pool1.Get();
+        }
+        else if(poolTypeI == 2)
+        {
+            D3D12MA::POOL_DESC poolDesc = {};
+            poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+            poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+            poolDesc.MaxBlockCount = 1;
+            poolDesc.BlockSize = 2 * MEGABYTE + MEGABYTE / 2; // 2.5 MB
+            hr = ctx.allocator->CreatePool(&poolDesc, &pool2);
+            CHECK_HR(hr);
+            allocDesc.CustomPool = pool2.Get();
+        }
+
+        uint32_t poolAllocCount = 0, poolBlockCount = 0;
+        D3D12_RESOURCE_DESC resDesc;
+        FillResourceDescForBuffer(resDesc, MEGABYTE);
+
+        // Default parameters
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+        CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
+        ID3D12Heap* const defaultAllocHeap = alloc->GetHeap();
+        const UINT64 defaultAllocOffset = alloc->GetOffset();
+        bufs.push_back(std::move(alloc));
+        ++poolAllocCount;
+
+        // COMMITTED. Should not try pool2 as it may assert on invalid call.
+        if(poolTypeI != 2)
+        {
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+            hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+            CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
+            CHECK_BOOL(alloc->GetOffset() == 0); // Committed
+            CHECK_BOOL(alloc->GetHeap() == nullptr); // Committed
+            bufs.push_back(std::move(alloc));
+            ++poolAllocCount;
+        }
+
+        // NEVER_ALLOCATE #1
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
+        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+        CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
+        CHECK_BOOL(alloc->GetHeap() == defaultAllocHeap); // Same memory block as default one.
+        CHECK_BOOL(alloc->GetOffset() != defaultAllocOffset);
+        bufs.push_back(std::move(alloc));
+        ++poolAllocCount;
+
+        // NEVER_ALLOCATE #2. Should fail in pool2 as it has no space.
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
+        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+        if(poolTypeI == 2)
+            CHECK_BOOL(FAILED(hr));
+        else
+        {
+            CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
+            bufs.push_back(std::move(alloc));
+            ++poolAllocCount;
+        }
+
+        // Pool stats
+        switch(poolTypeI)
+        {
+        case 0: poolBlockCount = 1; break; // At least 1 added for dedicated allocation.
+        case 1: poolBlockCount = 2; break; // 1 for custom pool block and 1 for dedicated allocation.
+        case 2: poolBlockCount = 1; break; // Only custom pool, no dedicated allocation.
+        }
+
+        if(poolTypeI > 0)
+        {
+            D3D12MA::StatInfo poolStats = {};
+            (poolTypeI == 2 ? pool2 : pool1)->CalculateStats(&poolStats);
+            CHECK_BOOL(poolStats.AllocationCount == poolAllocCount);
+            CHECK_BOOL(poolStats.UsedBytes == poolAllocCount * MEGABYTE);
+            CHECK_BOOL(poolStats.BlockCount == poolBlockCount);
+        }
+
+        totalNewAllocCount += poolAllocCount;
+        totalNewBlockCount += poolBlockCount;
+    }
+
+    ctx.allocator->CalculateStats(&statsEnd);
+
+    CHECK_BOOL(statsEnd.Total.AllocationCount == statsBeg.Total.AllocationCount + totalNewAllocCount);
+    CHECK_BOOL(statsEnd.Total.BlockCount >= statsBeg.Total.BlockCount + totalNewBlockCount);
+    CHECK_BOOL(statsEnd.Total.UsedBytes == statsBeg.Total.UsedBytes + totalNewAllocCount * MEGABYTE);
+}
+
 static void TestCustomPool_MinAllocationAlignment(const TestContext& ctx)
 {
     wprintf(L"Test custom pool MinAllocationAlignment\n");
@@ -1598,6 +1720,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCustomPools(ctx);
     TestCustomPool_MinAllocationAlignment(ctx);
     TestCustomPool_Committed(ctx);
+    TestPoolsAndAllocationParameters(ctx);
     TestCustomHeaps(ctx);
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
