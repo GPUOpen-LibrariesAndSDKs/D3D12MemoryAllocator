@@ -84,13 +84,12 @@ def CalcParams():
         iImgSizeY += len(lDefaultPoolBlocks) * (IMG_MARGIN * 2 + FONT_SIZE + MAP_SIZE)
         for objBlock in lDefaultPoolBlocks:
             iMaxBlockSize = max(iMaxBlockSize, objBlock['Size'])
-        """
-        dCustomPools = dictMemType['CustomPools']
-        for lBlocks in dCustomPools.values():
-            iImgSizeY += len(lBlocks) * (IMG_MARGIN * 2 + FONT_SIZE + MAP_SIZE)
-            for objBlock in lBlocks:
+        for poolData in dictMemType['CustomPools'].values():
+            iImgSizeY += len(poolData) * (IMG_MARGIN * 2 + FONT_SIZE + MAP_SIZE)
+            for objBlock in poolData['Blocks']:
                 iMaxBlockSize = max(iMaxBlockSize, objBlock['Size'])
-        """
+            for tDedicatedAlloc in poolData['CommittedAllocations']:
+                iMaxBlockSize = max(iMaxBlockSize, tDedicatedAlloc[1])
     fPixelsPerByte = (IMG_SIZE_X - IMG_MARGIN * 2) / float(iMaxBlockSize)
     return iImgSizeY, fPixelsPerByte
 
@@ -179,24 +178,16 @@ if 'DefaultPools' in objDetailedMap:
         typeData = GetDataForHeapType(sHeapType)
         for sBlockId, objBlock in tType[1]['Blocks'].items():
             ProcessBlock(typeData['DefaultPoolBlocks'], int(sBlockId), objBlock, '')
-"""
-if 'Pools' in jsonSrc:
-    objPools = jsonSrc['Pools']
-    for sPoolId, objPool in objPools.items():
-        iType = int(objPool['MemoryTypeIndex'])
-        typeData = GetDataForHeapType(iType)
-        objBlocks = objPool['Blocks']
-        sAlgorithm = objPool.get('Algorithm', '')
-        sName = objPool.get('Name', None)
-        if sName:
-            sFullName = sPoolId + ' "' + sName + '"'
-        else:
-            sFullName = sPoolId
-        dstBlockArray = []
-        typeData['CustomPools'][sFullName] = dstBlockArray
-        for sBlockId, objBlock in objBlocks.items():
-            ProcessBlock(dstBlockArray, int(sBlockId), objBlock, sAlgorithm)
-"""
+if 'Pools' in objDetailedMap:
+    for tType in objDetailedMap['Pools'].items():
+        sHeapType = tType[0]
+        typeData = GetDataForHeapType(sHeapType)
+        for pool in tType[1]:
+            typeData['CustomPools'][pool['Name']] = {'Blocks':[], 'CommittedAllocations':[]}
+            for sBlockId, objBlock in pool['Blocks'].items():
+                ProcessBlock(typeData['CustomPools'][pool['Name']]['Blocks'], int(sBlockId), objBlock, '')
+            for objAlloc in pool['CommittedAllocations']:
+                typeData['CustomPools'][pool['Name']]['CommittedAllocations'].append((objAlloc['Type'], int(objAlloc['Size']), int(objAlloc.get('Flags', 0)), int(objAlloc.get('Layout', 0))))
 
 iImgSizeY, fPixelsPerByte = CalcParams()
 
@@ -247,10 +238,9 @@ for sHeapType in data.keys():
         y += FONT_SIZE + IMG_MARGIN
         DrawBlock(draw, y, objBlock)
         y += MAP_SIZE + IMG_MARGIN
-    """
-    index = 0
-    for sPoolName, listPool in dictMemType['CustomPools'].items():
-        for objBlock in listPool:
+    for sPoolName, pool in dictMemType['CustomPools'].items():
+        index = 0
+        for objBlock in pool['Blocks']:
             if 'Algorithm' in objBlock and objBlock['Algorithm']:
                 sAlgorithm = ' (Algorithm: %s)' % (objBlock['Algorithm'])
             else:
@@ -258,9 +248,15 @@ for sHeapType in data.keys():
             draw.text((IMG_MARGIN, y), "Custom pool %s%s block %d" % (sPoolName, sAlgorithm, objBlock['ID']), fill=COLOR_TEXT_H2, font=font)
             y += FONT_SIZE + IMG_MARGIN
             DrawBlock(draw, y, objBlock)
+            y += 2 * (FONT_SIZE + IMG_MARGIN)
+            index += 1
+        index = 0
+        for objAlloc in pool['CommittedAllocations']:
+            draw.text((IMG_MARGIN, y), "Custom pool %s%s committed allocation %d" % (sPoolName, sAlgorithm, index), fill=COLOR_TEXT_H2, font=font)
+            y += FONT_SIZE + IMG_MARGIN
+            DrawCommittedAllocationBlock(draw, y, objAlloc)
             y += MAP_SIZE + IMG_MARGIN
             index += 1
-    """
 del draw
 img.save(args.output)
 
@@ -275,10 +271,12 @@ Main data structure - variable `data` - is a dictionary. Key is string - heap ty
     - Fixed key 'ID'. Value is int.
     - Fixed key 'Size'. Value is int.
     - Fixed key 'Suballocations'. Value is list of tuples as above.
-X- Fixed key 'CustomPools'. Value is dictionary.
-  - Key is string with pool ID/name. Value is list of objects representing memory blocks, each containing dictionary with:
-    - Fixed key 'ID'. Value is int.
-    - Fixed key 'Size'. Value is int.
-    - Fixed key 'Algorithm'. Optional. Value is string.
-    - Fixed key 'Suballocations'. Value is list of tuples as above.
+- Fixed key 'CustomPools'. Value is dictionary.
+  - Key is string with pool ID/name. Value is a dictionary with:
+    - Fixed key 'Blocks'. Value is a list of objects representing memory blocks, each containing dictionary with:
+      - Fixed key 'ID'. Value is int.
+      - Fixed key 'Size'. Value is int.
+      - Fixed key 'Algorithm'. Optional. Value is string.
+      - Fixed key 'Suballocations'. Value is list of tuples as above.
+    - Fixed key 'CommittedAllocations'. Value is list of tuples as above.
 """

@@ -5936,6 +5936,43 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
 
             json.EndObject(); // CommittedAllocations
 
+            json.WriteString(L"Pools");
+            json.BeginObject();
+
+            for (size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
+            {
+                json.WriteString(HeapTypeNames[heapTypeIndex]);
+                json.BeginArray();
+                MutexLockRead mutex(m_PoolsMutex[heapTypeIndex], m_UseMutex);
+                size_t index = 0;
+                for (auto* item = m_Pools[heapTypeIndex].Front(); item != nullptr; item = PoolList::GetNext(item))
+                {
+                    json.BeginObject();
+                    json.WriteString(L"Name");
+                    if (item->GetName() != nullptr)
+                    {
+                        json.WriteString(item->GetName());
+                    }
+                    else
+                    {
+                        json.BeginString();
+                        json.ContinueString(index);
+                        json.EndString();
+                    }
+                    ++index;
+
+                    json.WriteString(L"Blocks");
+                    item->GetBlockVector()->WriteBlockInfoToJson(json);
+                    json.WriteString(L"CommittedAllocations");
+                    item->GetCommittedAllocationList()->BuildStatsString(json);
+
+                    json.EndObject();
+                }
+                json.EndArray();
+            }
+
+            json.EndObject(); // Pools
+
             json.EndObject(); // DetailedMap
         }
         json.EndObject();
