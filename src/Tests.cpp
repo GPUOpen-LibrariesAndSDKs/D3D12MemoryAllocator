@@ -25,6 +25,7 @@
 #include <thread>
 
 extern ID3D12GraphicsCommandList* BeginCommandList();
+extern DXGI_ADAPTER_DESC1 g_AdapterDesc;
 extern void EndCommandList(ID3D12GraphicsCommandList* cmdList);
 
 static constexpr UINT64 MEGABYTE = 1024 * 1024;
@@ -1613,6 +1614,7 @@ static bool IsProtectedResourceSessionSupported(const TestContext& ctx)
     return support.Support > D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG_NONE;
 }
 
+#ifdef __ID3D12Device4_INTERFACE_DEFINED__
 static void TestDevice4(const TestContext& ctx)
 {
     wprintf(L"Test ID3D12Device4\n");
@@ -1641,32 +1643,54 @@ static void TestDevice4(const TestContext& ctx)
         return;
     }
 
-    // Create a buffer
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.pProtectedSession = session.Get();
+    poolDesc.MinAllocationAlignment = 0;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+
+    ComPtr<D3D12MA::Pool> pool;
+    hr = ctx.allocator->CreatePool(&poolDesc, &pool);
+    if(FAILED(hr))
+    {
+        wprintf(L"Failed to create custom pool.\n");
+        return;
+    }
 
     D3D12_RESOURCE_DESC resourceDesc;
     FillResourceDescForBuffer(resourceDesc, 1024);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    for(UINT testIndex = 0; testIndex < 2; ++testIndex)
+    {
+        // Create a buffer
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.CustomPool = pool.Get();
+        if(testIndex == 0)
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        ComPtr<D3D12MA::Allocation> bufAlloc;
+        ComPtr<ID3D12Resource> bufRes;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resourceDesc,
+            D3D12_RESOURCE_STATE_COMMON, NULL,
+            &bufAlloc, IID_PPV_ARGS(&bufRes)));
+        CHECK_BOOL(bufAlloc && bufAlloc->GetResource() == bufRes.Get());
+        // Make sure it's (not) committed.
+        CHECK_BOOL((bufAlloc->GetHeap() == NULL) == (testIndex == 0));
 
-    ComPtr<D3D12MA::Allocation> bufAlloc;
-    ComPtr<ID3D12Resource> bufRes;
-    CHECK_HR(ctx.allocator->CreateResource1(&allocDesc, &resourceDesc,
-        D3D12_RESOURCE_STATE_COMMON, NULL,
-        session.Get(), &bufAlloc, IID_PPV_ARGS(&bufRes)));
-
-    // Create a heap
-    // Temporarily commented out as it caues BSOD on RTX2080Ti driver 461.40.
-#if 0
-    D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {
-        D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 100, // SizeInBytes
-        D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // Alignment
-    };
-
-    CHECK_HR(ctx.allocator->AllocateMemory1(&allocDesc, &heapAllocInfo, session, &alloc));
-    AllocationUniquePtr heapAllocPtr{alloc};
-#endif
+        // Allocate memory/heap
+        // Temporarily disabled on NVIDIA as it causes BSOD on RTX2080Ti driver 461.40.
+        if(g_AdapterDesc.VendorId != VENDOR_ID_NVIDIA)
+        {
+            D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {
+                D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 2, // SizeInBytes
+                D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // Alignment
+            };
+            ComPtr<D3D12MA::Allocation> memAlloc;
+            CHECK_HR(ctx.allocator->AllocateMemory(&allocDesc, &heapAllocInfo, &memAlloc));
+            CHECK_BOOL(memAlloc->GetHeap());
+        }
+    }
 }
+#endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 static void TestDevice8(const TestContext& ctx)
@@ -1688,7 +1712,7 @@ static void TestDevice8(const TestContext& ctx)
     ComPtr<D3D12MA::Allocation> allocPtr0;
     ComPtr<ID3D12Resource> res0;
     CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
-        D3D12_RESOURCE_STATE_COMMON, NULL, NULL,
+        D3D12_RESOURCE_STATE_COMMON, NULL,
         &allocPtr0, IID_PPV_ARGS(&res0)));
     CHECK_BOOL(allocPtr0->GetHeap() == NULL);
 
@@ -1699,7 +1723,7 @@ static void TestDevice8(const TestContext& ctx)
     ComPtr<D3D12MA::Allocation> allocPtr1;
     ComPtr<ID3D12Resource> res1;
     CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
-        D3D12_RESOURCE_STATE_COMMON, NULL, NULL,
+        D3D12_RESOURCE_STATE_COMMON, NULL,
         &allocPtr1, IID_PPV_ARGS(&res1)));
     CHECK_BOOL(allocPtr1->GetHeap()!= NULL);
 }
@@ -1729,7 +1753,9 @@ static void TestGroupBasics(const TestContext& ctx)
     TestTransfer(ctx);
     TestZeroInitialized(ctx);
     TestMultithreading(ctx);
+#ifdef __ID3D12Device4_INTERFACE_DEFINED__
     TestDevice4(ctx);
+#endif
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     TestDevice8(ctx);
 #endif

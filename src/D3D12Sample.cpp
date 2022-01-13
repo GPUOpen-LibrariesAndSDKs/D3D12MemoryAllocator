@@ -90,6 +90,7 @@ static float g_TimeDelta;
 
 static DXGIUsage* g_DXGIUsage;
 static ComPtr<ID3D12Device> g_Device;
+DXGI_ADAPTER_DESC1 g_AdapterDesc;
 static ComPtr<D3D12MA::Allocator> g_Allocator;
 
 static ComPtr<IDXGISwapChain3> g_SwapChain; // swapchain used to switch between render targets
@@ -513,10 +514,6 @@ ComPtr<IDXGIAdapter1> DXGIUsage::CreateAdapter(const GPUSelection& GPUSelection)
     return adapter;
 }
 
-static const uint32_t VENDOR_ID_AMD = 0x1002;
-static const uint32_t VENDOR_ID_NVIDIA = 0x10DE;
-static const uint32_t VENDOR_ID_INTEL = 0x8086;
-
 static const wchar_t* VendorIDToStr(uint32_t vendorID)
 {
     switch(vendorID)
@@ -566,17 +563,15 @@ static std::wstring SizeToStr(size_t size)
 
 static void PrintAdapterInformation(IDXGIAdapter1* adapter)
 {
-    DXGI_ADAPTER_DESC1 adapterDesc = {};
-    adapter->GetDesc1(&adapterDesc);
     wprintf(L"DXGI_ADAPTER_DESC1:\n");
-    wprintf(L"    Description = %s\n", adapterDesc.Description);
-    wprintf(L"    VendorId = 0x%X (%s)\n", adapterDesc.VendorId, VendorIDToStr(adapterDesc.VendorId));
-    wprintf(L"    DeviceId = 0x%X\n", adapterDesc.DeviceId);
-    wprintf(L"    SubSysId = 0x%X\n", adapterDesc.SubSysId);
-    wprintf(L"    Revision = 0x%X\n", adapterDesc.Revision);
-    wprintf(L"    DedicatedVideoMemory = %zu B (%s)\n", adapterDesc.DedicatedVideoMemory, SizeToStr(adapterDesc.DedicatedVideoMemory).c_str());
-    wprintf(L"    DedicatedSystemMemory = %zu B (%s)\n", adapterDesc.DedicatedSystemMemory, SizeToStr(adapterDesc.DedicatedSystemMemory).c_str());
-    wprintf(L"    SharedSystemMemory = %zu B (%s)\n", adapterDesc.SharedSystemMemory, SizeToStr(adapterDesc.SharedSystemMemory).c_str());
+    wprintf(L"    Description = %s\n", g_AdapterDesc.Description);
+    wprintf(L"    VendorId = 0x%X (%s)\n", g_AdapterDesc.VendorId, VendorIDToStr(g_AdapterDesc.VendorId));
+    wprintf(L"    DeviceId = 0x%X\n", g_AdapterDesc.DeviceId);
+    wprintf(L"    SubSysId = 0x%X\n", g_AdapterDesc.SubSysId);
+    wprintf(L"    Revision = 0x%X\n", g_AdapterDesc.Revision);
+    wprintf(L"    DedicatedVideoMemory = %zu B (%s)\n", g_AdapterDesc.DedicatedVideoMemory, SizeToStr(g_AdapterDesc.DedicatedVideoMemory).c_str());
+    wprintf(L"    DedicatedSystemMemory = %zu B (%s)\n", g_AdapterDesc.DedicatedSystemMemory, SizeToStr(g_AdapterDesc.DedicatedSystemMemory).c_str());
+    wprintf(L"    SharedSystemMemory = %zu B (%s)\n", g_AdapterDesc.SharedSystemMemory, SizeToStr(g_AdapterDesc.SharedSystemMemory).c_str());
 
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& options = g_Allocator->GetD3D12Options();
     wprintf(L"D3D12_FEATURE_DATA_D3D12_OPTIONS:\n");
@@ -629,6 +624,8 @@ static void InitD3D() // initializes direct3d 12
 
     ComPtr<IDXGIAdapter1> adapter = g_DXGIUsage->CreateAdapter(g_CommandLineParameters.m_GPUSelection);
     CHECK_BOOL(adapter);
+
+    CHECK_HR(adapter->GetDesc1(&g_AdapterDesc));
 
     // Must be done before D3D12 device is created.
     if(ENABLE_DEBUG_LAYER)

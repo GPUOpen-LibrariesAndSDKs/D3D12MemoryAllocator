@@ -126,6 +126,9 @@ If providing your own implementation, you need to implement a subset of std::ato
     #define D3D12MA_API
 #endif
 
+// Forward declaration if ID3D12ProtectedResourceSession is not defined inside the headers (older SDK, pre ID3D12Device4)
+struct ID3D12ProtectedResourceSession;
+
 namespace D3D12MA
 {
 class D3D12MA_API IUnknownImpl : public IUnknown
@@ -468,6 +471,12 @@ struct POOL_DESC
     Leave 0 (default) not to impose any additional alignment. If not 0, it must be a power of two.
     */
     UINT64 MinAllocationAlignment;
+    /** \brief Additional parameter allowing pool to create resources with passed protected session.
+    
+    If not null then all the heaps and committed resources will be created with this parameter.
+    Valid only if ID3D12Device4 interface is present in current Windows SDK!
+    */
+    ID3D12ProtectedResourceSession* pProtectedSession;
 };
 
 /** \brief Custom memory pool
@@ -725,27 +734,8 @@ public:
         REFIID riidResource,
         void** ppvResource);
 
-#ifdef __ID3D12Device4_INTERFACE_DEFINED__
-    /** \brief Similar to Allocator::CreateResource, but supports additional parameter `pProtectedSession`.
-    
-    If `pProtectedSession` is not null, current implementation always creates the resource as committed
-    using `ID3D12Device4::CreateCommittedResource1`.
-
-    To work correctly, `ID3D12Device4` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
-    */
-    HRESULT CreateResource1(
-        const ALLOCATION_DESC* pAllocDesc,
-        const D3D12_RESOURCE_DESC* pResourceDesc,
-        D3D12_RESOURCE_STATES InitialResourceState,
-        const D3D12_CLEAR_VALUE *pOptimizedClearValue,
-        ID3D12ProtectedResourceSession *pProtectedSession,
-        Allocation** ppAllocation,
-        REFIID riidResource,
-        void** ppvResource);
-#endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
-
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    /** \brief Similar to Allocator::CreateResource1, but supports new structure `D3D12_RESOURCE_DESC1`.
+    /** \brief Similar to Allocator::CreateResource, but supports new structure `D3D12_RESOURCE_DESC1`.
     
     It internally uses `ID3D12Device8::CreateCommittedResource2` or `ID3D12Device8::CreatePlacedResource1`.
 
@@ -756,7 +746,6 @@ public:
         const D3D12_RESOURCE_DESC1* pResourceDesc,
         D3D12_RESOURCE_STATES InitialResourceState,
         const D3D12_CLEAR_VALUE *pOptimizedClearValue,
-        ID3D12ProtectedResourceSession *pProtectedSession,
         Allocation** ppAllocation,
         REFIID riidResource,
         void** ppvResource);
@@ -785,21 +774,6 @@ public:
         const ALLOCATION_DESC* pAllocDesc,
         const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
         Allocation** ppAllocation);
-
-#ifdef __ID3D12Device4_INTERFACE_DEFINED__
-    /** \brief Similar to Allocator::AllocateMemory, but supports additional parameter `pProtectedSession`.
-    
-    If `pProtectedSession` is not null, current implementation always creates separate heap
-    using `ID3D12Device4::CreateHeap1`.
-
-    To work correctly, `ID3D12Device4` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
-    */
-    HRESULT AllocateMemory1(
-        const ALLOCATION_DESC* pAllocDesc,
-        const D3D12_RESOURCE_ALLOCATION_INFO* pAllocInfo,
-        ID3D12ProtectedResourceSession *pProtectedSession,
-        Allocation** ppAllocation);
-#endif // #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 
     /** \brief Creates a new resource in place of an existing allocation. This is useful for memory aliasing.
 

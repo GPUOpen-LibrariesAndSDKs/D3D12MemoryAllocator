@@ -66,6 +66,10 @@ typedef std::chrono::high_resolution_clock::duration duration;
         throw std::runtime_error(__FILE__ "(" LINE_STRING "): FAILED( " #expr " )"); \
     } } while(false)
 
+const uint32_t VENDOR_ID_AMD = 0x1002;
+const uint32_t VENDOR_ID_NVIDIA = 0x10DE;
+const uint32_t VENDOR_ID_INTEL = 0x8086;
+
 template <typename T>
 inline constexpr T CeilDiv(T x, T y)
 {
