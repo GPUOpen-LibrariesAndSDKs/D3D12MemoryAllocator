@@ -302,7 +302,7 @@ static inline T RoundDiv(T x, T y)
 	return (x + (y / (T)2)) / y;
 }
 template <typename T>
-static inline T DivideRoudingUp(T x, T y)
+static inline T DivideRoundingUp(T x, T y)
 {
     return (x + y - 1) / y;
 }
@@ -708,8 +708,8 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
 
     if(IsFormatCompressed(resourceDesc.Format))
     {
-        sizeX = DivideRoudingUp(sizeX / 4, 1u);
-        sizeY = DivideRoudingUp(sizeY / 4, 1u);
+        sizeX = DivideRoundingUp(sizeX / 4, 1u);
+        sizeY = DivideRoundingUp(sizeY / 4, 1u);
         bitsPerPixel *= 16;
     }
 
@@ -724,7 +724,7 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
     default: return false;
     }
 
-    const UINT tileCount = DivideRoudingUp(sizeX, tileSizeX) * DivideRoudingUp(sizeY, tileSizeY);
+    const UINT tileCount = DivideRoundingUp(sizeX, tileSizeX) * DivideRoundingUp(sizeY, tileSizeY);
     return tileCount <= 16;
 }
 
