@@ -164,6 +164,9 @@ class Pool;
 class Allocator;
 struct StatInfo;
 
+/// \brief Unique identifier of single allocation done inside the memory heap.
+typedef UINT64 AllocHandle;
+
 /// Pointer to custom callback function that allocates CPU memory.
 using ALLOCATE_FUNC_PTR = void* (*)(size_t Size, size_t Alignment, void* pUserData);
 /**
@@ -248,6 +251,13 @@ struct ALLOCATION_DESC
     It will then never be created as committed.
     */
     Pool* CustomPool;
+};
+
+/// \brief Represents single memory allocation done inside VirtualBlock.
+struct D3D12MA_API VirtualAllocation
+{
+    /// \brief Unique idenitfier of current allocation.
+    AllocHandle AllocHandle;
 };
 
 /** \brief Represents single memory allocation.
@@ -372,7 +382,7 @@ private:
 
         struct
         {
-            UINT64 offset;
+            AllocHandle allocHandle;
             NormalBlock* block;
         } m_Placed;
 
@@ -414,11 +424,14 @@ private:
 
     Allocation(AllocatorPimpl* allocator, UINT64 size, BOOL wasZeroInitialized);
     //  Nothing here, everything already done in Release.
-    // ~Allocation() {}
-    
+    virtual ~Allocation() = default;
+
+
     void InitCommitted(CommittedAllocationList* list);
-    void InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block);
+    void InitPlaced(AllocHandle allocHandle, UINT64 alignment, NormalBlock* block);
     void InitHeap(CommittedAllocationList* list, ID3D12Heap* heap);
+    // If the Allocation represents committed resource with implicit heap, returns UINT64_MAX
+    AllocHandle GetAllocHandle() const;
     template<typename D3D12_RESOURCE_DESC_T>
     void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc);
     void FreeName();
@@ -899,6 +912,8 @@ struct VIRTUAL_ALLOCATION_DESC
 /// Parameters of an existing virtual allocation, returned by VirtualBlock::GetAllocationInfo().
 struct VIRTUAL_ALLOCATION_INFO
 {
+    /// \brief Offset of the allocation.
+    UINT64 offset;
     /** \brief Size of the allocation.
 
     Same value as passed in VIRTUAL_ALLOCATION_DESC::Size.
@@ -928,25 +943,26 @@ public:
     /** \brief Returns true if the block is empty - contains 0 allocations.
     */
     BOOL IsEmpty() const;
-    /** \brief Returns information about an allocation at given offset - its size and custom pointer.
+    /** \brief Returns information about an allocation - its offset, size and custom pointer.
     */
-    void GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO* pInfo) const;
+    void GetAllocationInfo(VirtualAllocation allocation, VIRTUAL_ALLOCATION_INFO* pInfo) const;
 
     /** \brief Creates new allocation.
     \param pDesc
-    \param[out] pOffset Offset of the new allocation, which can also be treated as an unique identifier of the allocation within this block. `UINT64_MAX` if allocation failed.
+    \param[out] pAllocation Unique indentifier of the new allocation within single block. `UINT64_MAX` in AllocHandle if allocation failed.
+    \param[out] pOffset Returned offset of the new allocation. Optional, can be null.
     \return `S_OK` if allocation succeeded, `E_OUTOFMEMORY` if it failed.
     */
-    HRESULT Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOffset);
-    /** \brief Frees the allocation at given offset.
+    HRESULT Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, VirtualAllocation* pAllocation, UINT64* pOffset);
+    /** \brief Frees the allocation.
     */
-    void FreeAllocation(UINT64 offset);
+    void FreeAllocation(VirtualAllocation allocation);
     /** \brief Frees all the allocations.
     */
     void Clear();
-    /** \brief Changes custom pointer for an allocation at given offset to a new value.
+    /** \brief Changes custom pointer for an allocation to a new value.
     */
-    void SetAllocationUserData(UINT64 offset, void* pUserData);
+    void SetAllocationUserData(VirtualAllocation allocation, void* pUserData);
 
     /** \brief Retrieves statistics from the current state of the block.
     */

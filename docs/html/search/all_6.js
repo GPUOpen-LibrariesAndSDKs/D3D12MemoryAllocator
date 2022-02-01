@@ -1,7 +1,7 @@
 var searchData=
 [
   ['general_20considerations_0',['General considerations',['../general_considerations.html',1,'index']]],
-  ['getallocationinfo_1',['GetAllocationInfo',['../class_d3_d12_m_a_1_1_virtual_block.html#a287b8f0e455ffc7f302094671f922afb',1,'D3D12MA::VirtualBlock']]],
+  ['getallocationinfo_1',['GetAllocationInfo',['../class_d3_d12_m_a_1_1_virtual_block.html#ac605dce05ca0d411e46079f0bad765d1',1,'D3D12MA::VirtualBlock']]],
   ['getbudget_2',['GetBudget',['../class_d3_d12_m_a_1_1_allocator.html#abe927bd3ad6930111d4d9408515b9601',1,'D3D12MA::Allocator']]],
   ['getd3d12options_3',['GetD3D12Options',['../class_d3_d12_m_a_1_1_allocator.html#ae276d2358a58a36f8c6639f837f29be5',1,'D3D12MA::Allocator']]],
   ['getdesc_4',['GetDesc',['../class_d3_d12_m_a_1_1_pool.html#aaab59af46d922d6b81fce8d8be987028',1,'D3D12MA::Pool']]],

@@ -98,18 +98,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aa37d6b9fe8ea0864f7a35b9d68e8345a"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">CreateResource</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
 <tr class="memdesc:aa37d6b9fe8ea0864f7a35b9d68e8345a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation function.  <a href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">More...</a><br /></td></tr>
 <tr class="separator:aa37d6b9fe8ea0864f7a35b9d68e8345a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afa0de85c76ce1f86fe9b0bd94dad5e8b"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#afa0de85c76ce1f86fe9b0bd94dad5e8b">CreateResource1</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, ID3D12ProtectedResourceSession *pProtectedSession, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
-<tr class="memdesc:afa0de85c76ce1f86fe9b0bd94dad5e8b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>, but supports additional parameter <code>pProtectedSession</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#afa0de85c76ce1f86fe9b0bd94dad5e8b">More...</a><br /></td></tr>
-<tr class="separator:afa0de85c76ce1f86fe9b0bd94dad5e8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad9616c8e8e59ede99214b9c7cea97e5a"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ad9616c8e8e59ede99214b9c7cea97e5a">CreateResource2</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC1 *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, ID3D12ProtectedResourceSession *pProtectedSession, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
-<tr class="memdesc:ad9616c8e8e59ede99214b9c7cea97e5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#afa0de85c76ce1f86fe9b0bd94dad5e8b" title="Similar to Allocator::CreateResource, but supports additional parameter pProtectedSession.">Allocator::CreateResource1</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#ad9616c8e8e59ede99214b9c7cea97e5a">More...</a><br /></td></tr>
-<tr class="separator:ad9616c8e8e59ede99214b9c7cea97e5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7a1c79c79a7a573c438aa45c4a531b96"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a7a1c79c79a7a573c438aa45c4a531b96">CreateResource2</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC1 *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
+<tr class="memdesc:a7a1c79c79a7a573c438aa45c4a531b96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#a7a1c79c79a7a573c438aa45c4a531b96">More...</a><br /></td></tr>
+<tr class="separator:a7a1c79c79a7a573c438aa45c4a531b96"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acb8a10a5ea30171ce60128286aec5ee2"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2">AllocateMemory</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_ALLOCATION_INFO *pAllocInfo, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation)</td></tr>
 <tr class="memdesc:acb8a10a5ea30171ce60128286aec5ee2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates memory without creating any resource placed in it.  <a href="class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2">More...</a><br /></td></tr>
 <tr class="separator:acb8a10a5ea30171ce60128286aec5ee2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6c1fbc673e2559ead34dbf039dd47d60"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a6c1fbc673e2559ead34dbf039dd47d60">AllocateMemory1</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_ALLOCATION_INFO *pAllocInfo, ID3D12ProtectedResourceSession *pProtectedSession, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation)</td></tr>
-<tr class="memdesc:a6c1fbc673e2559ead34dbf039dd47d60"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2" title="Allocates memory without creating any resource placed in it.">Allocator::AllocateMemory</a>, but supports additional parameter <code>pProtectedSession</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#a6c1fbc673e2559ead34dbf039dd47d60">More...</a><br /></td></tr>
-<tr class="separator:a6c1fbc673e2559ead34dbf039dd47d60"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab45536f92410aedb7be44ea36b1b4717"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717">CreateAliasingResource</a> (<a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> *pAllocation, UINT64 AllocationLocalOffset, const D3D12_RESOURCE_DESC *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, REFIID riidResource, void **ppvResource)</td></tr>
 <tr class="memdesc:ab45536f92410aedb7be44ea36b1b4717"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a new resource in place of an existing allocation. This is useful for memory aliasing.  <a href="class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717">More...</a><br /></td></tr>
 <tr class="separator:ab45536f92410aedb7be44ea36b1b4717"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -174,50 +168,6 @@ Public Member Functions</h2></td></tr>
 <p ><code>pAllocDesc-&gt;heapFlags</code> should contain one of these values, depending on type of resources you are going to create in this memory: <code>D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS</code>, <code>D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES</code>, <code>D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES</code>. Except if you validate that ResourceHeapTier = 2 - then <code>heapFlags</code> may be <code>D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES</code> = 0. Additional flags in <code>heapFlags</code> are allowed as well.</p>
 <p ><code>pAllocInfo-&gt;SizeInBytes</code> must be multiply of 64KB. <code>pAllocInfo-&gt;Alignment</code> must be one of the legal values as described in documentation of <code>D3D12_HEAP_DESC</code>.</p>
 <p >If you use <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a> you will get a separate memory block - a heap that always has offset 0. </p>
-
-</div>
-</div>
-<a id="a6c1fbc673e2559ead34dbf039dd47d60" name="a6c1fbc673e2559ead34dbf039dd47d60"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6c1fbc673e2559ead34dbf039dd47d60">&#9670;&nbsp;</a></span>AllocateMemory1()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">HRESULT D3D12MA::Allocator::AllocateMemory1 </td>
-          <td>(</td>
-          <td class="paramtype">const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *&#160;</td>
-          <td class="paramname"><em>pAllocDesc</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const D3D12_RESOURCE_ALLOCATION_INFO *&#160;</td>
-          <td class="paramname"><em>pAllocInfo</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">ID3D12ProtectedResourceSession *&#160;</td>
-          <td class="paramname"><em>pProtectedSession</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype"><a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **&#160;</td>
-          <td class="paramname"><em>ppAllocation</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2" title="Allocates memory without creating any resource placed in it.">Allocator::AllocateMemory</a>, but supports additional parameter <code>pProtectedSession</code>. </p>
-<p >If <code>pProtectedSession</code> is not null, current implementation always creates separate heap using <code>ID3D12Device4::CreateHeap1</code>.</p>
-<p >To work correctly, <code>ID3D12Device4</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
 
 </div>
 </div>
@@ -457,76 +407,8 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="afa0de85c76ce1f86fe9b0bd94dad5e8b" name="afa0de85c76ce1f86fe9b0bd94dad5e8b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afa0de85c76ce1f86fe9b0bd94dad5e8b">&#9670;&nbsp;</a></span>CreateResource1()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">HRESULT D3D12MA::Allocator::CreateResource1 </td>
-          <td>(</td>
-          <td class="paramtype">const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *&#160;</td>
-          <td class="paramname"><em>pAllocDesc</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const D3D12_RESOURCE_DESC *&#160;</td>
-          <td class="paramname"><em>pResourceDesc</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">D3D12_RESOURCE_STATES&#160;</td>
-          <td class="paramname"><em>InitialResourceState</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const D3D12_CLEAR_VALUE *&#160;</td>
-          <td class="paramname"><em>pOptimizedClearValue</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">ID3D12ProtectedResourceSession *&#160;</td>
-          <td class="paramname"><em>pProtectedSession</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype"><a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **&#160;</td>
-          <td class="paramname"><em>ppAllocation</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">REFIID&#160;</td>
-          <td class="paramname"><em>riidResource</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">void **&#160;</td>
-          <td class="paramname"><em>ppvResource</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>, but supports additional parameter <code>pProtectedSession</code>. </p>
-<p >If <code>pProtectedSession</code> is not null, current implementation always creates the resource as committed using <code>ID3D12Device4::CreateCommittedResource1</code>.</p>
-<p >To work correctly, <code>ID3D12Device4</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
-
-</div>
-</div>
-<a id="ad9616c8e8e59ede99214b9c7cea97e5a" name="ad9616c8e8e59ede99214b9c7cea97e5a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad9616c8e8e59ede99214b9c7cea97e5a">&#9670;&nbsp;</a></span>CreateResource2()</h2>
+<a id="a7a1c79c79a7a573c438aa45c4a531b96" name="a7a1c79c79a7a573c438aa45c4a531b96"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7a1c79c79a7a573c438aa45c4a531b96">&#9670;&nbsp;</a></span>CreateResource2()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -558,12 +440,6 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">ID3D12ProtectedResourceSession *&#160;</td>
-          <td class="paramname"><em>pProtectedSession</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
           <td class="paramtype"><a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **&#160;</td>
           <td class="paramname"><em>ppAllocation</em>, </td>
         </tr>
@@ -587,7 +463,7 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#afa0de85c76ce1f86fe9b0bd94dad5e8b" title="Similar to Allocator::CreateResource, but supports additional parameter pProtectedSession.">Allocator::CreateResource1</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>. </p>
+<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>. </p>
 <p >It internally uses <code>ID3D12Device8::CreateCommittedResource2</code> or <code>ID3D12Device8::CreatePlacedResource1</code>.</p>
 <p >To work correctly, <code>ID3D12Device8</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
 

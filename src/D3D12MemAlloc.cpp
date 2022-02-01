@@ -267,6 +267,98 @@ static inline void D3D12MA_SWAP(T& a, T& b)
     #define D3D12MA_RW_MUTEX RWMutex
 #endif // #ifndef D3D12MA_RW_MUTEX
 
+// Scans integer for index of first nonzero bit from the Least Significant Bit (LSB). If mask is 0 then returns UINT8_MAX
+static inline UINT8 BitScanLSB(UINT64 mask)
+{
+#if defined(_MSC_VER) && defined(_WIN64)
+    unsigned long pos;
+    if (_BitScanForward64(&pos, mask))
+        return static_cast<UINT8>(pos);
+    return UINT8_MAX;
+#elif defined __GNUC__ || defined __clang__
+    return static_cast<UINT8>(__builtin_ffsll(mask)) - 1U;
+#else
+    UINT8 pos = 0;
+    UINT64 bit = 1;
+    do
+    {
+        if (mask & bit)
+            return pos;
+        bit <<= 1;
+    } while (pos++ < 63);
+    return UINT8_MAX;
+#endif
+}
+
+// Scans integer for index of first nonzero bit from the Least Significant Bit (LSB). If mask is 0 then returns UINT8_MAX
+static inline UINT8 BitScanLSB(UINT32 mask)
+{
+#ifdef _MSC_VER
+    unsigned long pos;
+    if (_BitScanForward(&pos, mask))
+        return static_cast<UINT8>(pos);
+    return UINT8_MAX;
+#elif defined __GNUC__ || defined __clang__
+    return static_cast<UINT8>(__builtin_ffsl(mask)) - 1U;
+#else
+    UINT8 pos = 0;
+    UINT32 bit = 1;
+    do
+    {
+        if (mask & bit)
+            return pos;
+        bit <<= 1;
+    } while (pos++ < 31);
+    return UINT8_MAX;
+#endif
+}
+
+// Scans integer for index of first nonzero bit from the Most Significant Bit (MSB). If mask is 0 then returns UINT8_MAX
+static inline UINT8 BitScanMSB(UINT64 mask)
+{
+#if defined(_MSC_VER) && defined(_WIN64)
+    unsigned long pos;
+    if (_BitScanReverse64(&pos, mask))
+        return static_cast<UINT8>(pos);
+#elif defined __GNUC__ || defined __clang__
+    if (mask)
+        return static_cast<UINT8>(__builtin_clzll(mask));
+#else
+    UINT8 pos = 63;
+    UINT64 bit = 1U << 63;
+    do
+    {
+        if (mask & bit)
+            return pos;
+        bit >>= 1;
+    } while (pos-- > 0);
+#endif
+    return UINT8_MAX;
+}
+
+// Scans integer for index of first nonzero bit from the Most Significant Bit (MSB). If mask is 0 then returns UINT8_MAX
+static inline UINT8 BitScanMSB(UINT32 mask)
+{
+#ifdef _MSC_VER
+    unsigned long pos;
+    if (_BitScanReverse(&pos, mask))
+        return static_cast<UINT8>(pos);
+#elif defined __GNUC__ || defined __clang__
+    if (mask)
+        return static_cast<UINT8>(__builtin_clzl(mask));
+#else
+    UINT8 pos = 31;
+    UINT32 bit = 1 << 31;
+    do
+    {
+        if (mask & bit)
+            return pos;
+        bit >>= 1;
+    } while (pos-- > 0);
+#endif
+    return UINT8_MAX;
+}
+
 /*
 Returns true if given number is a power of two.
 T must be unsigned integer number or signed integer but always nonnegative.
@@ -2505,7 +2597,9 @@ Parameters of planned allocation inside a NormalBlock.
 */
 struct AllocationRequest
 {
-    UINT64 offset;
+    AllocHandle allocHandle;
+    UINT64 size;
+    UINT64 algorithmData;
     UINT64 sumFreeSize; // Sum size of free items that overlap with proposed allocation.
     UINT64 sumItemSize; // Sum size of items to make lost that overlap with proposed allocation.
     SuballocationList::iterator item;
@@ -2577,7 +2671,7 @@ class BlockMetadata
 {
 public:
     BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual);
-    virtual ~BlockMetadata() { }
+    virtual ~BlockMetadata() = default;
     virtual void Init(UINT64 size) { m_Size = size; }
 
     // Validates all data structures inside this object. If not valid, returns false.
@@ -2586,11 +2680,11 @@ public:
     bool IsVirtual() const { return m_IsVirtual; }
     virtual size_t GetAllocationCount() const = 0;
     virtual UINT64 GetSumFreeSize() const = 0;
-    virtual UINT64 GetUnusedRangeSizeMax() const = 0;
+    virtual UINT64 GetAllocationOffset(AllocHandle allocHandle) const = 0;
     // Returns true if this block is empty - contains only single free suballocation.
     virtual bool IsEmpty() const = 0;
 
-    virtual void GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const = 0;
+    virtual void GetAllocationInfo(AllocHandle allocHandle, VIRTUAL_ALLOCATION_INFO& outInfo) const = 0;
 
     // Tries to find a place for suballocation with given parameters inside this block.
     // If succeeded, fills pAllocationRequest and returns true.
@@ -2606,12 +2700,12 @@ public:
         UINT64 allocSize,
         void* userData) = 0;
 
-    virtual void FreeAtOffset(UINT64 offset) = 0;
+    virtual void Free(AllocHandle allocHandle) = 0;
     // Frees all allocations.
     // Careful! Don't call it if there are Allocation objects owned by pUserData of of cleared allocations!
     virtual void Clear() = 0;
 
-    virtual void SetAllocationUserData(UINT64 offset, void* userData) = 0;
+    virtual void SetAllocationUserData(AllocHandle allocHandle, void* userData) = 0;
 
     virtual void CalcAllocationStatInfo(StatInfo& outInfo) const = 0;
     virtual void WriteAllocationInfoToJson(JsonWriter& json) const = 0;
@@ -2632,33 +2726,33 @@ class BlockMetadata_Generic : public BlockMetadata
 public:
     BlockMetadata_Generic(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual);
     virtual ~BlockMetadata_Generic();
-    virtual void Init(UINT64 size);
 
-    virtual bool Validate() const;
-    virtual size_t GetAllocationCount() const { return m_Suballocations.size() - m_FreeCount; }
-    virtual UINT64 GetSumFreeSize() const { return m_SumFreeSize; }
-    virtual UINT64 GetUnusedRangeSizeMax() const;
-    virtual bool IsEmpty() const;
+    size_t GetAllocationCount() const override { return m_Suballocations.size() - m_FreeCount; }
+    UINT64 GetSumFreeSize() const override { return m_SumFreeSize; }
+    UINT64 GetAllocationOffset(AllocHandle allocHandle) const override { return (UINT64)allocHandle; }
 
-    virtual void GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const;
+    void Init(UINT64 size) override;
+    bool Validate() const override;
+    bool IsEmpty() const override;
+    void GetAllocationInfo(AllocHandle allocHandle, VIRTUAL_ALLOCATION_INFO& outInfo) const override;
 
-    virtual bool CreateAllocationRequest(
+    bool CreateAllocationRequest(
         UINT64 allocSize,
         UINT64 allocAlignment,
-        AllocationRequest* pAllocationRequest);
+        AllocationRequest* pAllocationRequest) override;
 
-    virtual void Alloc(
+    void Alloc(
         const AllocationRequest& request,
         UINT64 allocSize,
-        void* userData);
+        void* userData) override;
 
-    virtual void FreeAtOffset(UINT64 offset);
-    virtual void Clear();
+    void Free(AllocHandle allocHandle) override;
+    void Clear() override;
 
-    virtual void SetAllocationUserData(UINT64 offset, void* userData);
+    void SetAllocationUserData(AllocHandle allocHandle, void* userData) override;
 
-    virtual void CalcAllocationStatInfo(StatInfo& outInfo) const;
-    virtual void WriteAllocationInfoToJson(JsonWriter& json) const;
+    void CalcAllocationStatInfo(StatInfo& outInfo) const override;
+    void WriteAllocationInfoToJson(JsonWriter& json) const override;
 
 private:
     UINT m_FreeCount;
@@ -2678,7 +2772,7 @@ private:
         UINT64 allocSize,
         UINT64 allocAlignment,
         SuballocationList::const_iterator suballocItem,
-        UINT64* pOffset,
+        AllocHandle* pAllocHandle,
         UINT64* pSumFreeSize,
         UINT64* pSumItemSize,
         BOOL *pZeroInitialized) const;
@@ -2696,6 +2790,110 @@ private:
     void UnregisterFreeSuballocation(SuballocationList::iterator item);
 
     D3D12MA_CLASS_NO_COPY(BlockMetadata_Generic)
+};
+
+class BlockMetadata_TLSF : public BlockMetadata
+{
+public:
+    BlockMetadata_TLSF(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual);
+    virtual ~BlockMetadata_TLSF();
+
+    size_t GetAllocationCount() const override { return m_AllocCount; }
+    UINT64 GetSumFreeSize() const override { return m_BlocksFreeSize + m_NullBlock->size; }
+    bool IsEmpty() const override { return m_NullBlock->offset == 0; }
+    UINT64 GetAllocationOffset(AllocHandle allocHandle) const override { return ((Block*)allocHandle)->offset; };
+
+    void Init(UINT64 size) override;
+    bool Validate() const override;
+    void GetAllocationInfo(AllocHandle allocHandle, VIRTUAL_ALLOCATION_INFO& outInfo) const override;
+
+    bool CreateAllocationRequest(
+        UINT64 allocSize,
+        UINT64 allocAlignment,
+        AllocationRequest* pAllocationRequest) override;
+
+    void Alloc(
+        const AllocationRequest& request,
+        UINT64 allocSize,
+        void* userData) override;
+
+    void Free(AllocHandle allocHandle) override;
+    void Clear() override;
+
+    void SetAllocationUserData(AllocHandle allocHandle, void* userData) override;
+
+    void CalcAllocationStatInfo(StatInfo& outInfo) const override;
+    void WriteAllocationInfoToJson(JsonWriter& json) const override;
+
+private:
+    // According to original paper it should be preferable 4 or 5:
+    // M. Masmano, I. Ripoll, A. Crespo, and J. Real "TLSF: a New Dynamic Memory Allocator for Real-Time Systems"
+    // http://www.gii.upv.es/tlsf/files/ecrts04_tlsf.pdf
+    static const UINT8 SECOND_LEVEL_INDEX = 5;
+    static const UINT16 SMALL_BUFFER_SIZE = 256;
+    static const UINT INITIAL_BLOCK_ALLOC_COUNT = 16;
+    static const UINT8 MEMORY_CLASS_SHIFT = 7;
+    static const UINT8 MAX_MEMORY_CLASSES = 65 - MEMORY_CLASS_SHIFT;
+
+    class Block
+    {
+    public:
+        UINT64 offset;
+        UINT64 size;
+        Block* prevPhysical;
+        Block* nextPhysical;
+
+        void MarkFree() { prevFree = NULL; }
+        void MarkTaken() { prevFree = this; }
+        bool IsFree() const { return prevFree != this; }
+        void*& UserData() { D3D12MA_HEAVY_ASSERT(!IsFree()); return userData; }
+        Block*& PrevFree() { return prevFree; }
+        Block*& NextFree() { D3D12MA_HEAVY_ASSERT(IsFree()); return nextFree; }
+
+    private:
+        Block* prevFree; // Address of the same block here indicates that block is taken
+        union
+        {
+            Block* nextFree;
+            void* userData;
+        };
+    };
+    
+    size_t m_AllocCount;
+    // Total number of free blocks besides null block
+    size_t m_BlocksFreeCount;
+    // Total size of free blocks excluding null block
+    UINT64 m_BlocksFreeSize;
+    UINT32 m_IsFreeBitmap;
+    UINT8 m_MemoryClasses;
+    UINT32 m_InnerIsFreeBitmap[MAX_MEMORY_CLASSES];
+    UINT32 m_ListsCount;
+    /*
+    * 0: 0-3 lists for small buffers
+    * 1+: 0-(2^SLI-1) lists for normal buffers
+    */
+    Block** m_FreeList;
+    PoolAllocator<Block> m_BlockAllocator;
+    Block* m_NullBlock;
+
+    UINT8 SizeToMemoryClass(UINT64 size) const;
+    UINT16 SizeToSecondIndex(UINT64 size, UINT8 memoryClass) const;
+    UINT32 GetListIndex(UINT8 memoryClass, UINT16 secondIndex) const;
+    UINT32 GetListIndex(UINT64 size) const;
+
+    void RemoveFreeBlock(Block* block);
+    void InsertFreeBlock(Block* block);
+    void MergeBlock(Block* block, Block* prev);
+
+    Block* FindFreeBlock(UINT64 size, UINT32& listIndex) const;
+    bool CheckBlock(
+        Block& block,
+        UINT32 listIndex,
+        UINT64 allocSize,
+        UINT64 allocAlignment,
+        AllocationRequest* pAllocationRequest);
+
+    D3D12MA_CLASS_NO_COPY(BlockMetadata_TLSF)
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3389,26 +3587,15 @@ bool BlockMetadata_Generic::Validate() const
     return true;
 }
 
-UINT64 BlockMetadata_Generic::GetUnusedRangeSizeMax() const
-{
-    if(!m_FreeSuballocationsBySize.empty())
-    {
-        return m_FreeSuballocationsBySize.back()->size;
-    }
-    else
-    {
-        return 0;
-    }
-}
-
 bool BlockMetadata_Generic::IsEmpty() const
 {
     return (m_Suballocations.size() == 1) && (m_FreeCount == 1);
 }
 
-void BlockMetadata_Generic::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO& outInfo) const
+void BlockMetadata_Generic::GetAllocationInfo(AllocHandle allocHandle, VIRTUAL_ALLOCATION_INFO& outInfo) const
 {
-    Suballocation& suballoc = *FindAtOffset(offset).dropConst();
+    Suballocation& suballoc = *FindAtOffset((UINT64)allocHandle).dropConst();
+    outInfo.offset = suballoc.offset;
     outInfo.size = suballoc.size;
     outInfo.pUserData = suballoc.userData;
 }
@@ -3423,7 +3610,7 @@ bool BlockMetadata_Generic::CreateAllocationRequest(
     D3D12MA_HEAVY_ASSERT(Validate());
 
     // There is not enough total free space in this block to fullfill the request: Early return.
-    if(m_SumFreeSize < allocSize + 2 * D3D12MA_DEBUG_MARGIN)
+    if(m_SumFreeSize < allocSize + D3D12MA_DEBUG_MARGIN)
     {
         return false;
     }
@@ -3436,7 +3623,7 @@ bool BlockMetadata_Generic::CreateAllocationRequest(
         SuballocationList::iterator* const it = BinaryFindFirstNotLess(
             m_FreeSuballocationsBySize.data(),
             m_FreeSuballocationsBySize.data() + freeSuballocCount,
-            allocSize + 2 * D3D12MA_DEBUG_MARGIN,
+            allocSize + D3D12MA_DEBUG_MARGIN,
             SuballocationItemSizeLess());
         size_t index = it - m_FreeSuballocationsBySize.data();
         for(; index < freeSuballocCount; ++index)
@@ -3445,7 +3632,7 @@ bool BlockMetadata_Generic::CreateAllocationRequest(
                 allocSize,
                 allocAlignment,
                 m_FreeSuballocationsBySize[index],
-                &pAllocationRequest->offset,
+                &pAllocationRequest->allocHandle,
                 &pAllocationRequest->sumFreeSize,
                 &pAllocationRequest->sumItemSize,
                 &pAllocationRequest->zeroInitialized))
@@ -3469,8 +3656,9 @@ void BlockMetadata_Generic::Alloc(
     // Given suballocation is a free block.
     D3D12MA_ASSERT(suballoc.type == SUBALLOCATION_TYPE_FREE);
     // Given offset is inside this suballocation.
-    D3D12MA_ASSERT(request.offset >= suballoc.offset);
-    const UINT64 paddingBegin = request.offset - suballoc.offset;
+    UINT64 offset = (UINT64)request.allocHandle;
+    D3D12MA_ASSERT(offset >= suballoc.offset);
+    const UINT64 paddingBegin = offset - suballoc.offset;
     D3D12MA_ASSERT(suballoc.size >= paddingBegin + allocSize);
     const UINT64 paddingEnd = suballoc.size - paddingBegin - allocSize;
 
@@ -3478,7 +3666,7 @@ void BlockMetadata_Generic::Alloc(
     // it to become used.
     UnregisterFreeSuballocation(request.item);
 
-    suballoc.offset = request.offset;
+    suballoc.offset = offset;
     suballoc.size = allocSize;
     suballoc.type = SUBALLOCATION_TYPE_ALLOCATION;
     suballoc.userData = userData;
@@ -3487,7 +3675,7 @@ void BlockMetadata_Generic::Alloc(
     if(paddingEnd)
     {
         Suballocation paddingSuballoc = {};
-        paddingSuballoc.offset = request.offset + allocSize;
+        paddingSuballoc.offset = offset + allocSize;
         paddingSuballoc.size = paddingEnd;
         paddingSuballoc.type = SUBALLOCATION_TYPE_FREE;
         SuballocationList::iterator next = request.item;
@@ -3501,7 +3689,7 @@ void BlockMetadata_Generic::Alloc(
     if(paddingBegin)
     {
         Suballocation paddingSuballoc = {};
-        paddingSuballoc.offset = request.offset - paddingBegin;
+        paddingSuballoc.offset = offset - paddingBegin;
         paddingSuballoc.size = paddingBegin;
         paddingSuballoc.type = SUBALLOCATION_TYPE_FREE;
         const SuballocationList::iterator paddingBeginItem =
@@ -3521,12 +3709,12 @@ void BlockMetadata_Generic::Alloc(
     }
     m_SumFreeSize -= allocSize;
 
-    m_ZeroInitializedRange.MarkRangeAsUsed(request.offset, request.offset + allocSize);
+    m_ZeroInitializedRange.MarkRangeAsUsed(offset, offset + allocSize);
 }
 
-void BlockMetadata_Generic::FreeAtOffset(UINT64 offset)
+void BlockMetadata_Generic::Free(AllocHandle allocHandle)
 {
-    FreeSuballocation(FindAtOffset(offset).dropConst());
+    FreeSuballocation(FindAtOffset((UINT64)allocHandle).dropConst());
 }
 
 void BlockMetadata_Generic::Clear()
@@ -3596,14 +3784,14 @@ bool BlockMetadata_Generic::CheckAllocation(
     UINT64 allocSize,
     UINT64 allocAlignment,
     SuballocationList::const_iterator suballocItem,
-    UINT64* pOffset,
+    AllocHandle* pAllocHandle,
     UINT64* pSumFreeSize,
     UINT64* pSumItemSize,
     BOOL *pZeroInitialized) const
 {
     D3D12MA_ASSERT(allocSize > 0);
     D3D12MA_ASSERT(suballocItem != m_Suballocations.cend());
-    D3D12MA_ASSERT(pOffset != NULL && pZeroInitialized != NULL);
+    D3D12MA_ASSERT(pAllocHandle != NULL && pZeroInitialized != NULL);
 
     *pSumFreeSize = 0;
     *pSumItemSize = 0;
@@ -3621,31 +3809,23 @@ bool BlockMetadata_Generic::CheckAllocation(
     }
 
     // Start from offset equal to beginning of this suballocation.
-    *pOffset = suballoc.offset;
-
-    // Apply D3D12MA_DEBUG_MARGIN at the beginning.
-    if(D3D12MA_DEBUG_MARGIN > 0)
-    {
-        *pOffset += D3D12MA_DEBUG_MARGIN;
-    }
+    UINT64 offset = suballoc.offset;
 
     // Apply alignment.
-    *pOffset = AlignUp(*pOffset, allocAlignment);
+    offset = AlignUp(offset, allocAlignment);
 
     // Calculate padding at the beginning based on current offset.
-    const UINT64 paddingBegin = *pOffset - suballoc.offset;
-
-    // Calculate required margin at the end.
-    const UINT64 requiredEndMargin = D3D12MA_DEBUG_MARGIN;
+    const UINT64 paddingBegin = offset - suballoc.offset;
 
     // Fail if requested size plus margin before and after is bigger than size of this suballocation.
-    if(paddingBegin + allocSize + requiredEndMargin > suballoc.size)
+    if(paddingBegin + allocSize + D3D12MA_DEBUG_MARGIN > suballoc.size)
     {
         return false;
     }
 
-    // All tests passed: Success. pOffset is already filled.
-    *pZeroInitialized = m_ZeroInitializedRange.IsRangeZeroInitialized(*pOffset, *pOffset + allocSize);
+    // All tests passed: Success. Offset is already filled.
+    *pZeroInitialized = m_ZeroInitializedRange.IsRangeZeroInitialized(offset, offset + allocSize);
+    *pAllocHandle = (AllocHandle)offset;
     return true;
 }
 
@@ -3740,7 +3920,6 @@ void BlockMetadata_Generic::RegisterFreeSuballocation(SuballocationList::iterato
     //D3D12MA_HEAVY_ASSERT(ValidateFreeSuballocationList());
 }
 
-
 void BlockMetadata_Generic::UnregisterFreeSuballocation(SuballocationList::iterator item)
 {
     D3D12MA_ASSERT(item->type == SUBALLOCATION_TYPE_FREE);
@@ -3774,9 +3953,9 @@ void BlockMetadata_Generic::UnregisterFreeSuballocation(SuballocationList::itera
     //D3D12MA_HEAVY_ASSERT(ValidateFreeSuballocationList());
 }
 
-void BlockMetadata_Generic::SetAllocationUserData(UINT64 offset, void* userData)
+void BlockMetadata_Generic::SetAllocationUserData(AllocHandle allocHandle, void* userData)
 {
-    Suballocation& suballoc = *FindAtOffset(offset).dropConst();
+    Suballocation& suballoc = *FindAtOffset((UINT64)allocHandle).dropConst();
     suballoc.userData = userData;
 }
 
@@ -3858,6 +4037,659 @@ void BlockMetadata_Generic::WriteAllocationInfoToJson(JsonWriter& json) const
     }
     json.EndArray();
     json.EndObject();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Private class BlockMetadata_TLSF implementation
+
+BlockMetadata_TLSF::BlockMetadata_TLSF(const ALLOCATION_CALLBACKS* allocationCallbacks, bool isVirtual)
+    : BlockMetadata(allocationCallbacks, isVirtual),
+    m_AllocCount(0),
+    m_BlocksFreeCount(0),
+    m_BlocksFreeSize(0),
+    m_IsFreeBitmap(0),
+    m_MemoryClasses(0),
+    m_ListsCount(0),
+    m_FreeList(NULL),
+    m_BlockAllocator(*allocationCallbacks, INITIAL_BLOCK_ALLOC_COUNT),
+    m_NullBlock(NULL)
+{
+    D3D12MA_ASSERT(allocationCallbacks);
+}
+
+BlockMetadata_TLSF::~BlockMetadata_TLSF()
+{
+    if (m_FreeList)
+        D3D12MA_DELETE_ARRAY(*GetAllocs(), m_FreeList, m_ListsCount);
+}
+
+void BlockMetadata_TLSF::Init(UINT64 size)
+{
+    BlockMetadata::Init(size);
+
+    m_NullBlock = m_BlockAllocator.Alloc();
+    m_NullBlock->size = size;
+    m_NullBlock->offset = 0;
+    m_NullBlock->prevPhysical = NULL;
+    m_NullBlock->nextPhysical = NULL;
+    m_NullBlock->MarkFree();
+    m_NullBlock->NextFree() = NULL;
+    m_NullBlock->PrevFree() = NULL;
+    UINT8 memoryClass = SizeToMemoryClass(size);
+    UINT16 sli = SizeToSecondIndex(size, memoryClass);
+    m_ListsCount = (memoryClass == 0 ? 0 : (memoryClass - 1) * (1UL << SECOND_LEVEL_INDEX) + sli) + 1;
+    if (IsVirtual())
+        m_ListsCount += 1UL << SECOND_LEVEL_INDEX;
+    else
+        m_ListsCount += 4;
+
+    m_MemoryClasses = memoryClass + 2;
+    memset(m_InnerIsFreeBitmap, 0, MAX_MEMORY_CLASSES * sizeof(UINT32));
+
+    m_FreeList = D3D12MA_NEW_ARRAY(*GetAllocs(), Block*, m_ListsCount);
+    memset(m_FreeList, 0, m_ListsCount * sizeof(Block*));
+}
+
+bool BlockMetadata_TLSF::Validate() const
+{
+    D3D12MA_VALIDATE(GetSumFreeSize() <= GetSize());
+
+    UINT64 calculatedSize = m_NullBlock->size;
+    UINT64 calculatedFreeSize = m_NullBlock->size;
+    size_t allocCount = 0;
+    size_t freeCount = 0;
+
+    // Check integrity of free lists
+    for (UINT32 list = 0; list < m_ListsCount; ++list)
+    {
+        Block* block = m_FreeList[list];
+        if (block != NULL)
+        {
+            D3D12MA_VALIDATE(block->IsFree());
+            D3D12MA_VALIDATE(block->PrevFree() == NULL);
+            while (block->NextFree())
+            {
+                D3D12MA_VALIDATE(block->NextFree()->IsFree());
+                D3D12MA_VALIDATE(block->NextFree()->PrevFree() == block);
+                block = block->NextFree();
+            }
+        }
+    }
+
+    D3D12MA_VALIDATE(m_NullBlock->nextPhysical == NULL);
+    if (m_NullBlock->prevPhysical)
+    {
+        D3D12MA_VALIDATE(m_NullBlock->prevPhysical->nextPhysical == m_NullBlock);
+    }
+
+    // Check all blocks
+    UINT64 nextOffset = m_NullBlock->offset;
+    for (Block* prev = m_NullBlock->prevPhysical; prev != NULL; prev = prev->prevPhysical)
+    {
+        D3D12MA_VALIDATE(prev->offset + prev->size == nextOffset);
+        nextOffset = prev->offset;
+        calculatedSize += prev->size;
+
+        UINT32 listIndex = GetListIndex(prev->size);
+        if (prev->IsFree())
+        {
+            ++freeCount;
+            // Check if free block belongs to free list
+            Block* freeBlock = m_FreeList[listIndex];
+            D3D12MA_VALIDATE(freeBlock != NULL);
+
+            bool found = false;
+            do
+            {
+                if (freeBlock == prev)
+                    found = true;
+
+                freeBlock = freeBlock->NextFree();
+            } while (!found && freeBlock != NULL);
+
+            D3D12MA_VALIDATE(found);
+            calculatedFreeSize += prev->size;
+        }
+        else
+        {
+            ++allocCount;
+            // Check if taken block is not on a free list
+            Block* freeBlock = m_FreeList[listIndex];
+            while (freeBlock)
+            {
+                D3D12MA_VALIDATE(freeBlock != prev);
+                freeBlock = freeBlock->NextFree();
+            }
+        }
+
+        if (prev->prevPhysical)
+        {
+            D3D12MA_VALIDATE(prev->prevPhysical->nextPhysical == prev);
+        }
+    }
+
+    D3D12MA_VALIDATE(nextOffset == 0);
+    D3D12MA_VALIDATE(calculatedSize == GetSize());
+    D3D12MA_VALIDATE(calculatedFreeSize == GetSumFreeSize());
+    D3D12MA_VALIDATE(allocCount == m_AllocCount);
+    D3D12MA_VALIDATE(freeCount == m_BlocksFreeCount);
+
+    return true;
+}
+
+void BlockMetadata_TLSF::GetAllocationInfo(AllocHandle allocHandle, VIRTUAL_ALLOCATION_INFO& outInfo) const
+{
+    Block* block = (Block*)allocHandle;
+    D3D12MA_ASSERT(!block->IsFree() && "Cannot get allocation info for free block!");
+    outInfo.offset = block->offset;
+    outInfo.size = block->size;
+    outInfo.pUserData = block->UserData();
+}
+
+bool BlockMetadata_TLSF::CreateAllocationRequest(
+    UINT64 allocSize,
+    UINT64 allocAlignment,
+    AllocationRequest* pAllocationRequest)
+{
+    D3D12MA_ASSERT(allocSize > 0 && "Cannot allocate empty block!");
+    D3D12MA_ASSERT(pAllocationRequest != NULL); 
+    D3D12MA_HEAVY_ASSERT(Validate());
+
+    allocSize += D3D12MA_DEBUG_MARGIN;
+    // Quick check for too small pool
+    if (allocSize > GetSumFreeSize())
+        return false;
+
+    // If no free blocks in pool then check only null block
+    if (m_BlocksFreeCount == 0)
+        return CheckBlock(*m_NullBlock, m_ListsCount, allocSize, allocAlignment, pAllocationRequest);
+
+    // Round up to the next block
+    UINT64 sizeForNextList = allocSize;
+    if (allocSize >= (1 << SECOND_LEVEL_INDEX))
+    {
+        sizeForNextList += (1ULL << (BitScanMSB(allocSize) - SECOND_LEVEL_INDEX)) - 1;
+    }
+    else
+        sizeForNextList += (1 << SECOND_LEVEL_INDEX) - 1;
+
+    // Check larger bucket
+    UINT32 nextListIndex = 0;
+    Block* nextListBlock = FindFreeBlock(sizeForNextList, nextListIndex);
+    while (nextListBlock)
+    {
+        if (CheckBlock(*nextListBlock, nextListIndex, allocSize, allocAlignment, pAllocationRequest))
+            return true;
+        nextListBlock = nextListBlock->NextFree();
+    }
+
+    // If failed check null block
+    if (CheckBlock(*m_NullBlock, m_ListsCount, allocSize, allocAlignment, pAllocationRequest))
+        return true;
+
+    // Check best fit bucket
+    UINT32 prevListIndex = 0;
+    Block* prevListBlock = FindFreeBlock(allocSize, prevListIndex);
+    while (prevListBlock)
+    {
+        if (CheckBlock(*prevListBlock, prevListIndex, allocSize, allocAlignment, pAllocationRequest))
+            return true;
+        prevListBlock = prevListBlock->NextFree();
+    }
+
+    // Worst case, full search has to be done
+    while (++nextListIndex < m_ListsCount)
+    {
+        nextListBlock = m_FreeList[nextListIndex];
+        while (nextListBlock)
+        {
+            if (CheckBlock(*nextListBlock, nextListIndex, allocSize, allocAlignment, pAllocationRequest))
+                return true;
+            nextListBlock = nextListBlock->NextFree();
+        }
+    }
+
+    // No more memory sadly
+    return false;
+}
+
+void BlockMetadata_TLSF::Alloc(
+    const AllocationRequest& request,
+    UINT64 allocSize,
+    void* userData)
+{
+    // Get block and pop it from the free list
+    Block* currentBlock = (Block*)request.allocHandle;
+    UINT64 offset = request.algorithmData;
+    D3D12MA_ASSERT(currentBlock != NULL);
+    D3D12MA_ASSERT(currentBlock->offset <= offset);
+
+    if (currentBlock != m_NullBlock)
+        RemoveFreeBlock(currentBlock);
+
+    // Append missing alignment to prev block or create new one
+    UINT64 misssingAlignment = offset - currentBlock->offset;
+    if (misssingAlignment)
+    {
+        Block* prevBlock = currentBlock->prevPhysical;
+        D3D12MA_ASSERT(prevBlock != NULL && "There should be no missing alignment at offset 0!");
+
+        if (prevBlock->IsFree() && prevBlock->size != D3D12MA_DEBUG_MARGIN)
+        {
+            UINT32 oldList = GetListIndex(prevBlock->size);
+            prevBlock->size += misssingAlignment;
+            // Check if new size crosses list bucket
+            if (oldList != GetListIndex(prevBlock->size))
+            {
+                prevBlock->size -= misssingAlignment;
+                RemoveFreeBlock(prevBlock);
+                prevBlock->size += misssingAlignment;
+                InsertFreeBlock(prevBlock);
+            }
+            else
+                m_BlocksFreeSize += misssingAlignment;
+        }
+        else
+        {
+            Block* newBlock = m_BlockAllocator.Alloc();
+            currentBlock->prevPhysical = newBlock;
+            prevBlock->nextPhysical = newBlock;
+            newBlock->prevPhysical = prevBlock;
+            newBlock->nextPhysical = currentBlock;
+            newBlock->size = misssingAlignment;
+            newBlock->offset = currentBlock->offset;
+            newBlock->MarkTaken();
+
+            InsertFreeBlock(newBlock);
+        }
+
+        currentBlock->size -= misssingAlignment;
+        currentBlock->offset += misssingAlignment;
+    }
+
+    UINT64 size = request.size + D3D12MA_DEBUG_MARGIN;
+    if (currentBlock->size == size)
+    {
+        if (currentBlock == m_NullBlock)
+        {
+            // Setup new null block
+            m_NullBlock = m_BlockAllocator.Alloc();
+            m_NullBlock->size = 0;
+            m_NullBlock->offset = currentBlock->offset + size;
+            m_NullBlock->prevPhysical = currentBlock;
+            m_NullBlock->nextPhysical = NULL;
+            m_NullBlock->MarkFree();
+            m_NullBlock->PrevFree() = NULL;
+            m_NullBlock->NextFree() = NULL;
+            currentBlock->nextPhysical = m_NullBlock;
+            currentBlock->MarkTaken();
+        }
+    }
+    else
+    {
+        D3D12MA_ASSERT(currentBlock->size > size && "Proper block already found, shouldn't find smaller one!");
+
+        // Create new free block
+        Block* newBlock = m_BlockAllocator.Alloc();
+        newBlock->size = currentBlock->size - size;
+        newBlock->offset = currentBlock->offset + size;
+        newBlock->prevPhysical = currentBlock;
+        newBlock->nextPhysical = currentBlock->nextPhysical;
+        currentBlock->nextPhysical = newBlock;
+        currentBlock->size = size;
+
+        if (currentBlock == m_NullBlock)
+        {
+            m_NullBlock = newBlock;
+            m_NullBlock->MarkFree();
+            m_NullBlock->NextFree() = NULL;
+            m_NullBlock->PrevFree() = NULL;
+            currentBlock->MarkTaken();
+        }
+        else
+        {
+            newBlock->nextPhysical->prevPhysical = newBlock;
+            newBlock->MarkTaken();
+            InsertFreeBlock(newBlock);
+        }
+    }
+    currentBlock->UserData() = userData;
+
+    if (D3D12MA_DEBUG_MARGIN > 0)
+    {
+        currentBlock->size -= D3D12MA_DEBUG_MARGIN;
+        Block* newBlock = m_BlockAllocator.Alloc();
+        newBlock->size = D3D12MA_DEBUG_MARGIN;
+        newBlock->offset = currentBlock->offset + currentBlock->size;
+        newBlock->prevPhysical = currentBlock;
+        newBlock->nextPhysical = currentBlock->nextPhysical;
+        newBlock->MarkTaken();
+        currentBlock->nextPhysical->prevPhysical = newBlock;
+        currentBlock->nextPhysical = newBlock;
+        InsertFreeBlock(newBlock);
+    }
+    ++m_AllocCount;
+}
+
+void BlockMetadata_TLSF::Free(AllocHandle allocHandle)
+{
+    Block* block = (Block*)allocHandle;
+    Block* next = block->nextPhysical;
+    D3D12MA_ASSERT(!block->IsFree() && "Block is already free!");
+
+    --m_AllocCount;
+    if (D3D12MA_DEBUG_MARGIN > 0)
+    {
+        RemoveFreeBlock(next);
+        MergeBlock(next, block);
+        block = next;
+        next = next->nextPhysical;
+    }
+
+    // Try merging
+    Block* prev = block->prevPhysical;
+    if (prev != NULL && prev->IsFree() && prev->size != D3D12MA_DEBUG_MARGIN)
+    {
+        RemoveFreeBlock(prev);
+        MergeBlock(block, prev);
+    }
+
+    if (!next->IsFree())
+        InsertFreeBlock(block);
+    else if (next == m_NullBlock)
+        MergeBlock(m_NullBlock, block);
+    else
+    {
+        RemoveFreeBlock(next);
+        MergeBlock(next, block);
+        InsertFreeBlock(next);
+    }
+}
+
+void BlockMetadata_TLSF::Clear()
+{
+    m_AllocCount = 0;
+    m_BlocksFreeCount = 0;
+    m_BlocksFreeSize = 0;
+    m_IsFreeBitmap = 0;
+    m_NullBlock->offset = 0;
+    m_NullBlock->size = GetSize();
+    Block* block = m_NullBlock->prevPhysical;
+    m_NullBlock->prevPhysical = NULL;
+    while (block)
+    {
+        Block* prev = block->prevPhysical;
+        m_BlockAllocator.Free(block);
+        block = prev;
+    }
+    memset(m_FreeList, 0, m_ListsCount * sizeof(Block*));
+    memset(m_InnerIsFreeBitmap, 0, m_MemoryClasses * sizeof(UINT32));
+}
+
+void BlockMetadata_TLSF::SetAllocationUserData(AllocHandle allocHandle, void* userData)
+{
+    Block* block = (Block*)allocHandle;
+    D3D12MA_ASSERT(!block->IsFree() && "Trying to set user data for not allocated block!");
+    block->UserData() = userData;
+}
+
+void BlockMetadata_TLSF::CalcAllocationStatInfo(StatInfo& outInfo) const
+{
+    outInfo.BlockCount = 1;
+    outInfo.AllocationCount = static_cast<UINT>(m_AllocCount);
+    outInfo.UnusedRangeCount = static_cast<UINT>(m_BlocksFreeCount);
+
+    outInfo.UsedBytes = GetSize() - GetSumFreeSize();
+    outInfo.UnusedBytes = GetSumFreeSize();
+
+    outInfo.AllocationSizeMin = UINT64_MAX;
+    outInfo.AllocationSizeMax = 0;
+    outInfo.UnusedRangeSizeMin = UINT64_MAX;
+    outInfo.UnusedRangeSizeMax = 0;
+
+    for (Block* block = m_NullBlock->prevPhysical; block != NULL; block = block->prevPhysical)
+    {
+        if (block->IsFree())
+        {
+            outInfo.UnusedRangeSizeMin = D3D12MA_MIN(block->size, outInfo.UnusedRangeSizeMin);
+            outInfo.UnusedRangeSizeMax = D3D12MA_MAX(block->size, outInfo.UnusedRangeSizeMax);
+        }
+        else
+        {
+            outInfo.AllocationSizeMin = D3D12MA_MIN(block->size, outInfo.AllocationSizeMin);
+            outInfo.AllocationSizeMax = D3D12MA_MAX(block->size, outInfo.AllocationSizeMax);
+        }
+    }
+
+    if (m_NullBlock->size > 0)
+    {
+        ++outInfo.UnusedRangeCount;
+        outInfo.UnusedRangeSizeMin = D3D12MA_MIN(m_NullBlock->size, outInfo.UnusedRangeSizeMin);
+        outInfo.UnusedRangeSizeMax = D3D12MA_MAX(m_NullBlock->size, outInfo.UnusedRangeSizeMax);
+    }
+}
+
+void BlockMetadata_TLSF::WriteAllocationInfoToJson(JsonWriter& json) const
+{
+    json.BeginObject();
+    json.WriteString(L"TotalBytes");
+    json.WriteNumber(GetSize());
+    json.WriteString(L"UnusuedBytes");
+    json.WriteNumber(GetSumFreeSize());
+    json.WriteString(L"Allocations");
+    json.WriteNumber(GetAllocationCount());
+    json.WriteString(L"UnusedRanges");
+    json.WriteNumber(m_BlocksFreeCount + static_cast<bool>(m_NullBlock->size));
+    json.WriteString(L"Suballocations");
+
+    size_t blockCount = m_AllocCount + m_BlocksFreeCount;
+    Vector<Block*> blockList(blockCount, *GetAllocs());
+
+    size_t i = blockCount;
+    if (m_NullBlock->size > 0)
+    {
+        ++blockCount;
+        blockList.push_back(m_NullBlock);
+    }
+    for (Block* block = m_NullBlock->prevPhysical; block != NULL; block = block->prevPhysical)
+    {
+        blockList[--i] = block;
+    }
+    D3D12MA_ASSERT(i == 0);
+
+
+    json.BeginArray();
+    for (; i < blockCount; ++i)
+    {
+        Block* block = blockList[i];
+        json.BeginObject(true);
+        json.WriteString(L"Offset");
+        json.WriteNumber(block->offset);
+
+        if (block->IsFree())
+        {
+            json.WriteString(L"Type");
+            json.WriteString(L"FREE");
+            json.WriteString(L"Size");
+            json.WriteNumber(block->size);
+        }
+        else if (IsVirtual())
+        {
+            json.WriteString(L"Type");
+            json.WriteString(L"ALLOCATION");
+            json.WriteString(L"Size");
+            json.WriteNumber(block->size);
+            if (block->UserData())
+            {
+                json.WriteString(L"UserData");
+                json.WriteNumber((uintptr_t)block->UserData());
+            }
+        }
+        else
+        {
+            const Allocation* const alloc = (const Allocation*)block->UserData();
+            D3D12MA_ASSERT(alloc);
+            json.AddAllocationToObject(*alloc);
+        }
+        json.EndObject();
+    }
+    json.EndArray();
+    json.EndObject();
+}
+
+UINT8 BlockMetadata_TLSF::SizeToMemoryClass(UINT64 size) const
+{
+    if (size > SMALL_BUFFER_SIZE)
+        return BitScanMSB(size) - MEMORY_CLASS_SHIFT;
+    return 0;
+}
+
+UINT16 BlockMetadata_TLSF::SizeToSecondIndex(UINT64 size, UINT8 memoryClass) const
+{
+    if (memoryClass == 0)
+    {
+        if (IsVirtual())
+            return static_cast<UINT16>((size - 1) / 8);
+        else
+            return static_cast<UINT16>((size - 1) / 64);
+    }
+    return static_cast<UINT16>((size >> (memoryClass + MEMORY_CLASS_SHIFT - SECOND_LEVEL_INDEX)) ^ (1U << SECOND_LEVEL_INDEX));
+}
+
+UINT32 BlockMetadata_TLSF::GetListIndex(UINT8 memoryClass, UINT16 secondIndex) const
+{
+    if (memoryClass == 0)
+        return secondIndex;
+
+    const UINT32 index = static_cast<UINT32>(memoryClass - 1) * (1 << SECOND_LEVEL_INDEX) + secondIndex;
+    if (IsVirtual())
+        return index + (1 << SECOND_LEVEL_INDEX);
+    else
+        return index + 4;
+}
+
+UINT32 BlockMetadata_TLSF::GetListIndex(UINT64 size) const
+{
+    UINT8 memoryClass = SizeToMemoryClass(size);
+    return GetListIndex(memoryClass, SizeToSecondIndex(size, memoryClass));
+}
+
+void BlockMetadata_TLSF::RemoveFreeBlock(Block* block)
+{
+    D3D12MA_ASSERT(block != m_NullBlock);
+    D3D12MA_ASSERT(block->IsFree());
+
+    if (block->NextFree() != NULL)
+        block->NextFree()->PrevFree() = block->PrevFree();
+    if (block->PrevFree() != NULL)
+        block->PrevFree()->NextFree() = block->NextFree();
+    else
+    {
+        UINT8 memClass = SizeToMemoryClass(block->size);
+        UINT16 secondIndex = SizeToSecondIndex(block->size, memClass);
+        UINT32 index = GetListIndex(memClass, secondIndex);
+        m_FreeList[index] = block->NextFree();
+        if (block->NextFree() == NULL)
+        {
+            m_InnerIsFreeBitmap[memClass] &= ~(1U << secondIndex);
+            if (m_InnerIsFreeBitmap[memClass] == 0)
+                m_IsFreeBitmap &= ~(1UL << memClass);
+        }
+    }
+    block->MarkTaken();
+    block->UserData() = NULL;
+    --m_BlocksFreeCount;
+    m_BlocksFreeSize -= block->size;
+}
+
+void BlockMetadata_TLSF::InsertFreeBlock(Block* block)
+{
+    D3D12MA_ASSERT(block != m_NullBlock);
+    D3D12MA_ASSERT(!block->IsFree() && "Cannot insert block twice!");
+
+    UINT8 memClass = SizeToMemoryClass(block->size);
+    UINT16 secondIndex = SizeToSecondIndex(block->size, memClass);
+    UINT32 index = GetListIndex(memClass, secondIndex);
+    block->PrevFree() = NULL;
+    block->NextFree() = m_FreeList[index];
+    m_FreeList[index] = block;
+    if (block->NextFree() != NULL)
+        block->NextFree()->PrevFree() = block;
+    else
+    {
+        m_InnerIsFreeBitmap[memClass] |= 1U << secondIndex;
+        m_IsFreeBitmap |= 1UL << memClass;
+    }
+    ++m_BlocksFreeCount;
+    m_BlocksFreeSize += block->size;
+}
+
+void BlockMetadata_TLSF::MergeBlock(Block* block, Block* prev)
+{
+    D3D12MA_ASSERT(block->prevPhysical == prev && "Cannot merge seperate physical regions!");
+    D3D12MA_ASSERT(!prev->IsFree() && "Cannot merge block that belongs to free list!");
+
+    block->offset = prev->offset;
+    block->size += prev->size;
+    block->prevPhysical = prev->prevPhysical;
+    if (block->prevPhysical)
+        block->prevPhysical->nextPhysical = block;
+    m_BlockAllocator.Free(prev);
+}
+
+BlockMetadata_TLSF::Block* BlockMetadata_TLSF::FindFreeBlock(UINT64 size, UINT32& listIndex) const
+{
+    UINT8 memoryClass = SizeToMemoryClass(size);
+    UINT32 innerFreeMap = m_InnerIsFreeBitmap[memoryClass] & (~0U << SizeToSecondIndex(size, memoryClass));
+    if (!innerFreeMap)
+    {
+        // Check higher levels for avaiable blocks
+        UINT32 freeMap = m_IsFreeBitmap & (~0UL << (memoryClass + 1));
+        if (!freeMap)
+            return NULL; // No more memory avaible
+
+        // Find lowest free region
+        memoryClass = BitScanLSB(freeMap);
+        innerFreeMap = m_InnerIsFreeBitmap[memoryClass];
+        D3D12MA_ASSERT(innerFreeMap != 0);
+    }
+    // Find lowest free subregion
+    listIndex = GetListIndex(memoryClass, BitScanLSB(innerFreeMap));
+    return m_FreeList[listIndex];
+}
+
+bool BlockMetadata_TLSF::CheckBlock(
+    Block& block,
+    UINT32 listIndex,
+    UINT64 allocSize,
+    UINT64 allocAlignment,
+    AllocationRequest* pAllocationRequest)
+{
+    D3D12MA_ASSERT(block.IsFree() && "Block is already taken!");
+
+    UINT64 alignedOffset = AlignUp(block.offset, allocAlignment);
+    if (block.size < allocSize + alignedOffset - block.offset)
+        return false;
+
+    // Alloc successful
+    pAllocationRequest->allocHandle = (AllocHandle)&block;
+    pAllocationRequest->size = allocSize - D3D12MA_DEBUG_MARGIN;
+    pAllocationRequest->algorithmData = alignedOffset;
+
+    // Place block at the start of list if it's normal block
+    if (listIndex != m_ListsCount && block.PrevFree())
+    {
+        block.PrevFree()->NextFree() = block.NextFree();
+        if (block.NextFree())
+            block.NextFree()->PrevFree() = block.PrevFree();
+        block.PrevFree() = NULL;
+        block.NextFree() = m_FreeList[listIndex];
+        m_FreeList[listIndex] = &block;
+        if (block.NextFree())
+            block.NextFree()->PrevFree() = &block;
+    }
+
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4132,7 +4964,7 @@ HRESULT BlockVector::AllocatePage(
     Allocation** pAllocation)
 {
     // Early reject: requested allocation size is larger that maximum block size for this block vector.
-    if(size + 2 * D3D12MA_DEBUG_MARGIN > m_PreferredBlockSize)
+    if(size + D3D12MA_DEBUG_MARGIN > m_PreferredBlockSize)
     {
         return E_OUTOFMEMORY;
     }
@@ -4266,7 +5098,7 @@ void BlockVector::Free(Allocation* hAllocation)
 
         NormalBlock* pBlock = hAllocation->m_Placed.block;
 
-        pBlock->m_pMetadata->FreeAtOffset(hAllocation->GetOffset());
+        pBlock->m_pMetadata->Free(hAllocation->GetAllocHandle());
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
 
         const size_t blockCount = m_Blocks.size();
@@ -4483,7 +5315,7 @@ HRESULT BlockVector::AllocateFromBlock(
 
         *pAllocation = m_hAllocator->GetAllocationObjectAllocator().Allocate(m_hAllocator, size, currRequest.zeroInitialized);
         pBlock->m_pMetadata->Alloc(currRequest, size, *pAllocation);
-        (*pAllocation)->InitPlaced(currRequest.offset, alignment, pBlock);
+        (*pAllocation)->InitPlaced(currRequest.allocHandle, alignment, pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
         m_hAllocator->m_Budget.AddAllocation(HeapTypeToIndex(m_HeapProps.Type), size);
         return S_OK;
@@ -6024,7 +6856,7 @@ UINT64 Allocation::GetOffset() const
     case TYPE_HEAP:
         return 0;
     case TYPE_PLACED:
-        return m_Placed.offset;
+        return m_Placed.block->m_pMetadata->GetAllocationOffset(m_Placed.allocHandle);
     default:
         D3D12MA_ASSERT(0);
         return 0;
@@ -6083,10 +6915,10 @@ void Allocation::InitCommitted(CommittedAllocationList* list)
     m_Committed.next = NULL;
 }
 
-void Allocation::InitPlaced(UINT64 offset, UINT64 alignment, NormalBlock* block)
+void Allocation::InitPlaced(AllocHandle allocHandle, UINT64 alignment, NormalBlock* block)
 {
     m_PackedData.SetType(TYPE_PLACED);
-    m_Placed.offset = offset;
+    m_Placed.allocHandle = allocHandle;
     m_Placed.block = block;
 }
 
@@ -6097,6 +6929,21 @@ void Allocation::InitHeap(CommittedAllocationList* list, ID3D12Heap* heap)
     m_Committed.prev = NULL;
     m_Committed.next = NULL;
     m_Heap.heap = heap;
+}
+
+AllocHandle Allocation::GetAllocHandle() const
+{
+    switch (m_PackedData.GetType())
+    {
+    case TYPE_COMMITTED:
+    case TYPE_HEAP:
+        return (AllocHandle)UINT64_MAX;
+    case TYPE_PLACED:
+        return m_Placed.allocHandle;
+    default:
+        D3D12MA_ASSERT(0);
+        return (AllocHandle)UINT64_MAX;
+    }
 }
 
 template<typename D3D12_RESOURCE_DESC_T>
@@ -6380,24 +7227,24 @@ BOOL VirtualBlock::IsEmpty() const
     return m_Pimpl->m_Metadata.IsEmpty() ? TRUE : FALSE;
 }
 
-void VirtualBlock::GetAllocationInfo(UINT64 offset, VIRTUAL_ALLOCATION_INFO* pInfo) const
+void VirtualBlock::GetAllocationInfo(VirtualAllocation allocation, VIRTUAL_ALLOCATION_INFO* pInfo) const
 {
-    D3D12MA_ASSERT(offset != UINT64_MAX && pInfo);
+    D3D12MA_ASSERT(allocation.AllocHandle != (AllocHandle)UINT64_MAX && pInfo);
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
-    m_Pimpl->m_Metadata.GetAllocationInfo(offset, *pInfo);
+    m_Pimpl->m_Metadata.GetAllocationInfo(allocation.AllocHandle, *pInfo);
 }
 
-HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOffset)
+HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, VirtualAllocation* pAllocation, UINT64* pOffset)
 {
-    if(!pDesc || !pOffset || pDesc->Size == 0 || !IsPow2(pDesc->Alignment))
+    if(!pDesc || !pAllocation || pDesc->Size == 0 || !IsPow2(pDesc->Alignment))
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to VirtualBlock::Allocate.");
         return E_INVALIDARG;
     }
 
-    *pOffset = UINT64_MAX;
+    pAllocation->AllocHandle = (AllocHandle)UINT64_MAX;
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
         
@@ -6407,7 +7254,10 @@ HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOf
     {
         m_Pimpl->m_Metadata.Alloc(allocRequest, pDesc->Size, pDesc->pUserData);
         D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
-        *pOffset = allocRequest.offset;
+        pAllocation->AllocHandle = allocRequest.allocHandle;
+
+        if (pOffset)
+            *pOffset = m_Pimpl->m_Metadata.GetAllocationOffset(allocRequest.allocHandle);
         return S_OK;
     }
     else
@@ -6416,13 +7266,13 @@ HRESULT VirtualBlock::Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, UINT64* pOf
     }
 }
 
-void VirtualBlock::FreeAllocation(UINT64 offset)
+void VirtualBlock::FreeAllocation(VirtualAllocation allocation)
 {
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
-    D3D12MA_ASSERT(offset != UINT64_MAX);
+    D3D12MA_ASSERT(allocation.AllocHandle != (AllocHandle)UINT64_MAX);
         
-    m_Pimpl->m_Metadata.FreeAtOffset(offset);
+    m_Pimpl->m_Metadata.Free(allocation.AllocHandle);
     D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
 }
 
@@ -6434,13 +7284,13 @@ void VirtualBlock::Clear()
     D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata.Validate());
 }
 
-void VirtualBlock::SetAllocationUserData(UINT64 offset, void* pUserData)
+void VirtualBlock::SetAllocationUserData(VirtualAllocation allocation, void* pUserData)
 {
-    D3D12MA_ASSERT(offset != UINT64_MAX);
+    D3D12MA_ASSERT(allocation.AllocHandle != (AllocHandle)UINT64_MAX);
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
-    m_Pimpl->m_Metadata.SetAllocationUserData(offset, pUserData);
+    m_Pimpl->m_Metadata.SetAllocationUserData(allocation.AllocHandle, pUserData);
 }
 
 void VirtualBlock::CalculateStats(StatInfo* pInfo) const

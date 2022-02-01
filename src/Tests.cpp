@@ -137,46 +137,50 @@ static void TestVirtualBlocks(const TestContext& ctx)
     allocDesc.Alignment = alignment;
     allocDesc.pUserData = (void*)(uintptr_t)1;
     allocDesc.Size = 8 * MEGABYTE;
-    UINT64 alloc0Offset;
-    CHECK_HR( block->Allocate(&allocDesc, &alloc0Offset) );
-    CHECK_BOOL( alloc0Offset < blockSize );
+    VirtualAllocation alloc0;
+    CHECK_HR( block->Allocate(&allocDesc, &alloc0, nullptr) );
 
     // # Validate the allocation
   
-    VIRTUAL_ALLOCATION_INFO allocInfo = {};
-    block->GetAllocationInfo(alloc0Offset, &allocInfo);
-    CHECK_BOOL( allocInfo.size == allocDesc.Size );
-    CHECK_BOOL( allocInfo.pUserData == allocDesc.pUserData );
+    VIRTUAL_ALLOCATION_INFO alloc0Info = {};
+    block->GetAllocationInfo(alloc0, &alloc0Info);
+    CHECK_BOOL( alloc0Info.offset < blockSize );
+    CHECK_BOOL( alloc0Info.size == allocDesc.Size );
+    CHECK_BOOL( alloc0Info.pUserData == allocDesc.pUserData );
 
     // # Check SetUserData
 
-    block->SetAllocationUserData(alloc0Offset, (void*)(uintptr_t)2);
-    block->GetAllocationInfo(alloc0Offset, &allocInfo);
-    CHECK_BOOL( allocInfo.pUserData == (void*)(uintptr_t)2 );
+    block->SetAllocationUserData(alloc0, (void*)(uintptr_t)2);
+    block->GetAllocationInfo(alloc0, &alloc0Info);
+    CHECK_BOOL( alloc0Info.pUserData == (void*)(uintptr_t)2 );
 
     // # Allocate 4 MB
 
     allocDesc.Size = 4 * MEGABYTE;
     allocDesc.Alignment = alignment;
-    UINT64 alloc1Offset;
-    CHECK_HR( block->Allocate(&allocDesc, &alloc1Offset) );
-    CHECK_BOOL( alloc1Offset < blockSize );
-    CHECK_BOOL( alloc1Offset + 4 * MEGABYTE <= alloc0Offset || alloc0Offset + 8 * MEGABYTE <= alloc1Offset ); // Check if they don't overlap.
+    VirtualAllocation alloc1;
+    CHECK_HR( block->Allocate(&allocDesc, &alloc1, nullptr) );
+
+    VIRTUAL_ALLOCATION_INFO alloc1Info = {};
+    block->GetAllocationInfo(alloc1, &alloc1Info);
+    CHECK_BOOL( alloc1Info.offset < blockSize );
+    CHECK_BOOL( alloc1Info.offset + 4 * MEGABYTE <= alloc0Info.offset || alloc0Info.offset + 8 * MEGABYTE <= alloc1Info.offset); // Check if they don't overlap.
 
     // # Allocate another 8 MB - it should fail
 
     allocDesc.Size = 8 * MEGABYTE;
     allocDesc.Alignment = alignment;
-    UINT64 alloc2Offset;
-    CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2Offset)) );
-    CHECK_BOOL( alloc2Offset == UINT64_MAX );
+    VirtualAllocation alloc2;
+    CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2, nullptr)) );
+    CHECK_BOOL( alloc2.AllocHandle == (AllocHandle)UINT64_MAX );
 
     // # Free the 4 MB block. Now allocation of 8 MB should succeed.
 
-    block->FreeAllocation(alloc1Offset);
-    CHECK_HR( block->Allocate(&allocDesc, &alloc2Offset) );
+    block->FreeAllocation(alloc1);
+    UINT64 alloc2Offset;
+    CHECK_HR( block->Allocate(&allocDesc, &alloc2, &alloc2Offset) );
     CHECK_BOOL( alloc2Offset < blockSize );
-    CHECK_BOOL( alloc2Offset + 4 * MEGABYTE <= alloc0Offset || alloc0Offset + 8 * MEGABYTE <= alloc2Offset ); // Check if they don't overlap.
+    CHECK_BOOL( alloc2Offset + 4 * MEGABYTE <= alloc0Info.offset || alloc0Info.offset + 8 * MEGABYTE <= alloc2Offset); // Check if they don't overlap.
 
     // # Calculate statistics
 
@@ -200,34 +204,35 @@ static void TestVirtualBlocks(const TestContext& ctx)
 
     // # Free alloc0, leave alloc2 unfreed.
 
-    block->FreeAllocation(alloc0Offset);
+    block->FreeAllocation(alloc0);
 
     // # Test alignment
 
     {
         constexpr size_t allocCount = 10;
-        UINT64 allocOffset[allocCount] = {};
+        VirtualAllocation allocs[allocCount] = {};
         for(size_t i = 0; i < allocCount; ++i)
         {
             const bool alignment0 = i == allocCount - 1;
             allocDesc.Size = i * 3 + 15;
             allocDesc.Alignment = alignment0 ? 0 : 8;
-            CHECK_HR(block->Allocate(&allocDesc, &allocOffset[i]));
+            UINT64 offset;
+            CHECK_HR(block->Allocate(&allocDesc, &allocs[i], &offset));
             if(!alignment0)
             {
-                CHECK_BOOL(allocOffset[i] % allocDesc.Alignment == 0);
+                CHECK_BOOL(offset % allocDesc.Alignment == 0);
             }
         }
 
         for(size_t i = allocCount; i--; )
         {
-            block->FreeAllocation(allocOffset[i]);
+            block->FreeAllocation(allocs[i]);
         }
     }
 
     // # Final cleanup
 
-    block->FreeAllocation(alloc2Offset);
+    block->FreeAllocation(alloc2);
 
     //block->Clear();
 }

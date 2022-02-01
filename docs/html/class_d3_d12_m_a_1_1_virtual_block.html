@@ -89,21 +89,21 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a7b23fd2da6f0343095fb14b31395678b"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a7b23fd2da6f0343095fb14b31395678b">IsEmpty</a> () const</td></tr>
 <tr class="memdesc:a7b23fd2da6f0343095fb14b31395678b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if the block is empty - contains 0 allocations.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a7b23fd2da6f0343095fb14b31395678b">More...</a><br /></td></tr>
 <tr class="separator:a7b23fd2da6f0343095fb14b31395678b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a287b8f0e455ffc7f302094671f922afb"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a287b8f0e455ffc7f302094671f922afb">GetAllocationInfo</a> (UINT64 offset, <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___i_n_f_o.html">VIRTUAL_ALLOCATION_INFO</a> *pInfo) const</td></tr>
-<tr class="memdesc:a287b8f0e455ffc7f302094671f922afb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns information about an allocation at given offset - its size and custom pointer.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a287b8f0e455ffc7f302094671f922afb">More...</a><br /></td></tr>
-<tr class="separator:a287b8f0e455ffc7f302094671f922afb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa57575f1af18461012bde8c4b6f3c56c"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#aa57575f1af18461012bde8c4b6f3c56c">Allocate</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">VIRTUAL_ALLOCATION_DESC</a> *pDesc, UINT64 *pOffset)</td></tr>
-<tr class="memdesc:aa57575f1af18461012bde8c4b6f3c56c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates new allocation.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#aa57575f1af18461012bde8c4b6f3c56c">More...</a><br /></td></tr>
-<tr class="separator:aa57575f1af18461012bde8c4b6f3c56c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a02dfae4c0856f22da885a332de7821fa"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a02dfae4c0856f22da885a332de7821fa">FreeAllocation</a> (UINT64 offset)</td></tr>
-<tr class="memdesc:a02dfae4c0856f22da885a332de7821fa"><td class="mdescLeft">&#160;</td><td class="mdescRight">Frees the allocation at given offset.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a02dfae4c0856f22da885a332de7821fa">More...</a><br /></td></tr>
-<tr class="separator:a02dfae4c0856f22da885a332de7821fa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac605dce05ca0d411e46079f0bad765d1"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ac605dce05ca0d411e46079f0bad765d1">GetAllocationInfo</a> (<a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a> allocation, <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___i_n_f_o.html">VIRTUAL_ALLOCATION_INFO</a> *pInfo) const</td></tr>
+<tr class="memdesc:ac605dce05ca0d411e46079f0bad765d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns information about an allocation - its offset, size and custom pointer.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#ac605dce05ca0d411e46079f0bad765d1">More...</a><br /></td></tr>
+<tr class="separator:ac605dce05ca0d411e46079f0bad765d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9281daf76e888ea1bd5247d5732e8179"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a9281daf76e888ea1bd5247d5732e8179">Allocate</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">VIRTUAL_ALLOCATION_DESC</a> *pDesc, <a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a> *pAllocation, UINT64 *pOffset)</td></tr>
+<tr class="memdesc:a9281daf76e888ea1bd5247d5732e8179"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates new allocation.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a9281daf76e888ea1bd5247d5732e8179">More...</a><br /></td></tr>
+<tr class="separator:a9281daf76e888ea1bd5247d5732e8179"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aab44e46bd122054c894fc84740f1e8fb"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#aab44e46bd122054c894fc84740f1e8fb">FreeAllocation</a> (<a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a> allocation)</td></tr>
+<tr class="memdesc:aab44e46bd122054c894fc84740f1e8fb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Frees the allocation.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#aab44e46bd122054c894fc84740f1e8fb">More...</a><br /></td></tr>
+<tr class="separator:aab44e46bd122054c894fc84740f1e8fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae22b18c0b7c31b44c1d740f886369189"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189">Clear</a> ()</td></tr>
 <tr class="memdesc:ae22b18c0b7c31b44c1d740f886369189"><td class="mdescLeft">&#160;</td><td class="mdescRight">Frees all the allocations.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189">More...</a><br /></td></tr>
 <tr class="separator:ae22b18c0b7c31b44c1d740f886369189"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0af4aec3d2efc913ee43b0725e8a0289"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a0af4aec3d2efc913ee43b0725e8a0289">SetAllocationUserData</a> (UINT64 offset, void *pUserData)</td></tr>
-<tr class="memdesc:a0af4aec3d2efc913ee43b0725e8a0289"><td class="mdescLeft">&#160;</td><td class="mdescRight">Changes custom pointer for an allocation at given offset to a new value.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a0af4aec3d2efc913ee43b0725e8a0289">More...</a><br /></td></tr>
-<tr class="separator:a0af4aec3d2efc913ee43b0725e8a0289"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9faeb1ad64ffd04b86a314fe04a8c81d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a9faeb1ad64ffd04b86a314fe04a8c81d">SetAllocationUserData</a> (<a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a> allocation, void *pUserData)</td></tr>
+<tr class="memdesc:a9faeb1ad64ffd04b86a314fe04a8c81d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Changes custom pointer for an allocation to a new value.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a9faeb1ad64ffd04b86a314fe04a8c81d">More...</a><br /></td></tr>
+<tr class="separator:a9faeb1ad64ffd04b86a314fe04a8c81d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a039ee8426818d0126cf7f44c1c658526"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a039ee8426818d0126cf7f44c1c658526">CalculateStats</a> (<a class="el" href="struct_d3_d12_m_a_1_1_stat_info.html">StatInfo</a> *pInfo) const</td></tr>
 <tr class="memdesc:a039ee8426818d0126cf7f44c1c658526"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves statistics from the current state of the block.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a039ee8426818d0126cf7f44c1c658526">More...</a><br /></td></tr>
 <tr class="separator:a039ee8426818d0126cf7f44c1c658526"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -120,8 +120,8 @@ Public Member Functions</h2></td></tr>
 <p >To create this object, fill in <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a> and call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a0485028cbe13b5457fe422865f7edf74" title="Creates new D3D12MA::VirtualBlock object and returns it through ppVirtualBlock.">CreateVirtualBlock()</a>. To destroy it, call its method <code>VirtualBlock::Release()</code>. You need to free all the allocations within this block or call <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189" title="Frees all the allocations.">Clear()</a> before destroying it.</p>
 <p >This object is not thread-safe - should not be used from multiple threads simultaneously, must be synchronized externally. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="aa57575f1af18461012bde8c4b6f3c56c" name="aa57575f1af18461012bde8c4b6f3c56c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa57575f1af18461012bde8c4b6f3c56c">&#9670;&nbsp;</a></span>Allocate()</h2>
+<a id="a9281daf76e888ea1bd5247d5732e8179" name="a9281daf76e888ea1bd5247d5732e8179"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9281daf76e888ea1bd5247d5732e8179">&#9670;&nbsp;</a></span>Allocate()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -131,6 +131,12 @@ Public Member Functions</h2></td></tr>
           <td>(</td>
           <td class="paramtype">const <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">VIRTUAL_ALLOCATION_DESC</a> *&#160;</td>
           <td class="paramname"><em>pDesc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a> *&#160;</td>
+          <td class="paramname"><em>pAllocation</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -150,7 +156,8 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir"></td><td class="paramname">pDesc</td><td></td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">pOffset</td><td>Offset of the new allocation, which can also be treated as an unique identifier of the allocation within this block. <code>UINT64_MAX</code> if allocation failed. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">pAllocation</td><td>Unique indentifier of the new allocation within single block. <code>UINT64_MAX</code> in AllocHandle if allocation failed. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">pOffset</td><td>Returned offset of the new allocation. Optional, can be null. </td></tr>
   </table>
   </dd>
 </dl>
@@ -223,8 +230,8 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a02dfae4c0856f22da885a332de7821fa" name="a02dfae4c0856f22da885a332de7821fa"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a02dfae4c0856f22da885a332de7821fa">&#9670;&nbsp;</a></span>FreeAllocation()</h2>
+<a id="aab44e46bd122054c894fc84740f1e8fb" name="aab44e46bd122054c894fc84740f1e8fb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aab44e46bd122054c894fc84740f1e8fb">&#9670;&nbsp;</a></span>FreeAllocation()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -232,14 +239,14 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname">void D3D12MA::VirtualBlock::FreeAllocation </td>
           <td>(</td>
-          <td class="paramtype">UINT64&#160;</td>
-          <td class="paramname"><em>offset</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a>&#160;</td>
+          <td class="paramname"><em>allocation</em></td><td>)</td>
           <td></td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Frees the allocation at given offset. </p>
+<p>Frees the allocation. </p>
 
 </div>
 </div>
@@ -263,8 +270,8 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a287b8f0e455ffc7f302094671f922afb" name="a287b8f0e455ffc7f302094671f922afb"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a287b8f0e455ffc7f302094671f922afb">&#9670;&nbsp;</a></span>GetAllocationInfo()</h2>
+<a id="ac605dce05ca0d411e46079f0bad765d1" name="ac605dce05ca0d411e46079f0bad765d1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac605dce05ca0d411e46079f0bad765d1">&#9670;&nbsp;</a></span>GetAllocationInfo()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -272,8 +279,8 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname">void D3D12MA::VirtualBlock::GetAllocationInfo </td>
           <td>(</td>
-          <td class="paramtype">UINT64&#160;</td>
-          <td class="paramname"><em>offset</em>, </td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a>&#160;</td>
+          <td class="paramname"><em>allocation</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -289,7 +296,7 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Returns information about an allocation at given offset - its size and custom pointer. </p>
+<p>Returns information about an allocation - its offset, size and custom pointer. </p>
 
 </div>
 </div>
@@ -312,8 +319,8 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a0af4aec3d2efc913ee43b0725e8a0289" name="a0af4aec3d2efc913ee43b0725e8a0289"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0af4aec3d2efc913ee43b0725e8a0289">&#9670;&nbsp;</a></span>SetAllocationUserData()</h2>
+<a id="a9faeb1ad64ffd04b86a314fe04a8c81d" name="a9faeb1ad64ffd04b86a314fe04a8c81d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9faeb1ad64ffd04b86a314fe04a8c81d">&#9670;&nbsp;</a></span>SetAllocationUserData()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -321,8 +328,8 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname">void D3D12MA::VirtualBlock::SetAllocationUserData </td>
           <td>(</td>
-          <td class="paramtype">UINT64&#160;</td>
-          <td class="paramname"><em>offset</em>, </td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a>&#160;</td>
+          <td class="paramname"><em>allocation</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -338,7 +345,7 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Changes custom pointer for an allocation at given offset to a new value. </p>
+<p>Changes custom pointer for an allocation to a new value. </p>
 
 </div>
 </div>
