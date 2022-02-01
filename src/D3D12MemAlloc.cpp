@@ -4206,12 +4206,15 @@ bool BlockMetadata_TLSF::CreateAllocationRequest(
 
     // Round up to the next block
     UINT64 sizeForNextList = allocSize;
-    if (allocSize >= (1 << SECOND_LEVEL_INDEX))
+    UINT64 smallSizeStep = SMALL_BUFFER_SIZE / (IsVirtual() ? 1 << SECOND_LEVEL_INDEX : 4);
+    if (allocSize > SMALL_BUFFER_SIZE)
     {
-        sizeForNextList += (1ULL << (BitScanMSB(allocSize) - SECOND_LEVEL_INDEX)) - 1;
+        sizeForNextList += (1ULL << (BitScanMSB(allocSize) - SECOND_LEVEL_INDEX));
     }
+    else if (allocSize > SMALL_BUFFER_SIZE - smallSizeStep)
+        sizeForNextList = SMALL_BUFFER_SIZE + 1;
     else
-        sizeForNextList += (1 << SECOND_LEVEL_INDEX) - 1;
+        sizeForNextList += smallSizeStep;
 
     // Check larger bucket
     UINT32 nextListIndex = 0;
