@@ -213,6 +213,9 @@ static void TestVirtualBlocks(const TestContext& ctx)
 
     block->FreeAllocation(alloc0);
 
+    // # Test FreeAllocation with null allocation.
+    block->FreeAllocation({0});
+
     // # Test alignment
 
     {
