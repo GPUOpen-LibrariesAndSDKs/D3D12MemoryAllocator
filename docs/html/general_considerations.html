@@ -77,24 +77,11 @@ Thread safety</h1>
 <li>When the allocator is created with <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52">D3D12MA::ALLOCATOR_FLAG_SINGLETHREADED</a>, calls to methods of <a class="el" href="class_d3_d12_m_a_1_1_allocator.html" title="Represents main object of this library initialized for particular ID3D12Device.">D3D12MA::Allocator</a> class must be made from a single thread or synchronized by the user. Using this flag may improve performance.</li>
 <li><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html" title="Represents pure allocation algorithm and a data structure with allocations in some memory block,...">D3D12MA::VirtualBlock</a> is not safe to be used from multiple threads simultaneously.</li>
 </ul>
-<h1><a class="anchor" id="general_considerations_future_plans"></a>
-Future plans</h1>
-<p >Features planned for future releases:</p>
-<p >Near future: feature parity with <a href="https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/">Vulkan Memory Allocator</a>, including:</p>
-<ul>
-<li>Alternative allocation algorithms: linear allocator, buddy allocator</li>
-<li>Support for priorities using <code>ID3D12Device1::SetResidencyPriority</code></li>
-</ul>
-<p >Later:</p>
-<ul>
-<li>Memory defragmentation</li>
-<li>Support for multi-GPU (multi-adapter)</li>
-</ul>
 <h1><a class="anchor" id="general_considerations_features_not_supported"></a>
 Features not supported</h1>
 <p >Features deliberately excluded from the scope of this library:</p>
 <ul>
-<li><b>Descriptor allocation.</b> Although also called "heaps", objects that represent descriptors are separate part of the D3D12 API from buffers and textures.</li>
+<li><b>Descriptor allocation.</b> Although also called "heaps", objects that represent descriptors are separate part of the D3D12 API from buffers and textures. You can still use <a class="el" href="virtual_allocator.html">Virtual allocator</a> to manage descriptors and their ranges inside a descriptor heap.</li>
 <li><b>Support for reserved (tiled) resources.</b> We don't recommend using them.</li>
 <li>Support for <code>ID3D12Device::Evict</code> and <code>MakeResident</code>. We don't recommend using them. You can call them on the D3D12 objects manually. Plese keep in mind, however, that eviction happens on the level of entire <code>ID3D12Heap</code> memory blocks and not individual buffers or textures which may be placed inside them.</li>
 <li><b>Handling CPU memory allocation failures.</b> When dynamically creating small C++ objects in CPU memory (not the GPU memory), allocation failures are not handled gracefully, because that would complicate code significantly and is usually not needed in desktop PC applications anyway. Success of an allocation is just checked with an assert.</li>

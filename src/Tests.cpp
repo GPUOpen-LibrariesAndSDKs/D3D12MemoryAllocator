@@ -30,6 +30,9 @@ extern void EndCommandList(ID3D12GraphicsCommandList* cmdList);
 
 static constexpr UINT64 MEGABYTE = 1024 * 1024;
 
+// Define to the same value as you did for D3D12MemAlloc.cpp.
+//#define D3D12MA_DEBUG_MARGIN 16
+
 struct ResourceWithAllocation
 {
     ComPtr<ID3D12Resource> resource;
@@ -139,13 +142,14 @@ static void TestVirtualBlocks(const TestContext& ctx)
     allocDesc.Size = 8 * MEGABYTE;
     VirtualAllocation alloc0;
     CHECK_HR( block->Allocate(&allocDesc, &alloc0, nullptr) );
+    CHECK_BOOL(alloc0.AllocHandle);
 
     // # Validate the allocation
   
     VIRTUAL_ALLOCATION_INFO alloc0Info = {};
     block->GetAllocationInfo(alloc0, &alloc0Info);
-    CHECK_BOOL( alloc0Info.offset < blockSize );
-    CHECK_BOOL( alloc0Info.size == allocDesc.Size );
+    CHECK_BOOL( alloc0Info.Offset < blockSize );
+    CHECK_BOOL( alloc0Info.Size == allocDesc.Size );
     CHECK_BOOL( alloc0Info.pUserData == allocDesc.pUserData );
 
     // # Check SetUserData
@@ -160,19 +164,22 @@ static void TestVirtualBlocks(const TestContext& ctx)
     allocDesc.Alignment = alignment;
     VirtualAllocation alloc1;
     CHECK_HR( block->Allocate(&allocDesc, &alloc1, nullptr) );
+    CHECK_BOOL(alloc1.AllocHandle);
 
     VIRTUAL_ALLOCATION_INFO alloc1Info = {};
     block->GetAllocationInfo(alloc1, &alloc1Info);
-    CHECK_BOOL( alloc1Info.offset < blockSize );
-    CHECK_BOOL( alloc1Info.offset + 4 * MEGABYTE <= alloc0Info.offset || alloc0Info.offset + 8 * MEGABYTE <= alloc1Info.offset); // Check if they don't overlap.
+    CHECK_BOOL( alloc1Info.Offset < blockSize );
+    CHECK_BOOL( alloc1Info.Offset + 4 * MEGABYTE <= alloc0Info.Offset || alloc0Info.Offset + 8 * MEGABYTE <= alloc1Info.Offset); // Check if they don't overlap.
 
     // # Allocate another 8 MB - it should fail
 
     allocDesc.Size = 8 * MEGABYTE;
     allocDesc.Alignment = alignment;
-    VirtualAllocation alloc2;
-    CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2, nullptr)) );
-    CHECK_BOOL( alloc2.AllocHandle == (AllocHandle)UINT64_MAX );
+    VirtualAllocation alloc2 = {666};
+    UINT64 offset2 = 666;
+    CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2, &offset2)) );
+    CHECK_BOOL( alloc2.AllocHandle == (AllocHandle)0 );
+    CHECK_BOOL( offset2 == UINT64_MAX );
 
     // # Free the 4 MB block. Now allocation of 8 MB should succeed.
 
@@ -180,7 +187,7 @@ static void TestVirtualBlocks(const TestContext& ctx)
     UINT64 alloc2Offset;
     CHECK_HR( block->Allocate(&allocDesc, &alloc2, &alloc2Offset) );
     CHECK_BOOL( alloc2Offset < blockSize );
-    CHECK_BOOL( alloc2Offset + 4 * MEGABYTE <= alloc0Info.offset || alloc0Info.offset + 8 * MEGABYTE <= alloc2Offset); // Check if they don't overlap.
+    CHECK_BOOL( alloc2Offset + 4 * MEGABYTE <= alloc0Info.Offset || alloc0Info.Offset + 8 * MEGABYTE <= alloc2Offset); // Check if they don't overlap.
 
     // # Calculate statistics
 
@@ -235,6 +242,119 @@ static void TestVirtualBlocks(const TestContext& ctx)
     block->FreeAllocation(alloc2);
 
     //block->Clear();
+}
+
+#ifndef D3D12MA_DEBUG_MARGIN
+    #define D3D12MA_DEBUG_MARGIN (0)
+#endif
+
+static void TestDebugMargin(const TestContext& ctx)
+{
+    using namespace D3D12MA;
+
+    if(D3D12MA_DEBUG_MARGIN == 0)
+    {
+        return;
+    }
+
+    wprintf(L"Test D3D12MA_DEBUG_MARGIN = %u\n", (uint32_t)D3D12MA_DEBUG_MARGIN);
+
+    ALLOCATION_DESC allocDesc = {};
+
+    D3D12_RESOURCE_DESC resDesc = {};
+
+    POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    for(size_t algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+    {
+        switch(algorithmIndex)
+        {
+        case 0: poolDesc.Flags = POOL_FLAG_NONE; break;
+        case 1: poolDesc.Flags = POOL_FLAG_ALGORITHM_TLSF; break;
+        case 2: poolDesc.Flags = POOL_FLAG_ALGORITHM_LINEAR; break;
+        default: assert(0);
+        }
+        ComPtr<Pool> pool;
+        CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+        allocDesc.CustomPool = pool.Get();
+
+        // Create few buffers of different size.
+        const size_t BUF_COUNT = 10;
+        ComPtr<Allocation> buffers[BUF_COUNT];
+        for(size_t allocIndex = 0; allocIndex < 10; ++allocIndex)
+        {
+            const bool isLast = allocIndex == BUF_COUNT - 1;
+            FillResourceDescForBuffer(resDesc, (UINT64)(allocIndex + 1) * 0x10000);
+
+            CHECK_HR(ctx.allocator->CreateResource(
+                &allocDesc,
+                &resDesc,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                &buffers[allocIndex],
+                IID_NULL, nullptr));
+        }
+
+        // JSON dump
+        wchar_t* json = nullptr;
+        ctx.allocator->BuildStatsString(&json, TRUE);
+        int I = 1; // Put breakpoint here to manually inspect json in a debugger.
+
+        // Check if their offsets preserve margin between them.
+        std::sort(buffers, buffers + BUF_COUNT, [](const ComPtr<Allocation>& lhs, const ComPtr<Allocation>& rhs) -> bool
+            {
+                if(lhs->GetHeap() != rhs->GetHeap())
+                {
+                    return lhs->GetHeap() < rhs->GetHeap();
+                }
+                return lhs->GetOffset() < rhs->GetOffset();
+            });
+        for(size_t i = 1; i < BUF_COUNT; ++i)
+        {
+            if(buffers[i]->GetHeap() == buffers[i - 1]->GetHeap())
+            {
+                CHECK_BOOL(buffers[i]->GetOffset() >=
+                    buffers[i - 1]->GetOffset() + buffers[i - 1]->GetSize() + D3D12MA_DEBUG_MARGIN);
+            }
+        }
+
+        ctx.allocator->FreeStatsString(json);
+    }
+}
+
+static void TestDebugMarginNotInVirtualAllocator(const TestContext& ctx)
+{
+    wprintf(L"Test D3D12MA_DEBUG_MARGIN not applied to virtual allocator\n");
+    using namespace D3D12MA;
+    constexpr size_t ALLOCATION_COUNT = 10;
+    for(size_t algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+    {
+        VIRTUAL_BLOCK_DESC blockDesc = {};
+        blockDesc.Size = ALLOCATION_COUNT * MEGABYTE;
+        switch(algorithmIndex)
+        {
+        case 0: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_NONE; break;
+        case 1: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF; break;
+        case 2: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR; break;
+        default: assert(0);
+        }
+
+        ComPtr<VirtualBlock> block;
+        CHECK_HR(CreateVirtualBlock(&blockDesc, &block));
+
+        // Fill the entire block
+        VirtualAllocation allocs[ALLOCATION_COUNT];
+        for(size_t i = 0; i < ALLOCATION_COUNT; ++i)
+        {
+            VIRTUAL_ALLOCATION_DESC allocDesc = {};
+            allocDesc.Size = 1 * MEGABYTE;
+            CHECK_HR(block->Allocate(&allocDesc, &allocs[i], nullptr));
+        }
+
+        block->Clear();
+    }
 }
 
 static void TestFrameIndexAndJson(const TestContext& ctx)
@@ -1741,6 +1861,10 @@ static void TestGroupVirtual(const TestContext& ctx)
 
 static void TestGroupBasics(const TestContext& ctx)
 {
+#if D3D12MA_DEBUG_MARGIN
+    TestDebugMargin(ctx);
+    TestDebugMarginNotInVirtualAllocator(ctx);
+#else
     TestFrameIndexAndJson(ctx);
     TestCommittedResourcesAndJson(ctx);
     TestCustomHeapFlags(ctx);
@@ -1764,6 +1888,7 @@ static void TestGroupBasics(const TestContext& ctx)
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     TestDevice8(ctx);
 #endif
+#endif // #if D3D12_DEBUG_MARGIN
 }
 
 void Test(const TestContext& ctx)

@@ -134,19 +134,42 @@ Typedefs</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="enum-members" name="enum-members"></a>
 Enumerations</h2></td></tr>
-<tr class="memitem:abbad31a7e0b3d09d77f3fb704b77645e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e">ALLOCATION_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea0bf578b096d6ea73cea86b031541733e">ALLOCATION_FLAG_NONE</a> = 0
+<tr class="memitem:abbad31a7e0b3d09d77f3fb704b77645e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e">ALLOCATION_FLAGS</a> { <br />
+&#160;&#160;<a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea0bf578b096d6ea73cea86b031541733e">ALLOCATION_FLAG_NONE</a> = 0
 , <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">ALLOCATION_FLAG_COMMITTED</a> = 0x1
 , <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea9a52c6ae694eadcd20896091e77c0628">ALLOCATION_FLAG_NEVER_ALLOCATE</a> = 0x2
 , <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6">ALLOCATION_FLAG_WITHIN_BUDGET</a> = 0x4
+, <br />
+&#160;&#160;<a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eafb0e2dacce691336e717550a1df72474">ALLOCATION_FLAG_UPPER_ADDRESS</a> = 0x8
+<br />
  }</td></tr>
 <tr class="memdesc:abbad31a7e0b3d09d77f3fb704b77645e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with ALLOCATION_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e">More...</a><br /></td></tr>
 <tr class="separator:abbad31a7e0b3d09d77f3fb704b77645e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a919d8545365d6b7209a964f2b99936d1"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">POOL_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02">POOL_FLAG_NONE</a> = 0
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a0dbdb7cee4b4e381851275aa5ca2164a">POOL_FLAG_ALGORITHM_TLSF</a> = 0x1
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a">POOL_FLAG_ALGORITHM_LINEAR</a> = 0x2
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7">POOL_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_TLSF | POOL_FLAG_ALGORITHM_LINEAR
+ }</td></tr>
+<tr class="memdesc:a919d8545365d6b7209a964f2b99936d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with POOL_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">More...</a><br /></td></tr>
+<tr class="separator:a919d8545365d6b7209a964f2b99936d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916">ALLOCATOR_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f">ALLOCATOR_FLAG_NONE</a> = 0
 , <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52">ALLOCATOR_FLAG_SINGLETHREADED</a> = 0x1
 , <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb">ALLOCATOR_FLAG_ALWAYS_COMMITTED</a> = 0x2
  }</td></tr>
 <tr class="memdesc:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with ALLOCATOR_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916">More...</a><br /></td></tr>
 <tr class="separator:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a578329923a103be086ac52e3bed2085d"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085d">VIRTUAL_BLOCK_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dafc882884f8bacd5cab3087567df8c53d">VIRTUAL_BLOCK_FLAG_NONE</a> = 0
+, <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dab6eea831fa737a4160a81d9c0b2cf3cf">VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF</a> = POOL_FLAG_ALGORITHM_TLSF
+, <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dabd9968af113acc9a756254ab9f1dc13d">VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR</a> = POOL_FLAG_ALGORITHM_LINEAR
+, <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085da0fee243cbf2902a68123ac85caa21e3e">VIRTUAL_BLOCK_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_MASK
+ }</td></tr>
+<tr class="memdesc:a578329923a103be086ac52e3bed2085d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with VIRTUAL_BLOCK_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085d">More...</a><br /></td></tr>
+<tr class="separator:a578329923a103be086ac52e3bed2085d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7e4152ccaf661f5398b24a23cbe9ae72"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a7e4152ccaf661f5398b24a23cbe9ae72">VIRTUAL_ALLOCATION_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a7e4152ccaf661f5398b24a23cbe9ae72a03576295004dec9dc8f99a895d232027">VIRTUAL_ALLOCATION_FLAG_NONE</a> = 0
+, <a class="el" href="namespace_d3_d12_m_a.html#a7e4152ccaf661f5398b24a23cbe9ae72a86beebcb80a1a10cb5525e2c9ed1435e">VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS</a> = ALLOCATION_FLAG_UPPER_ADDRESS
+ }</td></tr>
+<tr class="memdesc:a7e4152ccaf661f5398b24a23cbe9ae72"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with VIRTUAL_ALLOCATION_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#a7e4152ccaf661f5398b24a23cbe9ae72">More...</a><br /></td></tr>
+<tr class="separator:a7e4152ccaf661f5398b24a23cbe9ae72"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
@@ -239,6 +262,9 @@ Variables</h2></td></tr>
 </td></tr>
 <tr><td class="fieldname"><a id="abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6" name="abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6"></a>ALLOCATION_FLAG_WITHIN_BUDGET&#160;</td><td class="fielddoc"><p >Create allocation only if additional memory required for it, if any, won't exceed memory budget. Otherwise return <code>E_OUTOFMEMORY</code>. </p>
 </td></tr>
+<tr><td class="fieldname"><a id="abbad31a7e0b3d09d77f3fb704b77645eafb0e2dacce691336e717550a1df72474" name="abbad31a7e0b3d09d77f3fb704b77645eafb0e2dacce691336e717550a1df72474"></a>ALLOCATION_FLAG_UPPER_ADDRESS&#160;</td><td class="fielddoc"><p ><a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">Allocation</a> will be created from upper stack in a double stack pool.</p>
+<p >This flag is only allowed for custom pools created with <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a" title="Enables alternative, linear allocation algorithm in this pool.">POOL_FLAG_ALGORITHM_LINEAR</a> flag. </p>
+</td></tr>
 </table>
 
 </div>
@@ -264,6 +290,85 @@ Variables</h2></td></tr>
 </td></tr>
 <tr><td class="fieldname"><a id="ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb" name="ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb"></a>ALLOCATOR_FLAG_ALWAYS_COMMITTED&#160;</td><td class="fielddoc"><p >Every allocation will have its own memory block. To be used for debugging purposes. </p>
 </td></tr>
+</table>
+
+</div>
+</div>
+<a id="a919d8545365d6b7209a964f2b99936d1" name="a919d8545365d6b7209a964f2b99936d1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a919d8545365d6b7209a964f2b99936d1">&#9670;&nbsp;</a></span>POOL_FLAGS</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">D3D12MA::POOL_FLAGS</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Bit flags to be used with <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#ac4ed93b0191344d68c0b4ac1a4822ff4" title="Flags.">POOL_DESC::Flags</a>. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02" name="a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02"></a>POOL_FLAG_NONE&#160;</td><td class="fielddoc"><p >Zero. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1a0dbdb7cee4b4e381851275aa5ca2164a" name="a919d8545365d6b7209a964f2b99936d1a0dbdb7cee4b4e381851275aa5ca2164a"></a>POOL_FLAG_ALGORITHM_TLSF&#160;</td><td class="fielddoc"><p >Enables alternative, TLSF allocation algorithm in virtual block. </p>
+<p >This algorithm is based on 2-level lists dividing address space into smaller chunks. The first level is aligned to power of two which serves as buckets for requested memory to fall into, and the second level is lineary subdivided into lists of free memory. This algorithm aims to achieve bounded response time even in the worst case scenario. <a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">Allocation</a> time can be sometimes slightly longer than compared to other algorithms but in return the application can avoid stalls in case of fragmentation, giving predictable results, suitable for real-time use cases. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a" name="a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a"></a>POOL_FLAG_ALGORITHM_LINEAR&#160;</td><td class="fielddoc"><p >Enables alternative, linear allocation algorithm in this pool. </p>
+<p >Specify this flag to enable linear allocation algorithm, which always creates new allocations after last one and doesn't reuse space from allocations freed in between. It trades memory consumption for simplified algorithm and data structure, which has better performance and uses less memory for metadata.</p>
+<p >By using this flag, you can achieve behavior of free-at-once, stack, ring buffer, and double stack. For details, see documentation chapter <a class="el" href="linear_algorithm.html">Linear allocation algorithm</a>. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7" name="a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7"></a>POOL_FLAG_ALGORITHM_MASK&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+</div>
+</div>
+<a id="a7e4152ccaf661f5398b24a23cbe9ae72" name="a7e4152ccaf661f5398b24a23cbe9ae72"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7e4152ccaf661f5398b24a23cbe9ae72">&#9670;&nbsp;</a></span>VIRTUAL_ALLOCATION_FLAGS</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="namespace_d3_d12_m_a.html#a7e4152ccaf661f5398b24a23cbe9ae72">D3D12MA::VIRTUAL_ALLOCATION_FLAGS</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Bit flags to be used with <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab848f8ad39b5bf8a7c8c077e113e7fc9" title="Flags.">VIRTUAL_ALLOCATION_DESC::Flags</a>. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a7e4152ccaf661f5398b24a23cbe9ae72a03576295004dec9dc8f99a895d232027" name="a7e4152ccaf661f5398b24a23cbe9ae72a03576295004dec9dc8f99a895d232027"></a>VIRTUAL_ALLOCATION_FLAG_NONE&#160;</td><td class="fielddoc"><p >Zero. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a7e4152ccaf661f5398b24a23cbe9ae72a86beebcb80a1a10cb5525e2c9ed1435e" name="a7e4152ccaf661f5398b24a23cbe9ae72a86beebcb80a1a10cb5525e2c9ed1435e"></a>VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS&#160;</td><td class="fielddoc"><p ><a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">Allocation</a> will be created from upper stack in a double stack pool. </p>
+<p >This flag is only allowed for virtual blocks created with <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dabd9968af113acc9a756254ab9f1dc13d" title="Enables alternative, linear allocation algorithm in this virtual block.">VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR</a> flag. </p>
+</td></tr>
+</table>
+
+</div>
+</div>
+<a id="a578329923a103be086ac52e3bed2085d" name="a578329923a103be086ac52e3bed2085d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a578329923a103be086ac52e3bed2085d">&#9670;&nbsp;</a></span>VIRTUAL_BLOCK_FLAGS</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085d">D3D12MA::VIRTUAL_BLOCK_FLAGS</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Bit flags to be used with <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html#a1c887a732b4db0c68a07902462e0732b" title="Flags.">VIRTUAL_BLOCK_DESC::Flags</a>. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a578329923a103be086ac52e3bed2085dafc882884f8bacd5cab3087567df8c53d" name="a578329923a103be086ac52e3bed2085dafc882884f8bacd5cab3087567df8c53d"></a>VIRTUAL_BLOCK_FLAG_NONE&#160;</td><td class="fielddoc"><p >Zero. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a578329923a103be086ac52e3bed2085dab6eea831fa737a4160a81d9c0b2cf3cf" name="a578329923a103be086ac52e3bed2085dab6eea831fa737a4160a81d9c0b2cf3cf"></a>VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF&#160;</td><td class="fielddoc"><p >Enables alternative, TLSF allocation algorithm in virtual block. </p>
+<p >This algorithm is based on 2-level lists dividing address space into smaller chunks. The first level is aligned to power of two which serves as buckets for requested memory to fall into, and the second level is lineary subdivided into lists of free memory. This algorithm aims to achieve bounded response time even in the worst case scenario. <a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">Allocation</a> time can be sometimes slightly longer than compared to other algorithms but in return the application can avoid stalls in case of fragmentation, giving predictable results, suitable for real-time use cases. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a578329923a103be086ac52e3bed2085dabd9968af113acc9a756254ab9f1dc13d" name="a578329923a103be086ac52e3bed2085dabd9968af113acc9a756254ab9f1dc13d"></a>VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR&#160;</td><td class="fielddoc"><p >Enables alternative, linear allocation algorithm in this virtual block. </p>
+<p >Specify this flag to enable linear allocation algorithm, which always creates new allocations after last one and doesn't reuse space from allocations freed in between. It trades memory consumption for simplified algorithm and data structure, which has better performance and uses less memory for metadata.</p>
+<p >By using this flag, you can achieve behavior of free-at-once, stack, ring buffer, and double stack. For details, see documentation chapter <a class="el" href="linear_algorithm.html">Linear allocation algorithm</a>. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a578329923a103be086ac52e3bed2085da0fee243cbf2902a68123ac85caa21e3e" name="a578329923a103be086ac52e3bed2085da0fee243cbf2902a68123ac85caa21e3e"></a>VIRTUAL_BLOCK_FLAG_ALGORITHM_MASK&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
 </div>

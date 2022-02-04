@@ -40,12 +40,13 @@ Documentation of all members: D3D12MemAlloc.h
         - [Mapping memory](@ref quick_start_mapping_memory)
     - \subpage custom_pools
     - \subpage resource_aliasing
+    - \subpage linear_algorithm
     - \subpage virtual_allocator
 - \subpage configuration
   - [Custom CPU memory allocator](@ref custom_memory_allocator)
+  - [Debug margins](@ref debug_margins)
 - \subpage general_considerations
   - [Thread safety](@ref general_considerations_thread_safety)
-  - [Future plans](@ref general_considerations_future_plans)
   - [Features not supported](@ref general_considerations_features_not_supported)
 		
 \section main_see_also See also
@@ -215,6 +216,12 @@ enum ALLOCATION_FLAGS
     memory budget. Otherwise return `E_OUTOFMEMORY`.
     */
     ALLOCATION_FLAG_WITHIN_BUDGET = 0x4,
+
+    /** Allocation will be created from upper stack in a double stack pool.
+
+    This flag is only allowed for custom pools created with #POOL_FLAG_ALGORITHM_LINEAR flag.
+    */
+    ALLOCATION_FLAG_UPPER_ADDRESS = 0x8
 };
 
 /// \brief Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.
@@ -256,7 +263,7 @@ struct ALLOCATION_DESC
 /// \brief Represents single memory allocation done inside VirtualBlock.
 struct D3D12MA_API VirtualAllocation
 {
-    /// \brief Unique idenitfier of current allocation.
+    /// \brief Unique idenitfier of current allocation. 0 means null/invalid.
     AllocHandle AllocHandle;
 };
 
@@ -353,6 +360,7 @@ private:
     friend class BlockVector;
     friend class CommittedAllocationList;
     friend class JsonWriter;
+    friend class BlockMetadata_Linear;
     friend struct CommittedAllocationListItemTraits;
     template<typename T> friend void D3D12MA_DELETE(const ALLOCATION_CALLBACKS&, T*);
     template<typename T> friend class PoolAllocator;
@@ -430,7 +438,7 @@ private:
     void InitCommitted(CommittedAllocationList* list);
     void InitPlaced(AllocHandle allocHandle, UINT64 alignment, NormalBlock* block);
     void InitHeap(CommittedAllocationList* list, ID3D12Heap* heap);
-    // If the Allocation represents committed resource with implicit heap, returns UINT64_MAX
+    // If the Allocation represents committed resource with implicit heap, returns UINT64_MAX.
     AllocHandle GetAllocHandle() const;
     template<typename D3D12_RESOURCE_DESC_T>
     void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc);
@@ -439,9 +447,46 @@ private:
     D3D12MA_CLASS_NO_COPY(Allocation)
 };
 
+/// \brief Bit flags to be used with POOL_DESC::Flags.
+enum POOL_FLAGS
+{
+    /// Zero
+    POOL_FLAG_NONE = 0,
+
+    /** \brief Enables alternative, TLSF allocation algorithm in virtual block.
+
+    This algorithm is based on 2-level lists dividing address space into smaller
+    chunks. The first level is aligned to power of two which serves as buckets for requested
+    memory to fall into, and the second level is lineary subdivided into lists of free memory.
+    This algorithm aims to achieve bounded response time even in the worst case scenario.
+    Allocation time can be sometimes slightly longer than compared to other algorithms
+    but in return the application can avoid stalls in case of fragmentation, giving
+    predictable results, suitable for real-time use cases.
+    */
+    POOL_FLAG_ALGORITHM_TLSF = 0x1,
+
+    /** \brief Enables alternative, linear allocation algorithm in this pool.
+
+    Specify this flag to enable linear allocation algorithm, which always creates
+    new allocations after last one and doesn't reuse space from allocations freed in
+    between. It trades memory consumption for simplified algorithm and data
+    structure, which has better performance and uses less memory for metadata.
+
+    By using this flag, you can achieve behavior of free-at-once, stack,
+    ring buffer, and double stack.
+    For details, see documentation chapter \ref linear_algorithm.
+    */
+    POOL_FLAG_ALGORITHM_LINEAR = 0x2,
+
+    // Bit mask to extract only `ALGORITHM` bits from entire set of flags.
+    POOL_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_TLSF | POOL_FLAG_ALGORITHM_LINEAR
+};
+
 /// \brief Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.
 struct POOL_DESC
 {
+    /// Flags.
+    POOL_FLAGS Flags;
     /** \brief The parameters of memory heap where allocations of this pool should be placed.
 
     In the simplest case, just fill it with zeros and set `Type` to one of: `D3D12_HEAP_TYPE_DEFAULT`,
@@ -564,7 +609,7 @@ enum ALLOCATOR_FLAGS
     /**
     Every allocation will have its own memory block.
     To be used for debugging purposes.
-   */
+    */
     ALLOCATOR_FLAG_ALWAYS_COMMITTED = 0x2,
 };
 
@@ -873,9 +918,46 @@ private:
     D3D12MA_CLASS_NO_COPY(Allocator)
 };
 
+/// \brief Bit flags to be used with VIRTUAL_BLOCK_DESC::Flags.
+enum VIRTUAL_BLOCK_FLAGS
+{
+    /// Zero
+    VIRTUAL_BLOCK_FLAG_NONE = 0,
+
+    /** \brief Enables alternative, TLSF allocation algorithm in virtual block.
+
+    This algorithm is based on 2-level lists dividing address space into smaller
+    chunks. The first level is aligned to power of two which serves as buckets for requested
+    memory to fall into, and the second level is lineary subdivided into lists of free memory.
+    This algorithm aims to achieve bounded response time even in the worst case scenario.
+    Allocation time can be sometimes slightly longer than compared to other algorithms
+    but in return the application can avoid stalls in case of fragmentation, giving
+    predictable results, suitable for real-time use cases.
+    */
+    VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF = POOL_FLAG_ALGORITHM_TLSF,
+
+    /** \brief Enables alternative, linear allocation algorithm in this virtual block.
+
+    Specify this flag to enable linear allocation algorithm, which always creates
+    new allocations after last one and doesn't reuse space from allocations freed in
+    between. It trades memory consumption for simplified algorithm and data
+    structure, which has better performance and uses less memory for metadata.
+
+    By using this flag, you can achieve behavior of free-at-once, stack,
+    ring buffer, and double stack.
+    For details, see documentation chapter \ref linear_algorithm.
+    */
+    VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR = POOL_FLAG_ALGORITHM_LINEAR,
+
+    // Bit mask to extract only `ALGORITHM` bits from entire set of flags.
+    VIRTUAL_BLOCK_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_MASK
+};
+
 /// Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().
 struct VIRTUAL_BLOCK_DESC
 {
+    /// Flags.
+    VIRTUAL_BLOCK_FLAGS Flags;
     /** \brief Total size of the block.
 
     Sizes can be expressed in bytes or any units you want as long as you are consistent in using them.
@@ -889,9 +971,24 @@ struct VIRTUAL_BLOCK_DESC
     const ALLOCATION_CALLBACKS* pAllocationCallbacks;
 };
 
+/// \brief Bit flags to be used with VIRTUAL_ALLOCATION_DESC::Flags.
+enum VIRTUAL_ALLOCATION_FLAGS
+{
+    /// Zero
+    VIRTUAL_ALLOCATION_FLAG_NONE = 0,
+
+    /** \brief Allocation will be created from upper stack in a double stack pool.
+
+    This flag is only allowed for virtual blocks created with #VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR flag.
+    */
+    VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS = ALLOCATION_FLAG_UPPER_ADDRESS,
+};
+
 /// Parameters of created virtual allocation to be passed to VirtualBlock::Allocate().
 struct VIRTUAL_ALLOCATION_DESC
 {
+    /// Flags.
+    VIRTUAL_ALLOCATION_FLAGS Flags;
     /** \brief Size of the allocation.
     
     Cannot be zero.
@@ -913,12 +1010,12 @@ struct VIRTUAL_ALLOCATION_DESC
 struct VIRTUAL_ALLOCATION_INFO
 {
     /// \brief Offset of the allocation.
-    UINT64 offset;
+    UINT64 Offset;
     /** \brief Size of the allocation.
 
     Same value as passed in VIRTUAL_ALLOCATION_DESC::Size.
     */
-    UINT64 size;
+    UINT64 Size;
     /** \brief Custom pointer associated with the allocation.
 
     Same value as passed in VIRTUAL_ALLOCATION_DESC::pUserData or VirtualBlock::SetAllocationUserData().
@@ -949,12 +1046,16 @@ public:
 
     /** \brief Creates new allocation.
     \param pDesc
-    \param[out] pAllocation Unique indentifier of the new allocation within single block. `UINT64_MAX` in AllocHandle if allocation failed.
+    \param[out] pAllocation Unique indentifier of the new allocation within single block.
     \param[out] pOffset Returned offset of the new allocation. Optional, can be null.
     \return `S_OK` if allocation succeeded, `E_OUTOFMEMORY` if it failed.
+
+    If the allocation failed, `pAllocation->AllocHandle` is set to 0 and `pOffset`, if not null, is set to `UINT64_MAX`.
     */
     HRESULT Allocate(const VIRTUAL_ALLOCATION_DESC* pDesc, VirtualAllocation* pAllocation, UINT64* pOffset);
     /** \brief Frees the allocation.
+    
+    Calling this function with `allocation.AllocHandle == 0` is correct and does nothing.
     */
     void FreeAllocation(VirtualAllocation allocation);
     /** \brief Frees all the allocations.
@@ -1009,6 +1110,9 @@ D3D12MA_API HRESULT CreateVirtualBlock(const VIRTUAL_BLOCK_DESC* pDesc, VirtualB
 /// \cond INTERNAL
 DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::ALLOCATION_FLAGS);
 DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::ALLOCATOR_FLAGS);
+DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::POOL_FLAGS);
+DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::VIRTUAL_BLOCK_FLAGS);
+DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::VIRTUAL_ALLOCATION_FLAGS);
 /// \endcond
 
 /**
@@ -1395,6 +1499,93 @@ Additional considerations:
   Otherwise they must be placed in different memory heap types, and thus aliasing them is not possible.
 
 
+\page linear_algorithm Linear allocation algorithm
+
+Each D3D12 memory block managed by this library has accompanying metadata that
+keeps track of used and unused regions. By default, the metadata structure and
+algorithm tries to find best place for new allocations among free regions to
+optimize memory usage. This way you can allocate and free objects in any order.
+
+![Default allocation algorithm](../gfx/Linear_allocator_1_algo_default.png)
+
+Sometimes there is a need to use simpler, linear allocation algorithm. You can
+create custom pool that uses such algorithm by adding flag
+D3D12MA::POOL_FLAG_ALGORITHM_LINEAR to D3D12MA::POOL_DESC::Flags while creating
+D3D12MA::Pool object. Then an alternative metadata management is used. It always
+creates new allocations after last one and doesn't reuse free regions after
+allocations freed in the middle. It results in better allocation performance and
+less memory consumed by metadata.
+
+![Linear allocation algorithm](../gfx/Linear_allocator_2_algo_linear.png)
+
+With this one flag, you can create a custom pool that can be used in many ways:
+free-at-once, stack, double stack, and ring buffer. See below for details.
+You don't need to specify explicitly which of these options you are going to use - it is detected automatically.
+
+\section linear_algorithm_free_at_once Free-at-once
+
+In a pool that uses linear algorithm, you still need to free all the allocations
+individually by calling `allocation->Release()`. You can free
+them in any order. New allocations are always made after last one - free space
+in the middle is not reused. However, when you release all the allocation and
+the pool becomes empty, allocation starts from the beginning again. This way you
+can use linear algorithm to speed up creation of allocations that you are going
+to release all at once.
+
+![Free-at-once](../gfx/Linear_allocator_3_free_at_once.png)
+
+This mode is also available for pools created with D3D12MA::POOL_DESC::MaxBlockCount
+value that allows multiple memory blocks.
+
+\section linear_algorithm_stack Stack
+
+When you free an allocation that was created last, its space can be reused.
+Thanks to this, if you always release allocations in the order opposite to their
+creation (LIFO - Last In First Out), you can achieve behavior of a stack.
+
+![Stack](../gfx/Linear_allocator_4_stack.png)
+
+This mode is also available for pools created with D3D12MA::POOL_DESC::MaxBlockCount
+value that allows multiple memory blocks.
+
+\section linear_algorithm_double_stack Double stack
+
+The space reserved by a custom pool with linear algorithm may be used by two
+stacks:
+
+- First, default one, growing up from offset 0.
+- Second, "upper" one, growing down from the end towards lower offsets.
+
+To make allocation from the upper stack, add flag D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS
+to D3D12MA::ALLOCATION_DESC::Flags.
+
+![Double stack](../gfx/Linear_allocator_7_double_stack.png)
+
+Double stack is available only in pools with one memory block -
+D3D12MA::POOL_DESC::MaxBlockCount must be 1. Otherwise behavior is undefined.
+
+When the two stacks' ends meet so there is not enough space between them for a
+new allocation, such allocation fails with usual `E_OUTOFMEMORY` error.
+
+\section linear_algorithm_ring_buffer Ring buffer
+
+When you free some allocations from the beginning and there is not enough free space
+for a new one at the end of a pool, allocator's "cursor" wraps around to the
+beginning and starts allocation there. Thanks to this, if you always release
+allocations in the same order as you created them (FIFO - First In First Out),
+you can achieve behavior of a ring buffer / queue.
+
+![Ring buffer](../gfx/Linear_allocator_5_ring_buffer.png)
+
+Ring buffer is available only in pools with one memory block -
+D3D12MA::POOL_DESC::MaxBlockCount must be 1. Otherwise behavior is undefined.
+
+\section linear_algorithm_additional_considerations Additional considerations
+
+Linear algorithm can also be used with \ref virtual_allocator.
+See flag D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR.
+
+
 \page virtual_allocator Virtual allocator
 
 As an extra feature, the core allocation algorithm of the library is exposed through a simple and convenient API of "virtual allocator".
@@ -1425,14 +1616,13 @@ HRESULT hr = CreateVirtualBlock(&blockDesc, &block);
 
 D3D12MA::VirtualBlock object contains internal data structure that keeps track of free and occupied regions
 using the same code as the main D3D12 memory allocator.
-However, there is no "virtual allocation" object.
-When you request a new allocation, a `UINT64` number is returned.
-It is an offset inside the block where the allocation has been placed, but it also uniquely identifies the allocation within this block.
+A single allocation is identified by a lightweight structure D3D12MA::VirtualAllocation.
+You will also likely want to know the offset at which the allocation was made in the block.
 
 In order to make an allocation:
 
 -# Fill in D3D12MA::VIRTUAL_ALLOCATION_DESC structure.
--# Call D3D12MA::VirtualBlock::Allocate. Get new `UINT64 offset` that identifies the allocation.
+-# Call D3D12MA::VirtualBlock::Allocate. Get new D3D12MA::VirtualAllocation value that identifies the allocation.
 
 Example:
 
@@ -1440,8 +1630,9 @@ Example:
 D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
 allocDesc.Size = 4096; // 4 KB
 
+D3D12MA::VirtualAllocation alloc;
 UINT64 allocOffset;
-hr = block->Allocate(&allocDesc, &allocOffset);
+hr = block->Allocate(&allocDesc, &alloc, &allocOffset);
 if(SUCCEEDED(hr))
 {
     // Use the 4 KB of your memory starting at allocOffset.
@@ -1455,16 +1646,16 @@ else
 \section virtual_allocator_deallocation Deallocation
 
 When no longer needed, an allocation can be freed by calling D3D12MA::VirtualBlock::FreeAllocation.
-You can only pass to this function the exact offset that was previously returned by D3D12MA::VirtualBlock::Allocate
-and not any other location within the memory.
 
-When whole block is no longer needed, the block object can be released by calling D3D12MA::VirtualBlock::Release.
+When whole block is no longer needed, the block object can be released by calling `block->Release()`.
 All allocations must be freed before the block is destroyed, which is checked internally by an assert.
 However, if you don't want to call `block->FreeAllocation` for each allocation, you can use D3D12MA::VirtualBlock::Clear to free them all at once -
-a feature not available in normal D3D12 memory allocator. Example:
+a feature not available in normal D3D12 memory allocator.
+
+Example:
 
 \code
-block->FreeAllocation(allocOffset);
+block->FreeAllocation(alloc);
 block->Release();
 \endcode
 
@@ -1482,20 +1673,20 @@ struct CustomAllocData
 };
 CustomAllocData* allocData = new CustomAllocData();
 allocData->m_AllocName = "My allocation 1";
-block->SetAllocationUserData(allocOffset, allocData);
+block->SetAllocationUserData(alloc, allocData);
 \endcode
 
-The pointer can later be fetched, along with allocation size, by passing the allocation offset to function
+The pointer can later be fetched, along with allocation offset and size, by passing the allocation handle to function
 D3D12MA::VirtualBlock::GetAllocationInfo and inspecting returned structure D3D12MA::VIRTUAL_ALLOCATION_INFO.
 If you allocated a new object to be used as the custom pointer, don't forget to delete that object before freeing the allocation!
 Example:
 
 \code
 VIRTUAL_ALLOCATION_INFO allocInfo;
-block->GetAllocationInfo(allocOffset, &allocInfo);
+block->GetAllocationInfo(alloc, &allocInfo);
 delete (CustomAllocData*)allocInfo.pUserData;
 
-block->FreeAllocation(allocOffset);
+block->FreeAllocation(alloc);
 \endcode
 
 \section virtual_allocator_alignment_and_units Alignment and units
@@ -1509,8 +1700,9 @@ D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
 allocDesc.Size = 4096; // 4 KB
 allocDesc.Alignment = 4; // Returned offset must be a multiply of 4 B
 
+D3D12MA::VirtualAllocation alloc;
 UINT64 allocOffset;
-hr = block->Allocate(&allocDesc, &allocOffset);
+hr = block->Allocate(&allocDesc, &alloc, &allocOffset);
 \endcode
 
 Alignments of different allocations made from one block may vary.
@@ -1520,7 +1712,7 @@ It might be more convenient, but you need to make sure to use this new unit cons
 
 - D3D12MA::VIRTUAL_BLOCK_DESC::Size
 - D3D12MA::VIRTUAL_ALLOCATION_DESC::Size and D3D12MA::VIRTUAL_ALLOCATION_DESC::Alignment
-- Using offset returned by D3D12MA::VirtualBlock::Allocate
+- Using offset returned by D3D12MA::VirtualBlock::Allocate and D3D12MA::VIRTUAL_ALLOCATION_INFO::Offset
 
 \section virtual_allocator_statistics Statistics
 
@@ -1541,6 +1733,9 @@ Returned string must be later freed using D3D12MA::VirtualBlock::FreeStatsString
 The format of this string may differ from the one returned by the main D3D12 allocator, but it is similar.
 
 \section virtual_allocator_additional_considerations Additional considerations
+
+Alternative, linear algorithm can be used with virtual allocator - see flag
+D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR and documentation: \ref linear_algorithm.
 
 Note that the "virtual allocator" functionality is implemented on a level of individual memory blocks.
 Keeping track of a whole collection of blocks, allocating new ones when out of free space,
@@ -1594,6 +1789,37 @@ HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
 \endcode
 
 
+\section debug_margins Debug margins
+
+By default, allocations are laid out in memory blocks next to each other if possible
+(considering required alignment returned by `ID3D12Device::GetResourceAllocationInfo`).
+
+![Allocations without margin](../gfx/Margins_1.png)
+
+Define macro `D3D12MA_DEBUG_MARGIN` to some non-zero value (e.g. 16) inside "D3D12MemAlloc.cpp"
+to enforce specified number of bytes as a margin after every allocation.
+
+![Allocations with margin](../gfx/Margins_2.png)
+
+If your bug goes away after enabling margins, it means it may be caused by memory
+being overwritten outside of allocation boundaries. It is not 100% certain though.
+Change in application behavior may also be caused by different order and distribution
+of allocations across memory blocks after margins are applied.
+
+Margins work with all memory heap types.
+
+Margin is applied only to placed allocations made out of memory heaps and not to committed
+allocations, which have their own, implicit memory heap of specific size.
+It is thus not applied to allocations made using D3D12MA::ALLOCATION_FLAG_COMMITTED flag
+or those automatically decided to put into committed allocations, e.g. due to its large size.
+
+Margins appear in [JSON dump](@ref statistics_json_dump) as part of free space.
+
+Note that enabling margins increases memory usage and fragmentation.
+
+Margins do not apply to \ref virtual_allocator.
+
+
 \page general_considerations General considerations
 
 \section general_considerations_thread_safety Thread safety
@@ -1607,26 +1833,13 @@ HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
   Using this flag may improve performance.
 - D3D12MA::VirtualBlock is not safe to be used from multiple threads simultaneously.
 
-\section general_considerations_future_plans Future plans
-
-Features planned for future releases:
-
-Near future: feature parity with [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/), including:
-
-- Alternative allocation algorithms: linear allocator, buddy allocator
-- Support for priorities using `ID3D12Device1::SetResidencyPriority`
-
-Later:
-
-- Memory defragmentation
-- Support for multi-GPU (multi-adapter)
-
 \section general_considerations_features_not_supported Features not supported
 
 Features deliberately excluded from the scope of this library:
 
 - **Descriptor allocation.** Although also called "heaps", objects that represent
   descriptors are separate part of the D3D12 API from buffers and textures.
+  You can still use \ref virtual_allocator to manage descriptors and their ranges inside a descriptor heap.
 - **Support for reserved (tiled) resources.** We don't recommend using them.
 - Support for `ID3D12Device::Evict` and `MakeResident`. We don't recommend using them.
   You can call them on the D3D12 objects manually.

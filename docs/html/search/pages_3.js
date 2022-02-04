@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['quick_20start_0',['Quick start',['../quick_start.html',1,'index']]]
+  ['linear_20allocation_20algorithm_0',['Linear allocation algorithm',['../linear_algorithm.html',1,'index']]]
 ];

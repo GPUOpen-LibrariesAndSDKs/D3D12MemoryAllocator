@@ -156,12 +156,13 @@ Public Member Functions</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir"></td><td class="paramname">pDesc</td><td></td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">pAllocation</td><td>Unique indentifier of the new allocation within single block. <code>UINT64_MAX</code> in AllocHandle if allocation failed. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">pAllocation</td><td>Unique indentifier of the new allocation within single block. </td></tr>
     <tr><td class="paramdir">[out]</td><td class="paramname">pOffset</td><td>Returned offset of the new allocation. Optional, can be null. </td></tr>
   </table>
   </dd>
 </dl>
-<dl class="section return"><dt>Returns</dt><dd><code>S_OK</code> if allocation succeeded, <code>E_OUTOFMEMORY</code> if it failed. </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd><code>S_OK</code> if allocation succeeded, <code>E_OUTOFMEMORY</code> if it failed.</dd></dl>
+<p>If the allocation failed, <code>pAllocation-&gt;AllocHandle</code> is set to 0 and <code>pOffset</code>, if not null, is set to <code>UINT64_MAX</code>. </p>
 
 </div>
 </div>
@@ -247,6 +248,7 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Frees the allocation. </p>
+<p >Calling this function with <code>allocation.AllocHandle == 0</code> is correct and does nothing. </p>
 
 </div>
 </div>
