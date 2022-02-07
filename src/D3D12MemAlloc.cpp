@@ -4009,8 +4009,8 @@ bool BlockMetadata_Generic::CheckAllocation(
         return false;
     }
 
-    // Start from offset equal to beginning of this suballocation.
-    UINT64 offset = suballoc.offset;
+    // Start from offset equal to beginning of this suballocation and debug margin of previous allocation if present.
+    UINT64 offset = suballoc.offset + (suballocItem == m_Suballocations.cbegin() ? 0 : GetDebugMargin());
 
     // Apply alignment.
     offset = AlignUp(offset, allocAlignment);
@@ -4018,7 +4018,7 @@ bool BlockMetadata_Generic::CheckAllocation(
     // Calculate padding at the beginning based on current offset.
     const UINT64 paddingBegin = offset - suballoc.offset;
 
-    // Fail if requested size plus margin before and after is bigger than size of this suballocation.
+    // Fail if requested size plus margin after is bigger than size of this suballocation.
     if(paddingBegin + allocSize + GetDebugMargin() > suballoc.size)
     {
         return false;

@@ -20,8 +20,8 @@
 // THE SOFTWARE.
 //
 
-#include "D3D12MemAlloc.h"
 #include "Common.h"
+#include "D3D12MemAlloc.h"
 #include "Tests.h"
 #include <atomic>
 #include <Shlwapi.h> // For StrStrI

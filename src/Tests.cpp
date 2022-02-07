@@ -24,14 +24,79 @@
 #include "Tests.h"
 #include <thread>
 
+// Define to the same value as you did for D3D12MemAlloc.cpp.
+#ifndef D3D12MA_DEBUG_MARGIN
+    #define D3D12MA_DEBUG_MARGIN 0
+#endif
+
 extern ID3D12GraphicsCommandList* BeginCommandList();
 extern DXGI_ADAPTER_DESC1 g_AdapterDesc;
 extern void EndCommandList(ID3D12GraphicsCommandList* cmdList);
 
-static constexpr UINT64 MEGABYTE = 1024 * 1024;
+enum CONFIG_TYPE
+{
+    CONFIG_TYPE_MINIMUM,
+    CONFIG_TYPE_SMALL,
+    CONFIG_TYPE_AVERAGE,
+    CONFIG_TYPE_LARGE,
+    CONFIG_TYPE_MAXIMUM,
+    CONFIG_TYPE_COUNT
+};
 
-// Define to the same value as you did for D3D12MemAlloc.cpp.
-//#define D3D12MA_DEBUG_MARGIN 16
+enum class FREE_ORDER { FORWARD, BACKWARD, RANDOM, COUNT };
+
+static const char* CODE_DESCRIPTION = "D3D12MA Tests";
+static constexpr UINT64 KILOBYTE = 1024;
+static constexpr UINT64 MEGABYTE = 1024 * KILOBYTE;
+static constexpr CONFIG_TYPE ConfigType = CONFIG_TYPE_SMALL;
+static const char* FREE_ORDER_NAMES[] = { "FORWARD", "BACKWARD", "RANDOM", };
+
+static void CurrentTimeToStr(std::string& out)
+{
+    time_t rawTime; time(&rawTime);
+    struct tm timeInfo; localtime_s(&timeInfo, &rawTime);
+    char timeStr[128];
+    strftime(timeStr, _countof(timeStr), "%c", &timeInfo);
+    out = timeStr;
+}
+
+static float ToFloatSeconds(duration d)
+{
+    return std::chrono::duration_cast<std::chrono::duration<float>>(d).count();
+}
+
+static const char* AlgorithmToStr(D3D12MA::POOL_FLAGS algorithm)
+{
+    switch (algorithm)
+    {
+    case D3D12MA::POOL_FLAG_ALGORITHM_LINEAR:
+        return "Linear";
+    case D3D12MA::POOL_FLAG_ALGORITHM_TLSF:
+        return "TLSF";
+    case 0:
+        return "Default";
+    default:
+        assert(0);
+        return "";
+    }
+}
+
+static const char* VirtualAlgorithmToStr(D3D12MA::VIRTUAL_BLOCK_FLAGS algorithm)
+{
+    switch (algorithm)
+    {
+    case D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR:
+        return "Linear";
+    case D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF:
+        return "TLSF";
+    case 0:
+        return "Default";
+    default:
+        assert(0);
+        return "";
+    }
+}
+
 
 struct ResourceWithAllocation
 {
@@ -116,141 +181,6 @@ static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFile
     ctx.allocator->FreeStatsString(s);
 }
 
-static void TestVirtualBlocks(const TestContext& ctx)
-{
-    wprintf(L"Test virtual blocks\n");
-
-    using namespace D3D12MA;
-
-    const UINT64 blockSize = 16 * MEGABYTE;
-    const UINT64 alignment = 256;
-
-    // # Create block 16 MB
-
-    ComPtr<D3D12MA::VirtualBlock> block;
-    VIRTUAL_BLOCK_DESC blockDesc = {};
-    blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
-    blockDesc.Size = blockSize;
-    CHECK_HR( CreateVirtualBlock(&blockDesc, &block) );
-    CHECK_BOOL( block );
-
-    // # Allocate 8 MB
-
-    VIRTUAL_ALLOCATION_DESC allocDesc = {};
-    allocDesc.Alignment = alignment;
-    allocDesc.pUserData = (void*)(uintptr_t)1;
-    allocDesc.Size = 8 * MEGABYTE;
-    VirtualAllocation alloc0;
-    CHECK_HR( block->Allocate(&allocDesc, &alloc0, nullptr) );
-    CHECK_BOOL(alloc0.AllocHandle);
-
-    // # Validate the allocation
-  
-    VIRTUAL_ALLOCATION_INFO alloc0Info = {};
-    block->GetAllocationInfo(alloc0, &alloc0Info);
-    CHECK_BOOL( alloc0Info.Offset < blockSize );
-    CHECK_BOOL( alloc0Info.Size == allocDesc.Size );
-    CHECK_BOOL( alloc0Info.pUserData == allocDesc.pUserData );
-
-    // # Check SetUserData
-
-    block->SetAllocationUserData(alloc0, (void*)(uintptr_t)2);
-    block->GetAllocationInfo(alloc0, &alloc0Info);
-    CHECK_BOOL( alloc0Info.pUserData == (void*)(uintptr_t)2 );
-
-    // # Allocate 4 MB
-
-    allocDesc.Size = 4 * MEGABYTE;
-    allocDesc.Alignment = alignment;
-    VirtualAllocation alloc1;
-    CHECK_HR( block->Allocate(&allocDesc, &alloc1, nullptr) );
-    CHECK_BOOL(alloc1.AllocHandle);
-
-    VIRTUAL_ALLOCATION_INFO alloc1Info = {};
-    block->GetAllocationInfo(alloc1, &alloc1Info);
-    CHECK_BOOL( alloc1Info.Offset < blockSize );
-    CHECK_BOOL( alloc1Info.Offset + 4 * MEGABYTE <= alloc0Info.Offset || alloc0Info.Offset + 8 * MEGABYTE <= alloc1Info.Offset); // Check if they don't overlap.
-
-    // # Allocate another 8 MB - it should fail
-
-    allocDesc.Size = 8 * MEGABYTE;
-    allocDesc.Alignment = alignment;
-    VirtualAllocation alloc2 = {666};
-    UINT64 offset2 = 666;
-    CHECK_BOOL( FAILED(block->Allocate(&allocDesc, &alloc2, &offset2)) );
-    CHECK_BOOL( alloc2.AllocHandle == (AllocHandle)0 );
-    CHECK_BOOL( offset2 == UINT64_MAX );
-
-    // # Free the 4 MB block. Now allocation of 8 MB should succeed.
-
-    block->FreeAllocation(alloc1);
-    UINT64 alloc2Offset;
-    CHECK_HR( block->Allocate(&allocDesc, &alloc2, &alloc2Offset) );
-    CHECK_BOOL( alloc2Offset < blockSize );
-    CHECK_BOOL( alloc2Offset + 4 * MEGABYTE <= alloc0Info.Offset || alloc0Info.Offset + 8 * MEGABYTE <= alloc2Offset); // Check if they don't overlap.
-
-    // # Calculate statistics
-
-    StatInfo statInfo = {};
-    block->CalculateStats(&statInfo);
-    CHECK_BOOL(statInfo.AllocationCount == 2);
-    CHECK_BOOL(statInfo.BlockCount == 1);
-    CHECK_BOOL(statInfo.UsedBytes == blockSize);
-    CHECK_BOOL(statInfo.UnusedBytes + statInfo.UsedBytes == blockSize);
-
-    // # Generate JSON dump
-
-    WCHAR* json = nullptr;
-    block->BuildStatsString(&json);
-    {
-        std::wstring str(json);
-        CHECK_BOOL( str.find(L"\"UserData\": 1") != std::wstring::npos );
-        CHECK_BOOL( str.find(L"\"UserData\": 2") != std::wstring::npos );
-    }
-    block->FreeStatsString(json);
-
-    // # Free alloc0, leave alloc2 unfreed.
-
-    block->FreeAllocation(alloc0);
-
-    // # Test FreeAllocation with null allocation.
-    block->FreeAllocation({0});
-
-    // # Test alignment
-
-    {
-        constexpr size_t allocCount = 10;
-        VirtualAllocation allocs[allocCount] = {};
-        for(size_t i = 0; i < allocCount; ++i)
-        {
-            const bool alignment0 = i == allocCount - 1;
-            allocDesc.Size = i * 3 + 15;
-            allocDesc.Alignment = alignment0 ? 0 : 8;
-            UINT64 offset;
-            CHECK_HR(block->Allocate(&allocDesc, &allocs[i], &offset));
-            if(!alignment0)
-            {
-                CHECK_BOOL(offset % allocDesc.Alignment == 0);
-            }
-        }
-
-        for(size_t i = allocCount; i--; )
-        {
-            block->FreeAllocation(allocs[i]);
-        }
-    }
-
-    // # Final cleanup
-
-    block->FreeAllocation(alloc2);
-
-    //block->Clear();
-}
-
-#ifndef D3D12MA_DEBUG_MARGIN
-    #define D3D12MA_DEBUG_MARGIN (0)
-#endif
-
 static void TestDebugMargin(const TestContext& ctx)
 {
     using namespace D3D12MA;
@@ -318,8 +248,9 @@ static void TestDebugMargin(const TestContext& ctx)
         {
             if(buffers[i]->GetHeap() == buffers[i - 1]->GetHeap())
             {
-                CHECK_BOOL(buffers[i]->GetOffset() >=
-                    buffers[i - 1]->GetOffset() + buffers[i - 1]->GetSize() + D3D12MA_DEBUG_MARGIN);
+                const UINT64 allocStart = buffers[i]->GetOffset();
+                const UINT64 prevAllocEnd = buffers[i - 1]->GetOffset() + buffers[i - 1]->GetSize();
+                CHECK_BOOL(allocStart >= prevAllocEnd + D3D12MA_DEBUG_MARGIN);
             }
         }
 
@@ -1742,6 +1673,681 @@ static bool IsProtectedResourceSessionSupported(const TestContext& ctx)
     return support.Support > D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG_NONE;
 }
 
+static void TestLinearAllocator(const TestContext& ctx)
+{
+    wprintf(L"Test linear allocator\n");
+
+    RandomNumberGenerator rand{ 645332 };
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.Flags = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
+    poolDesc.BlockSize = 64 * KILOBYTE * 300; // Alignment of buffers is always 64KB
+    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12_RESOURCE_DESC buffDesc = {};
+    FillResourceDescForBuffer(buffDesc, 0);
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    constexpr size_t maxBufCount = 100;
+    struct BufferInfo
+    {
+        ComPtr<ID3D12Resource> Buffer;
+        ComPtr<D3D12MA::Allocation> Allocation;
+    };
+    std::vector<BufferInfo> buffInfo;
+
+    constexpr UINT64 bufSizeMin = 16;
+    constexpr UINT64 bufSizeMax = 1024;
+    UINT64 prevOffset = 0;
+
+    // Test one-time free.
+    for (size_t i = 0; i < 2; ++i)
+    {
+        // Allocate number of buffers of varying size that surely fit into this block.
+        UINT64 bufSumSize = 0;
+        for (size_t i = 0; i < maxBufCount; ++i)
+        {
+            buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+            CHECK_BOOL(i == 0 || offset > prevOffset);
+            buffInfo.push_back(std::move(newBuffInfo));
+            prevOffset = offset;
+            bufSumSize += buffDesc.Width;
+        }
+
+        // Validate pool stats.
+        D3D12MA::StatInfo stats;
+        pool->CalculateStats(&stats);
+        CHECK_BOOL(stats.UnusedBytes = poolDesc.BlockSize - bufSumSize);
+        CHECK_BOOL(stats.AllocationCount == buffInfo.size());
+
+        // Destroy the buffers in random order.
+        while (!buffInfo.empty())
+        {
+            const size_t indexToDestroy = rand.Generate() % buffInfo.size();
+            buffInfo.erase(buffInfo.begin() + indexToDestroy);
+        }
+    }
+
+    // Test stack.
+    {
+        // Allocate number of buffers of varying size that surely fit into this block.
+        for (size_t i = 0; i < maxBufCount; ++i)
+        {
+            buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+            CHECK_BOOL(i == 0 || offset > prevOffset);
+            buffInfo.push_back(std::move(newBuffInfo));
+            prevOffset = offset;
+        }
+
+        // Destroy few buffers from top of the stack.
+        for (size_t i = 0; i < maxBufCount / 5; ++i)
+            buffInfo.pop_back();
+
+        // Create some more
+        for (size_t i = 0; i < maxBufCount / 5; ++i)
+        {
+            buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+            CHECK_BOOL(i == 0 || offset > prevOffset);
+            buffInfo.push_back(std::move(newBuffInfo));
+            prevOffset = offset;
+        }
+
+        // Destroy the buffers in reverse order.
+        while (!buffInfo.empty())
+            buffInfo.pop_back();
+    }
+
+    // Test ring buffer.
+    {
+        // Allocate number of buffers that surely fit into this block.
+        buffDesc.Width = bufSizeMax;
+        for (size_t i = 0; i < maxBufCount; ++i)
+        {
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+            CHECK_BOOL(i == 0 || offset > prevOffset);
+            buffInfo.push_back(std::move(newBuffInfo));
+            prevOffset = offset;
+        }
+
+        // Free and allocate new buffers so many times that we make sure we wrap-around at least once.
+        const size_t buffersPerIter = maxBufCount / 10 - 1;
+        const size_t iterCount = poolDesc.BlockSize / buffDesc.Width / buffersPerIter * 2;
+        for (size_t iter = 0; iter < iterCount; ++iter)
+        {
+            buffInfo.erase(buffInfo.begin(), buffInfo.begin() + buffersPerIter);
+
+            for (size_t bufPerIter = 0; bufPerIter < buffersPerIter; ++bufPerIter)
+            {
+                BufferInfo newBuffInfo;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                    nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+                buffInfo.push_back(std::move(newBuffInfo));
+            }
+        }
+
+        // Allocate buffers until we reach out-of-memory.
+        UINT32 debugIndex = 0;
+        while (true)
+        {
+            BufferInfo newBuffInfo;
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer));
+            ++debugIndex;
+            if (SUCCEEDED(hr))
+            {
+                buffInfo.push_back(std::move(newBuffInfo));
+            }
+            else
+            {
+                CHECK_BOOL(hr == E_OUTOFMEMORY);
+                break;
+            }
+        }
+
+        // Destroy the buffers in random order.
+        while (!buffInfo.empty())
+        {
+            const size_t indexToDestroy = rand.Generate() % buffInfo.size();
+            buffInfo.erase(buffInfo.begin() + indexToDestroy);
+        }
+    }
+
+    // Test double stack.
+    {
+        // Allocate number of buffers of varying size that surely fit into this block, alternate from bottom/top.
+        UINT64 prevOffsetLower = 0;
+        UINT64 prevOffsetUpper = poolDesc.BlockSize;
+        for (size_t i = 0; i < maxBufCount; ++i)
+        {
+            const bool upperAddress = (i % 2) != 0;
+            if (upperAddress)
+                allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS;
+            else
+                allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+            buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+            if (upperAddress)
+            {
+                CHECK_BOOL(offset < prevOffsetUpper);
+                prevOffsetUpper = offset;
+            }
+            else
+            {
+                CHECK_BOOL(offset >= prevOffsetLower);
+                prevOffsetLower = offset;
+            }
+            CHECK_BOOL(prevOffsetLower < prevOffsetUpper);
+            buffInfo.push_back(std::move(newBuffInfo));
+        }
+
+        // Destroy few buffers from top of the stack.
+        for (size_t i = 0; i < maxBufCount / 5; ++i)
+            buffInfo.pop_back();
+
+        // Create some more
+        for (size_t i = 0; i < maxBufCount / 5; ++i)
+        {
+            const bool upperAddress = (i % 2) != 0;
+            if (upperAddress)
+                allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS;
+            else
+                allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+            buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            buffInfo.push_back(std::move(newBuffInfo));
+        }
+
+        // Destroy the buffers in reverse order.
+        while (!buffInfo.empty())
+            buffInfo.pop_back();
+
+        // Create buffers on both sides until we reach out of memory.
+        prevOffsetLower = 0;
+        prevOffsetUpper = poolDesc.BlockSize;
+        for (size_t i = 0; true; ++i)
+        {
+            const bool upperAddress = (i % 2) != 0;
+            if (upperAddress)
+                allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS;
+            else
+                allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+            buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
+            BufferInfo newBuffInfo;
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer));
+            if (SUCCEEDED(hr))
+            {
+                const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+                if (upperAddress)
+                {
+                    CHECK_BOOL(offset < prevOffsetUpper);
+                    prevOffsetUpper = offset;
+                }
+                else
+                {
+                    CHECK_BOOL(offset >= prevOffsetLower);
+                    prevOffsetLower = offset;
+                }
+                CHECK_BOOL(prevOffsetLower < prevOffsetUpper);
+                buffInfo.push_back(std::move(newBuffInfo));
+            }
+            else
+                break;
+        }
+
+        // Destroy the buffers in random order.
+        while (!buffInfo.empty())
+        {
+            const size_t indexToDestroy = rand.Generate() % buffInfo.size();
+            buffInfo.erase(buffInfo.begin() + indexToDestroy);
+        }
+
+        // Create buffers on upper side only, constant size, until we reach out of memory.
+        prevOffsetUpper = poolDesc.BlockSize;
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS;
+        buffDesc.Width = bufSizeMax;
+        while (true)
+        {
+            BufferInfo newBuffInfo;
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer));
+            if (SUCCEEDED(hr))
+            {
+                const UINT64 offset = newBuffInfo.Allocation->GetOffset();
+                CHECK_BOOL(offset < prevOffsetUpper);
+                prevOffsetUpper = offset;
+                buffInfo.push_back(std::move(newBuffInfo));
+            }
+            else
+                break;
+        }
+
+        // Destroy the buffers in reverse order.
+        while (!buffInfo.empty())
+        {
+            const BufferInfo& currBufInfo = buffInfo.back();
+            buffInfo.pop_back();
+        }
+    }
+}
+
+static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
+{
+    wprintf(L"Test linear allocator multi block\n");
+
+    RandomNumberGenerator rand{ 345673 };
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.Flags = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12_RESOURCE_DESC buffDesc = {};
+    FillResourceDescForBuffer(buffDesc, 1024 * 1024);
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    struct BufferInfo
+    {
+        ComPtr<ID3D12Resource> Buffer;
+        ComPtr<D3D12MA::Allocation> Allocation;
+    };
+    std::vector<BufferInfo> buffInfo;
+
+    // Test one-time free.
+    {
+        // Allocate buffers until we move to a second block.
+        ID3D12Heap* lastHeap = nullptr;
+        while (true)
+        {
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            ID3D12Heap* heap = newBuffInfo.Allocation->GetHeap();
+            buffInfo.push_back(std::move(newBuffInfo));
+            if (lastHeap && heap != lastHeap)
+            {
+                break;
+            }
+            lastHeap = heap;
+        }
+        CHECK_BOOL(buffInfo.size() > 2);
+
+        // Make sure that pool has now two blocks.
+        D3D12MA::StatInfo poolStats = {};
+        pool->CalculateStats(&poolStats);
+        CHECK_BOOL(poolStats.BlockCount == 2);
+
+        // Destroy all the buffers in random order.
+        while (!buffInfo.empty())
+        {
+            const size_t indexToDestroy = rand.Generate() % buffInfo.size();
+            buffInfo.erase(buffInfo.begin() + indexToDestroy);
+        }
+
+        // Make sure that pool has now at most one block.
+        pool->CalculateStats(&poolStats);
+        CHECK_BOOL(poolStats.BlockCount <= 1);
+    }
+
+    // Test stack.
+    {
+        // Allocate buffers until we move to a second block.
+        ID3D12Heap* lastHeap = nullptr;
+        while (true)
+        {
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            ID3D12Heap* heap = newBuffInfo.Allocation->GetHeap();
+            buffInfo.push_back(std::move(newBuffInfo));
+            if (lastHeap && heap != lastHeap)
+            {
+                break;
+            }
+            lastHeap = heap;
+        }
+        CHECK_BOOL(buffInfo.size() > 2);
+
+        // Add few more buffers.
+        for (UINT32 i = 0; i < 5; ++i)
+        {
+            BufferInfo newBuffInfo;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+            buffInfo.push_back(std::move(newBuffInfo));
+        }
+
+        // Make sure that pool has now two blocks.
+        D3D12MA::StatInfo poolStats = {};
+        pool->CalculateStats(&poolStats);
+        CHECK_BOOL(poolStats.BlockCount == 2);
+
+        // Delete half of buffers, LIFO.
+        for (size_t i = 0, countToDelete = buffInfo.size() / 2; i < countToDelete; ++i)
+            buffInfo.pop_back();
+
+        // Add one more buffer.
+        BufferInfo newBuffInfo;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        // Make sure that pool has now one block.
+        pool->CalculateStats(&poolStats);
+        CHECK_BOOL(poolStats.BlockCount == 1);
+
+        // Delete all the remaining buffers, LIFO.
+        while (!buffInfo.empty())
+            buffInfo.pop_back();
+    }
+}
+
+static void ManuallyTestLinearAllocator(const TestContext& ctx)
+{
+    wprintf(L"Manually test linear allocator\n");
+
+    RandomNumberGenerator rand{ 645332 };
+
+    D3D12MA::Stats origStats;
+    ctx.allocator->CalculateStats(&origStats);
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.Flags = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
+    poolDesc.BlockSize = 6 * 64 * KILOBYTE;
+    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12_RESOURCE_DESC buffDesc = {};
+    FillResourceDescForBuffer(buffDesc, 0);
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    struct BufferInfo
+    {
+        ComPtr<ID3D12Resource> Buffer;
+        ComPtr<D3D12MA::Allocation> Allocation;
+    };
+    std::vector<BufferInfo> buffInfo;
+    BufferInfo newBuffInfo;
+
+    // Test double stack.
+    {
+        /*
+        Lower: Buffer 32 B, Buffer 1024 B, Buffer 32 B
+        Upper: Buffer 16 B, Buffer 1024 B, Buffer 128 B
+
+        Totally:
+        1 block allocated
+        393 216 DirectX 12 bytes
+        6 new allocations
+        2256 bytes in allocations (384 KB according to alignment)
+        */
+
+        buffDesc.Width = 32;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        buffDesc.Width = 1024;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        buffDesc.Width = 32;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS;
+
+        buffDesc.Width = 128;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        buffDesc.Width = 1024;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        buffDesc.Width = 16;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
+        buffInfo.push_back(std::move(newBuffInfo));
+
+        D3D12MA::Stats currStats;
+        ctx.allocator->CalculateStats(&currStats);
+        D3D12MA::StatInfo poolStats;
+        pool->CalculateStats(&poolStats);
+
+        WCHAR* statsStr = nullptr;
+        ctx.allocator->BuildStatsString(&statsStr, FALSE);
+
+        // PUT BREAKPOINT HERE TO CHECK.
+        // Inspect: currStats versus origStats, poolStats, statsStr.
+        int I = 0;
+
+        ctx.allocator->FreeStatsString(statsStr);
+
+        // Destroy the buffers in reverse order.
+        while (!buffInfo.empty())
+            buffInfo.pop_back();
+    }
+}
+
+static void BenchmarkAlgorithmsCase(const TestContext& ctx,
+    FILE* file,
+    D3D12MA::POOL_FLAGS algorithm,
+    bool empty,
+    FREE_ORDER freeOrder)
+{
+    RandomNumberGenerator rand{ 16223 };
+
+    const UINT64 bufSize = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    const size_t maxBufCapacity = 10000;
+    const UINT32 iterationCount = 10;
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.BlockSize = bufSize * maxBufCapacity;
+    poolDesc.Flags |= algorithm;
+    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12_RESOURCE_ALLOCATION_INFO allocInfo = {};
+    allocInfo.SizeInBytes = bufSize;
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    std::vector<ComPtr<D3D12MA::Allocation>> baseAllocations;
+    const size_t allocCount = maxBufCapacity / 3;
+    if (!empty)
+    {
+        // Make allocations up to 1/3 of pool size.
+        for (UINT64 i = 0; i < allocCount; ++i)
+        {
+            ComPtr<D3D12MA::Allocation> alloc;
+            CHECK_HR(ctx.allocator->AllocateMemory(&allocDesc, &allocInfo, &alloc));
+            baseAllocations.push_back(std::move(alloc));
+        }
+
+        // Delete half of them, choose randomly.
+        size_t allocsToDelete = baseAllocations.size() / 2;
+        for (size_t i = 0; i < allocsToDelete; ++i)
+        {
+            const size_t index = (size_t)rand.Generate() % baseAllocations.size();
+            baseAllocations.erase(baseAllocations.begin() + index);
+        }
+    }
+
+    // BENCHMARK
+    std::vector<ComPtr<D3D12MA::Allocation>> testAllocations;
+    duration allocTotalDuration = duration::zero();
+    duration freeTotalDuration = duration::zero();
+    for (uint32_t iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+    {
+        testAllocations.reserve(allocCount);
+        // Allocations
+        time_point allocTimeBeg = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < allocCount; ++i)
+        {
+            ComPtr<D3D12MA::Allocation> alloc;
+            CHECK_HR(ctx.allocator->AllocateMemory(&allocDesc, &allocInfo, &alloc));
+            testAllocations.push_back(std::move(alloc));
+        }
+        allocTotalDuration += std::chrono::high_resolution_clock::now() - allocTimeBeg;
+
+        // Deallocations
+        switch (freeOrder)
+        {
+        case FREE_ORDER::FORWARD:
+            // Leave testAllocations unchanged.
+            break;
+        case FREE_ORDER::BACKWARD:
+            std::reverse(testAllocations.begin(), testAllocations.end());
+            break;
+        case FREE_ORDER::RANDOM:
+            std::shuffle(testAllocations.begin(), testAllocations.end(), MyUniformRandomNumberGenerator(rand));
+            break;
+        default: assert(0);
+        }
+
+        time_point freeTimeBeg = std::chrono::high_resolution_clock::now();
+        testAllocations.clear();
+        freeTotalDuration += std::chrono::high_resolution_clock::now() - freeTimeBeg;
+
+    }
+
+    // Delete baseAllocations
+    baseAllocations.clear();
+
+    const float allocTotalSeconds = ToFloatSeconds(allocTotalDuration);
+    const float freeTotalSeconds = ToFloatSeconds(freeTotalDuration);
+
+    printf("    Algorithm=%s %s FreeOrder=%s: allocations %g s, free %g s\n",
+        AlgorithmToStr(algorithm),
+        empty ? "Empty" : "Not empty",
+        FREE_ORDER_NAMES[(size_t)freeOrder],
+        allocTotalSeconds,
+        freeTotalSeconds);
+
+    if (file)
+    {
+        std::string currTime;
+        CurrentTimeToStr(currTime);
+
+        fprintf(file, "%s,%s,%s,%u,%s,%g,%g\n",
+            CODE_DESCRIPTION, currTime.c_str(),
+            AlgorithmToStr(algorithm),
+            empty ? 1 : 0,
+            FREE_ORDER_NAMES[(uint32_t)freeOrder],
+            allocTotalSeconds,
+            freeTotalSeconds);
+    }
+}
+
+static void BenchmarkAlgorithms(const TestContext& ctx, FILE* file)
+{
+    wprintf(L"Benchmark algorithms\n");
+
+    if (file)
+    {
+        fprintf(file,
+            "Code,Time,"
+            "Algorithm,Empty,Free order,"
+            "Allocation time (s),Deallocation time (s)\n");
+    }
+
+    UINT32 freeOrderCount = 1;
+    if (ConfigType >= CONFIG_TYPE::CONFIG_TYPE_LARGE)
+        freeOrderCount = 3;
+    else if (ConfigType >= CONFIG_TYPE::CONFIG_TYPE_SMALL)
+        freeOrderCount = 2;
+
+    const UINT32 emptyCount = ConfigType >= CONFIG_TYPE::CONFIG_TYPE_SMALL ? 2 : 1;
+
+    for (UINT32 freeOrderIndex = 0; freeOrderIndex < freeOrderCount; ++freeOrderIndex)
+    {
+        FREE_ORDER freeOrder = FREE_ORDER::COUNT;
+        switch (freeOrderIndex)
+        {
+        case 0: freeOrder = FREE_ORDER::BACKWARD; break;
+        case 1: freeOrder = FREE_ORDER::FORWARD; break;
+        case 2: freeOrder = FREE_ORDER::RANDOM; break;
+        default: assert(0);
+        }
+
+        for (UINT32 emptyIndex = 0; emptyIndex < emptyCount; ++emptyIndex)
+        {
+            for (UINT32 algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+            {
+                D3D12MA::POOL_FLAGS algorithm;
+                switch (algorithmIndex)
+                {
+                case 0:
+                    algorithm = D3D12MA::POOL_FLAG_NONE;
+                    break;
+                case 1:
+                    algorithm = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
+                    break;
+                case 2:
+                    algorithm = D3D12MA::POOL_FLAG_ALGORITHM_TLSF;
+                    break;
+                default:
+                    assert(0);
+                }
+
+                BenchmarkAlgorithmsCase(ctx,
+                    file,
+                    algorithm,
+                    (emptyIndex == 0), // empty
+                    freeOrder);
+            }
+        }
+    }
+}
+
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
 static void TestDevice4(const TestContext& ctx)
 {
@@ -1857,9 +2463,369 @@ static void TestDevice8(const TestContext& ctx)
 }
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
+static void TestVirtualBlocks(const TestContext& ctx)
+{
+    wprintf(L"Test virtual blocks\n");
+
+    using namespace D3D12MA;
+
+    const UINT64 blockSize = 16 * MEGABYTE;
+    const UINT64 alignment = 256;
+
+    // # Create block 16 MB
+
+    ComPtr<D3D12MA::VirtualBlock> block;
+    VIRTUAL_BLOCK_DESC blockDesc = {};
+    blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
+    blockDesc.Size = blockSize;
+    CHECK_HR(CreateVirtualBlock(&blockDesc, &block));
+    CHECK_BOOL(block);
+
+    // # Allocate 8 MB
+
+    VIRTUAL_ALLOCATION_DESC allocDesc = {};
+    allocDesc.Alignment = alignment;
+    allocDesc.pUserData = (void*)(uintptr_t)1;
+    allocDesc.Size = 8 * MEGABYTE;
+    VirtualAllocation alloc0;
+    CHECK_HR(block->Allocate(&allocDesc, &alloc0, nullptr));
+
+    // # Validate the allocation
+
+    VIRTUAL_ALLOCATION_INFO alloc0Info = {};
+    block->GetAllocationInfo(alloc0, &alloc0Info);
+    CHECK_BOOL(alloc0Info.Offset < blockSize);
+    CHECK_BOOL(alloc0Info.Size == allocDesc.Size);
+    CHECK_BOOL(alloc0Info.pUserData == allocDesc.pUserData);
+
+    // # Check SetUserData
+
+    block->SetAllocationUserData(alloc0, (void*)(uintptr_t)2);
+    block->GetAllocationInfo(alloc0, &alloc0Info);
+    CHECK_BOOL(alloc0Info.pUserData == (void*)(uintptr_t)2);
+
+    // # Allocate 4 MB
+
+    allocDesc.Size = 4 * MEGABYTE;
+    allocDesc.Alignment = alignment;
+    VirtualAllocation alloc1;
+    CHECK_HR(block->Allocate(&allocDesc, &alloc1, nullptr));
+
+    VIRTUAL_ALLOCATION_INFO alloc1Info = {};
+    block->GetAllocationInfo(alloc1, &alloc1Info);
+    CHECK_BOOL(alloc1Info.Offset < blockSize);
+    CHECK_BOOL(alloc1Info.Offset + 4 * MEGABYTE <= alloc0Info.Offset || alloc0Info.Offset + 8 * MEGABYTE <= alloc1Info.Offset); // Check if they don't overlap.
+
+    // # Allocate another 8 MB - it should fail
+
+    allocDesc.Size = 8 * MEGABYTE;
+    allocDesc.Alignment = alignment;
+    VirtualAllocation alloc2;
+    CHECK_BOOL(FAILED(block->Allocate(&allocDesc, &alloc2, nullptr)));
+    CHECK_BOOL(alloc2.AllocHandle == (AllocHandle)0);
+
+    // # Free the 4 MB block. Now allocation of 8 MB should succeed.
+
+    block->FreeAllocation(alloc1);
+    UINT64 alloc2Offset;
+    CHECK_HR(block->Allocate(&allocDesc, &alloc2, &alloc2Offset));
+    CHECK_BOOL(alloc2Offset < blockSize);
+    CHECK_BOOL(alloc2Offset + 4 * MEGABYTE <= alloc0Info.Offset || alloc0Info.Offset + 8 * MEGABYTE <= alloc2Offset); // Check if they don't overlap.
+
+    // # Calculate statistics
+
+    StatInfo statInfo = {};
+    block->CalculateStats(&statInfo);
+    CHECK_BOOL(statInfo.AllocationCount == 2);
+    CHECK_BOOL(statInfo.BlockCount == 1);
+    CHECK_BOOL(statInfo.UsedBytes == blockSize);
+    CHECK_BOOL(statInfo.UnusedBytes + statInfo.UsedBytes == blockSize);
+
+    // # Generate JSON dump
+
+    WCHAR* json = nullptr;
+    block->BuildStatsString(&json);
+    {
+        std::wstring str(json);
+        CHECK_BOOL(str.find(L"\"UserData\": 1") != std::wstring::npos);
+        CHECK_BOOL(str.find(L"\"UserData\": 2") != std::wstring::npos);
+    }
+    block->FreeStatsString(json);
+
+    // # Free alloc0, leave alloc2 unfreed.
+
+    block->FreeAllocation(alloc0);
+
+    // # Test alignment
+
+    {
+        constexpr size_t allocCount = 10;
+        VirtualAllocation allocs[allocCount] = {};
+        for (size_t i = 0; i < allocCount; ++i)
+        {
+            const bool alignment0 = i == allocCount - 1;
+            allocDesc.Size = i * 3 + 15;
+            allocDesc.Alignment = alignment0 ? 0 : 8;
+            UINT64 offset;
+            CHECK_HR(block->Allocate(&allocDesc, &allocs[i], &offset));
+            if (!alignment0)
+            {
+                CHECK_BOOL(offset % allocDesc.Alignment == 0);
+            }
+        }
+
+        for (size_t i = allocCount; i--; )
+        {
+            block->FreeAllocation(allocs[i]);
+        }
+    }
+
+    // # Final cleanup
+
+    block->FreeAllocation(alloc2);
+}
+
+static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
+{
+    wprintf(L"Test virtual blocks algorithms\n");
+
+    RandomNumberGenerator rand{ 3454335 };
+    auto calcRandomAllocSize = [&rand]() -> UINT64 { return rand.Generate() % 20 + 5; };
+
+    for (size_t algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+    {
+        // Create the block
+        D3D12MA::VIRTUAL_BLOCK_DESC blockDesc = {};
+        blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
+        blockDesc.Size = 10'000;
+        switch (algorithmIndex)
+        {
+        case 1: blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR; break;
+        case 2: blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF; break;
+        }
+        ComPtr<D3D12MA::VirtualBlock> block;
+        CHECK_HR(D3D12MA::CreateVirtualBlock(&blockDesc, &block));
+
+        struct AllocData
+        {
+            D3D12MA::VirtualAllocation allocation;
+            UINT64 allocOffset, requestedSize, allocationSize;
+        };
+        std::vector<AllocData> allocations;
+
+        // Make some allocations
+        for (size_t i = 0; i < 20; ++i)
+        {
+            D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
+            allocDesc.Size = calcRandomAllocSize();
+            allocDesc.pUserData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            if (i < 10) {}
+            else if (i < 20 && algorithmIndex == 1) allocDesc.Flags = D3D12MA::VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS;
+
+            AllocData alloc = {};
+            alloc.requestedSize = allocDesc.Size;
+            CHECK_HR(block->Allocate(&allocDesc, &alloc.allocation, nullptr));
+
+            D3D12MA::VIRTUAL_ALLOCATION_INFO allocInfo;
+            block->GetAllocationInfo(alloc.allocation, &allocInfo);
+            CHECK_BOOL(allocInfo.Size >= allocDesc.Size);
+            alloc.allocOffset = allocInfo.Offset;
+            alloc.allocationSize = allocInfo.Size;
+
+            allocations.push_back(alloc);
+        }
+
+        // Free some of the allocations
+        for (size_t i = 0; i < 5; ++i)
+        {
+            const size_t index = rand.Generate() % allocations.size();
+            block->FreeAllocation(allocations[index].allocation);
+            allocations.erase(allocations.begin() + index);
+        }
+
+        // Allocate some more
+        for (size_t i = 0; i < 6; ++i)
+        {
+            D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
+            allocDesc.Size = calcRandomAllocSize();
+            allocDesc.pUserData = (void*)(uintptr_t)(allocDesc.Size * 10);
+
+            AllocData alloc = {};
+            alloc.requestedSize = allocDesc.Size;
+            CHECK_HR(block->Allocate(&allocDesc, &alloc.allocation, nullptr));
+
+            D3D12MA::VIRTUAL_ALLOCATION_INFO allocInfo;
+            block->GetAllocationInfo(alloc.allocation, &allocInfo);
+            CHECK_BOOL(allocInfo.Size >= allocDesc.Size);
+            alloc.allocOffset = allocInfo.Offset;
+            alloc.allocationSize = allocInfo.Size;
+
+            allocations.push_back(alloc);
+        }
+
+        // Allocate some with extra alignment
+        for (size_t i = 0; i < 3; ++i)
+        {
+            D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
+            allocDesc.Size = calcRandomAllocSize();
+            allocDesc.Alignment = 16;
+            allocDesc.pUserData = (void*)(uintptr_t)(allocDesc.Size * 10);
+
+            AllocData alloc = {};
+            alloc.requestedSize = allocDesc.Size;
+            CHECK_HR(block->Allocate(&allocDesc, &alloc.allocation, nullptr));
+
+            D3D12MA::VIRTUAL_ALLOCATION_INFO allocInfo;
+            block->GetAllocationInfo(alloc.allocation, &allocInfo);
+            CHECK_BOOL(allocInfo.Offset % 16 == 0);
+            CHECK_BOOL(allocInfo.Size >= allocDesc.Size);
+            alloc.allocOffset = allocInfo.Offset;
+            alloc.allocationSize = allocInfo.Size;
+
+            allocations.push_back(alloc);
+        }
+
+        // Check if the allocations don't overlap
+        std::sort(allocations.begin(), allocations.end(), [](const AllocData& lhs, const AllocData& rhs) {
+            return lhs.allocOffset < rhs.allocOffset; });
+        for (size_t i = 0; i < allocations.size() - 1; ++i)
+        {
+            CHECK_BOOL(allocations[i + 1].allocOffset >= allocations[i].allocOffset + allocations[i].allocationSize);
+        }
+
+        // Check pUserData
+        {
+            const AllocData& alloc = allocations.back();
+            D3D12MA::VIRTUAL_ALLOCATION_INFO allocInfo;
+            block->GetAllocationInfo(alloc.allocation, &allocInfo);
+            CHECK_BOOL((uintptr_t)allocInfo.pUserData == alloc.requestedSize * 10);
+
+            block->SetAllocationUserData(alloc.allocation, (void*)(uintptr_t)666);
+            block->GetAllocationInfo(alloc.allocation, &allocInfo);
+            CHECK_BOOL((uintptr_t)allocInfo.pUserData == 666);
+        }
+
+        // Calculate statistics
+        {
+            UINT64 actualAllocSizeMin = UINT64_MAX, actualAllocSizeMax = 0, actualAllocSizeSum = 0;
+            std::for_each(allocations.begin(), allocations.end(), [&](const AllocData& a) {
+                actualAllocSizeMin = std::min(actualAllocSizeMin, a.allocationSize);
+                actualAllocSizeMax = std::max(actualAllocSizeMax, a.allocationSize);
+                actualAllocSizeSum += a.allocationSize;
+                });
+
+            D3D12MA::StatInfo statInfo = {};
+            block->CalculateStats(&statInfo);
+            CHECK_BOOL(statInfo.AllocationCount == allocations.size());
+            CHECK_BOOL(statInfo.BlockCount == 1);
+            CHECK_BOOL(statInfo.UsedBytes + statInfo.UnusedBytes == blockDesc.Size);
+            CHECK_BOOL(statInfo.AllocationSizeMax == actualAllocSizeMax);
+            CHECK_BOOL(statInfo.AllocationSizeMin == actualAllocSizeMin);
+            CHECK_BOOL(statInfo.UsedBytes >= actualAllocSizeSum);
+        }
+
+        // Build JSON dump string
+        {
+            WCHAR* json = nullptr;
+            block->BuildStatsString(&json);
+            int I = 0; // put a breakpoint here to debug
+            block->FreeStatsString(json);
+        }
+
+        // Final cleanup
+        block->Clear();
+    }
+}
+
+static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
+{
+    wprintf(L"Benchmark virtual blocks algorithms\n");
+
+    const size_t ALLOCATION_COUNT = 7200;
+    const UINT32 MAX_ALLOC_SIZE = 2056;
+
+    D3D12MA::VIRTUAL_BLOCK_DESC blockDesc = {};
+    blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
+    blockDesc.Size = 0;
+
+    RandomNumberGenerator rand{ 20092010 };
+
+    UINT32 allocSizes[ALLOCATION_COUNT];
+    for (size_t i = 0; i < ALLOCATION_COUNT; ++i)
+    {
+        allocSizes[i] = rand.Generate() % MAX_ALLOC_SIZE + 1;
+        blockDesc.Size += allocSizes[i];
+    }
+    blockDesc.Size = static_cast<UINT64>(blockDesc.Size * 1.5); // 50% size margin in case of alignment
+
+    for (UINT8 alignmentIndex = 0; alignmentIndex < 4; ++alignmentIndex)
+    {
+        UINT64 alignment;
+        switch (alignmentIndex)
+        {
+        case 0: alignment = 1; break;
+        case 1: alignment = 16; break;
+        case 2: alignment = 64; break;
+        case 3: alignment = 256; break;
+        default: assert(0); break;
+        }
+        printf("    Alignment=%llu\n", alignment);
+
+        for (UINT8 algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+        {
+            switch (algorithmIndex)
+            {
+            case 0:
+                blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_NONE;
+                break;
+            case 1:
+                blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR;
+                break;
+            case 2:
+                blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF;
+                break;
+            default:
+                assert(0);
+            }
+
+            D3D12MA::VirtualAllocation allocs[ALLOCATION_COUNT];
+            ComPtr<D3D12MA::VirtualBlock> block;
+            CHECK_HR(D3D12MA::CreateVirtualBlock(&blockDesc, &block));
+            duration allocDuration = duration::zero();
+            duration freeDuration = duration::zero();
+
+            // Alloc
+            time_point timeBegin = std::chrono::high_resolution_clock::now();
+            for (size_t i = 0; i < ALLOCATION_COUNT; ++i)
+            {
+                D3D12MA::VIRTUAL_ALLOCATION_DESC allocCreateInfo = {};
+                allocCreateInfo.Size = allocSizes[i];
+                allocCreateInfo.Alignment = alignment;
+
+                CHECK_HR(block->Allocate(&allocCreateInfo, allocs + i, nullptr));
+            }
+            allocDuration += std::chrono::high_resolution_clock::now() - timeBegin;
+
+            // Free
+            timeBegin = std::chrono::high_resolution_clock::now();
+            for (size_t i = ALLOCATION_COUNT; i;)
+                block->FreeAllocation(allocs[--i]);
+            freeDuration += std::chrono::high_resolution_clock::now() - timeBegin;
+
+            printf("        Algorithm=%s  \tallocations %g s,   \tfree %g s\n",
+                VirtualAlgorithmToStr(blockDesc.Flags),
+                ToFloatSeconds(allocDuration),
+                ToFloatSeconds(freeDuration));
+        }
+        printf("\n");
+    }
+}
+
 static void TestGroupVirtual(const TestContext& ctx)
 {
     TestVirtualBlocks(ctx);
+    TestVirtualBlocksAlgorithms(ctx);
+    TestVirtualBlocksAlgorithmsBenchmark(ctx);
 }
 
 static void TestGroupBasics(const TestContext& ctx)
@@ -1885,12 +2851,21 @@ static void TestGroupBasics(const TestContext& ctx)
     TestTransfer(ctx);
     TestZeroInitialized(ctx);
     TestMultithreading(ctx);
+    TestLinearAllocator(ctx);
+    TestLinearAllocatorMultiBlock(ctx);
+    ManuallyTestLinearAllocator(ctx);
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     TestDevice4(ctx);
 #endif
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     TestDevice8(ctx);
 #endif
+
+    FILE* file;
+    fopen_s(&file, "Results.csv", "w");
+    assert(file != NULL);
+    BenchmarkAlgorithms(ctx, file);
+    fclose(file);
 #endif // #if D3D12_DEBUG_MARGIN
 }
 
