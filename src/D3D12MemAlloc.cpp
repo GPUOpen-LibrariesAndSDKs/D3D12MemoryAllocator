@@ -299,7 +299,7 @@ static inline UINT8 BitScanLSB(UINT32 mask)
         return static_cast<UINT8>(pos);
     return UINT8_MAX;
 #elif defined __GNUC__ || defined __clang__
-    return static_cast<UINT8>(__builtin_ffsl(mask)) - 1U;
+    return static_cast<UINT8>(__builtin_ffs(mask)) - 1U;
 #else
     UINT8 pos = 0;
     UINT32 bit = 1;
@@ -322,10 +322,10 @@ static inline UINT8 BitScanMSB(UINT64 mask)
         return static_cast<UINT8>(pos);
 #elif defined __GNUC__ || defined __clang__
     if (mask)
-        return static_cast<UINT8>(__builtin_clzll(mask));
+        return 63 - static_cast<UINT8>(__builtin_clzll(mask));
 #else
     UINT8 pos = 63;
-    UINT64 bit = 1U << 63;
+    UINT64 bit = 1ULL << 63;
     do
     {
         if (mask & bit)
@@ -345,10 +345,10 @@ static inline UINT8 BitScanMSB(UINT32 mask)
         return static_cast<UINT8>(pos);
 #elif defined __GNUC__ || defined __clang__
     if (mask)
-        return static_cast<UINT8>(__builtin_clzl(mask));
+        return 31 - static_cast<UINT8>(__builtin_clz(mask));
 #else
     UINT8 pos = 31;
-    UINT32 bit = 1 << 31;
+    UINT32 bit = 1UL << 31;
     do
     {
         if (mask & bit)
