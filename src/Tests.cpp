@@ -1712,6 +1712,7 @@ static void TestLinearAllocator(const TestContext& ctx)
     {
         // Allocate number of buffers of varying size that surely fit into this block.
         UINT64 bufSumSize = 0;
+        UINT64 allocSumSize = 0;
         for (size_t i = 0; i < maxBufCount; ++i)
         {
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
@@ -1720,15 +1721,17 @@ static void TestLinearAllocator(const TestContext& ctx)
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             const UINT64 offset = newBuffInfo.Allocation->GetOffset();
             CHECK_BOOL(i == 0 || offset > prevOffset);
-            buffInfo.push_back(std::move(newBuffInfo));
             prevOffset = offset;
             bufSumSize += buffDesc.Width;
+            allocSumSize += newBuffInfo.Allocation->GetSize();
+            buffInfo.push_back(std::move(newBuffInfo));
         }
 
         // Validate pool stats.
         D3D12MA::StatInfo stats;
         pool->CalculateStats(&stats);
-        CHECK_BOOL(stats.UnusedBytes = poolDesc.BlockSize - bufSumSize);
+        CHECK_BOOL(stats.UnusedBytes == poolDesc.BlockSize - allocSumSize);
+        CHECK_BOOL(allocSumSize >= bufSumSize);
         CHECK_BOOL(stats.AllocationCount == buffInfo.size());
 
         // Destroy the buffers in random order.
