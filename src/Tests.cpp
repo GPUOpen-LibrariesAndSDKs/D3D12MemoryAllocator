@@ -71,10 +71,8 @@ static const char* AlgorithmToStr(D3D12MA::POOL_FLAGS algorithm)
     {
     case D3D12MA::POOL_FLAG_ALGORITHM_LINEAR:
         return "Linear";
-    case D3D12MA::POOL_FLAG_ALGORITHM_TLSF:
-        return "TLSF";
     case 0:
-        return "Default";
+        return "TLSF";
     default:
         assert(0);
         return "";
@@ -87,10 +85,8 @@ static const char* VirtualAlgorithmToStr(D3D12MA::VIRTUAL_BLOCK_FLAGS algorithm)
     {
     case D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR:
         return "Linear";
-    case D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF:
-        return "TLSF";
     case 0:
-        return "Default";
+        return "TLSF";
     default:
         assert(0);
         return "";
@@ -199,13 +195,12 @@ static void TestDebugMargin(const TestContext& ctx)
     POOL_DESC poolDesc = {};
     poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
 
-    for(size_t algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+    for(size_t algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
     {
         switch(algorithmIndex)
         {
         case 0: poolDesc.Flags = POOL_FLAG_NONE; break;
-        case 1: poolDesc.Flags = POOL_FLAG_ALGORITHM_TLSF; break;
-        case 2: poolDesc.Flags = POOL_FLAG_ALGORITHM_LINEAR; break;
+        case 1: poolDesc.Flags = POOL_FLAG_ALGORITHM_LINEAR; break;
         default: assert(0);
         }
         ComPtr<Pool> pool;
@@ -263,15 +258,14 @@ static void TestDebugMarginNotInVirtualAllocator(const TestContext& ctx)
     wprintf(L"Test D3D12MA_DEBUG_MARGIN not applied to virtual allocator\n");
     using namespace D3D12MA;
     constexpr size_t ALLOCATION_COUNT = 10;
-    for(size_t algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+    for(size_t algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
     {
         VIRTUAL_BLOCK_DESC blockDesc = {};
         blockDesc.Size = ALLOCATION_COUNT * MEGABYTE;
         switch(algorithmIndex)
         {
         case 0: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_NONE; break;
-        case 1: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF; break;
-        case 2: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR; break;
+        case 1: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR; break;
         default: assert(0);
         }
 
@@ -604,8 +598,8 @@ static void TestCustomPools(const TestContext& ctx)
 
     // # Fetch global stats 1
 
-    D3D12MA::Stats globalStatsBeg = {};
-    ctx.allocator->CalculateStats(&globalStatsBeg);
+    D3D12MA::TotalStatistics globalStatsBeg = {};
+    ctx.allocator->CalculateStatistics(&globalStatsBeg);
 
     // # Create pool, 1..2 blocks of 11 MB
     
@@ -621,12 +615,13 @@ static void TestCustomPools(const TestContext& ctx)
 
     // # Validate stats for empty pool
 
-    D3D12MA::StatInfo poolStats = {};
-    pool->CalculateStats(&poolStats);
-    CHECK_BOOL( poolStats.BlockCount == 1 );
-    CHECK_BOOL( poolStats.AllocationCount == 0 );
-    CHECK_BOOL( poolStats.UsedBytes == 0 );
-    CHECK_BOOL( poolStats.UnusedBytes == poolStats.BlockCount * poolDesc.BlockSize );
+    D3D12MA::DetailedStatistics poolStats = {};
+    pool->CalculateStatistics(&poolStats);
+    CHECK_BOOL( poolStats.Stats.BlockCount == 1 );
+    CHECK_BOOL( poolStats.Stats.AllocationCount == 0 );
+    CHECK_BOOL( poolStats.Stats.AllocationBytes == 0 );
+    CHECK_BOOL( poolStats.Stats.BlockBytes - poolStats.Stats.AllocationBytes ==
+        poolStats.Stats.BlockCount * poolDesc.BlockSize );
 
     // # SetName and GetName
 
@@ -657,20 +652,24 @@ static void TestCustomPools(const TestContext& ctx)
 
     // # Validate pool stats now
 
-    pool->CalculateStats(&poolStats);
-    CHECK_BOOL( poolStats.BlockCount == 1 );
-    CHECK_BOOL( poolStats.AllocationCount == 2 );
-    CHECK_BOOL( poolStats.UsedBytes == 2 * BUFFER_SIZE );
-    CHECK_BOOL( poolStats.UnusedBytes == poolDesc.BlockSize - poolStats.UsedBytes );
+    pool->CalculateStatistics(&poolStats);
+    CHECK_BOOL( poolStats.Stats.BlockCount == 1 );
+    CHECK_BOOL( poolStats.Stats.AllocationCount == 2 );
+    CHECK_BOOL( poolStats.Stats.AllocationBytes == 2 * BUFFER_SIZE );
+    CHECK_BOOL( poolStats.Stats.BlockBytes - poolStats.Stats.AllocationBytes ==
+        poolDesc.BlockSize - poolStats.Stats.AllocationBytes );
 
     // # Check that global stats are updated as well
 
-    D3D12MA::Stats globalStatsCurr = {};
-    ctx.allocator->CalculateStats(&globalStatsCurr);
+    D3D12MA::TotalStatistics globalStatsCurr = {};
+    ctx.allocator->CalculateStatistics(&globalStatsCurr);
 
-    CHECK_BOOL( globalStatsCurr.Total.AllocationCount == globalStatsBeg.Total.AllocationCount + poolStats.AllocationCount );
-    CHECK_BOOL( globalStatsCurr.Total.BlockCount == globalStatsBeg.Total.BlockCount + poolStats.BlockCount );
-    CHECK_BOOL( globalStatsCurr.Total.UsedBytes == globalStatsBeg.Total.UsedBytes + poolStats.UsedBytes );
+    CHECK_BOOL( globalStatsCurr.Total.Stats.AllocationCount ==
+        globalStatsBeg.Total.Stats.AllocationCount + poolStats.Stats.AllocationCount );
+    CHECK_BOOL( globalStatsCurr.Total.Stats.BlockCount ==
+        globalStatsBeg.Total.Stats.BlockCount + poolStats.Stats.BlockCount );
+    CHECK_BOOL( globalStatsCurr.Total.Stats.AllocationBytes ==
+        globalStatsBeg.Total.Stats.AllocationBytes + poolStats.Stats.AllocationBytes );
 
     // # NEVER_ALLOCATE and COMMITTED should fail
     // (Committed allocations not allowed in this pool because BlockSize != 0.)
@@ -711,11 +710,12 @@ static void TestCustomPools(const TestContext& ctx)
         }
     }
 
-    pool->CalculateStats(&poolStats);
-    CHECK_BOOL( poolStats.BlockCount == 2 );
-    CHECK_BOOL( poolStats.AllocationCount == 4 );
-    CHECK_BOOL( poolStats.UsedBytes == 4 * BUFFER_SIZE );
-    CHECK_BOOL( poolStats.UnusedBytes == poolStats.BlockCount * poolDesc.BlockSize - poolStats.UsedBytes );
+    pool->CalculateStatistics(&poolStats);
+    CHECK_BOOL( poolStats.Stats.BlockCount == 2 );
+    CHECK_BOOL( poolStats.Stats.AllocationCount == 4 );
+    CHECK_BOOL( poolStats.Stats.AllocationBytes == 4 * BUFFER_SIZE );
+    CHECK_BOOL( poolStats.Stats.BlockBytes - poolStats.Stats.AllocationBytes ==
+        poolStats.Stats.BlockCount * poolDesc.BlockSize - poolStats.Stats.AllocationBytes );
 
     // # Make room, AllocateMemory, CreateAliasingResource
 
@@ -748,8 +748,8 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
     D3D12MA::ALLOCATION_DESC allocDesc = {};
 
     uint32_t totalNewAllocCount = 0, totalNewBlockCount = 0;
-    D3D12MA::Stats statsBeg, statsEnd;
-    ctx.allocator->CalculateStats(&statsBeg);
+    D3D12MA::TotalStatistics statsBeg, statsEnd;
+    ctx.allocator->CalculateStatistics(&statsBeg);
 
     HRESULT hr;
     ComPtr<D3D12MA::Allocation> alloc;
@@ -842,22 +842,25 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
 
         if(poolTypeI > 0)
         {
-            D3D12MA::StatInfo poolStats = {};
-            (poolTypeI == 2 ? pool2 : pool1)->CalculateStats(&poolStats);
-            CHECK_BOOL(poolStats.AllocationCount == poolAllocCount);
-            CHECK_BOOL(poolStats.UsedBytes == poolAllocCount * MEGABYTE);
-            CHECK_BOOL(poolStats.BlockCount == poolBlockCount);
+            D3D12MA::DetailedStatistics poolStats = {};
+            (poolTypeI == 2 ? pool2 : pool1)->CalculateStatistics(&poolStats);
+            CHECK_BOOL(poolStats.Stats.AllocationCount == poolAllocCount);
+            CHECK_BOOL(poolStats.Stats.AllocationBytes == poolAllocCount * MEGABYTE);
+            CHECK_BOOL(poolStats.Stats.BlockCount == poolBlockCount);
         }
 
         totalNewAllocCount += poolAllocCount;
         totalNewBlockCount += poolBlockCount;
     }
 
-    ctx.allocator->CalculateStats(&statsEnd);
+    ctx.allocator->CalculateStatistics(&statsEnd);
 
-    CHECK_BOOL(statsEnd.Total.AllocationCount == statsBeg.Total.AllocationCount + totalNewAllocCount);
-    CHECK_BOOL(statsEnd.Total.BlockCount >= statsBeg.Total.BlockCount + totalNewBlockCount);
-    CHECK_BOOL(statsEnd.Total.UsedBytes == statsBeg.Total.UsedBytes + totalNewAllocCount * MEGABYTE);
+    CHECK_BOOL(statsEnd.Total.Stats.AllocationCount ==
+        statsBeg.Total.Stats.AllocationCount + totalNewAllocCount);
+    CHECK_BOOL(statsEnd.Total.Stats.BlockCount >=
+        statsBeg.Total.Stats.BlockCount + totalNewBlockCount);
+    CHECK_BOOL(statsEnd.Total.Stats.AllocationBytes ==
+        statsBeg.Total.Stats.AllocationBytes + totalNewAllocCount * MEGABYTE);
 }
 
 static void TestCustomPool_MinAllocationAlignment(const TestContext& ctx)
@@ -927,8 +930,8 @@ static void TestCustomPool_Committed(const TestContext& ctx)
 
 static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIES& heapProps)
 {
-    D3D12MA::Stats globalStatsBeg = {};
-    ctx.allocator->CalculateStats(&globalStatsBeg);
+    D3D12MA::TotalStatistics globalStatsBeg = {};
+    ctx.allocator->CalculateStatistics(&globalStatsBeg);
 
     D3D12MA::POOL_DESC poolDesc = {};
     poolDesc.HeapProperties = heapProps;
@@ -957,19 +960,19 @@ static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIE
             &alloc,
             __uuidof(ID3D12Resource), NULL) ); // riidResource, ppvResource
 
-        D3D12MA::Stats globalStatsCurr = {};
-        ctx.allocator->CalculateStats(&globalStatsCurr);
+        D3D12MA::TotalStatistics globalStatsCurr = {};
+        ctx.allocator->CalculateStatistics(&globalStatsCurr);
 
         // Make sure it is accounted only in CUSTOM heap not any of the standard heaps.
-        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[0], &globalStatsBeg.HeapType[0], sizeof(D3D12MA::StatInfo)) == 0);
-        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[1], &globalStatsBeg.HeapType[1], sizeof(D3D12MA::StatInfo)) == 0);
-        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[2], &globalStatsBeg.HeapType[2], sizeof(D3D12MA::StatInfo)) == 0);
-        CHECK_BOOL( globalStatsCurr.HeapType[3].AllocationCount == globalStatsBeg.HeapType[3].AllocationCount + 1 );
-        CHECK_BOOL( globalStatsCurr.HeapType[3].BlockCount == globalStatsBeg.HeapType[3].BlockCount + 1 );
-        CHECK_BOOL( globalStatsCurr.HeapType[3].UsedBytes == globalStatsBeg.HeapType[3].UsedBytes + BUFFER_SIZE );
-        CHECK_BOOL( globalStatsCurr.Total.AllocationCount == globalStatsBeg.Total.AllocationCount + 1 );
-        CHECK_BOOL( globalStatsCurr.Total.BlockCount == globalStatsBeg.Total.BlockCount + 1 );
-        CHECK_BOOL( globalStatsCurr.Total.UsedBytes == globalStatsBeg.Total.UsedBytes + BUFFER_SIZE );
+        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[0], &globalStatsBeg.HeapType[0], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[1], &globalStatsBeg.HeapType[1], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[2], &globalStatsBeg.HeapType[2], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        CHECK_BOOL( globalStatsCurr.HeapType[3].Stats.AllocationCount == globalStatsBeg.HeapType[3].Stats.AllocationCount + 1 );
+        CHECK_BOOL( globalStatsCurr.HeapType[3].Stats.BlockCount == globalStatsBeg.HeapType[3].Stats.BlockCount + 1 );
+        CHECK_BOOL( globalStatsCurr.HeapType[3].Stats.AllocationBytes == globalStatsBeg.HeapType[3].Stats.AllocationBytes + BUFFER_SIZE );
+        CHECK_BOOL( globalStatsCurr.Total.Stats.AllocationCount == globalStatsBeg.Total.Stats.AllocationCount + 1 );
+        CHECK_BOOL( globalStatsCurr.Total.Stats.BlockCount == globalStatsBeg.Total.Stats.BlockCount + 1 );
+        CHECK_BOOL( globalStatsCurr.Total.Stats.AllocationBytes == globalStatsBeg.Total.Stats.AllocationBytes + BUFFER_SIZE );
 
         // Map and write some data.
         if(heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE ||
@@ -1020,10 +1023,10 @@ static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
 
     std::vector<ComPtr<D3D12MA::Allocation>> allocations;
     
-    D3D12MA::Stats statsBeg = {};
-    D3D12MA::StatInfo poolStatInfoBeg = {};
-    ctx.allocator->CalculateStats(&statsBeg);
-    pool->CalculateStats(&poolStatInfoBeg);
+    D3D12MA::TotalStatistics statsBeg = {};
+    D3D12MA::DetailedStatistics poolStatInfoBeg = {};
+    ctx.allocator->CalculateStatistics(&statsBeg);
+    pool->CalculateStatistics(&poolStatInfoBeg);
 
     size_t poolAllocCount = 0;
 
@@ -1074,17 +1077,17 @@ static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
         }
     }
 
-    D3D12MA::Stats statsEnd = {};
-    D3D12MA::StatInfo poolStatInfoEnd = {};
-    ctx.allocator->CalculateStats(&statsEnd);
-    pool->CalculateStats(&poolStatInfoEnd);
+    D3D12MA::TotalStatistics statsEnd = {};
+    D3D12MA::DetailedStatistics poolStatInfoEnd = {};
+    ctx.allocator->CalculateStatistics(&statsEnd);
+    pool->CalculateStatistics(&poolStatInfoEnd);
 
-    CHECK_BOOL(statsEnd.Total.AllocationCount == statsBeg.Total.AllocationCount + allocations.size());
-    CHECK_BOOL(statsEnd.Total.UsedBytes >= statsBeg.Total.UsedBytes + allocations.size() * bufferSize);
-    CHECK_BOOL(statsEnd.HeapType[0].AllocationCount == statsBeg.HeapType[0].AllocationCount + allocations.size());
-    CHECK_BOOL(statsEnd.HeapType[0].UsedBytes >= statsBeg.HeapType[0].UsedBytes + allocations.size() * bufferSize);
-    CHECK_BOOL(poolStatInfoEnd.AllocationCount == poolStatInfoBeg.AllocationCount + poolAllocCount);
-    CHECK_BOOL(poolStatInfoEnd.UsedBytes >= poolStatInfoBeg.UsedBytes + poolAllocCount * bufferSize);
+    CHECK_BOOL(statsEnd.Total.Stats.AllocationCount == statsBeg.Total.Stats.AllocationCount + allocations.size());
+    CHECK_BOOL(statsEnd.Total.Stats.AllocationBytes >= statsBeg.Total.Stats.AllocationBytes + allocations.size() * bufferSize);
+    CHECK_BOOL(statsEnd.HeapType[0].Stats.AllocationCount == statsBeg.HeapType[0].Stats.AllocationCount + allocations.size());
+    CHECK_BOOL(statsEnd.HeapType[0].Stats.AllocationBytes >= statsBeg.HeapType[0].Stats.AllocationBytes + allocations.size() * bufferSize);
+    CHECK_BOOL(poolStatInfoEnd.Stats.AllocationCount == poolStatInfoBeg.Stats.AllocationCount + poolAllocCount);
+    CHECK_BOOL(poolStatInfoEnd.Stats.AllocationBytes >= poolStatInfoBeg.Stats.AllocationBytes + poolAllocCount * bufferSize);
 }
 
 static void TestAliasingMemory(const TestContext& ctx)
@@ -1194,38 +1197,21 @@ static void TestMapping(const TestContext& ctx)
     }
 }
 
-static inline bool StatInfoEqual(const D3D12MA::StatInfo& lhs, const D3D12MA::StatInfo& rhs)
+static inline bool StatisticsEqual(const D3D12MA::DetailedStatistics& lhs, const D3D12MA::DetailedStatistics& rhs)
 {
-    return lhs.BlockCount == rhs.BlockCount &&
-        lhs.AllocationCount == rhs.AllocationCount &&
-        lhs.UnusedRangeCount == rhs.UnusedRangeCount &&
-        lhs.UsedBytes == rhs.UsedBytes &&
-        lhs.UnusedBytes == rhs.UnusedBytes &&
-        lhs.AllocationSizeMin == rhs.AllocationSizeMin &&
-        lhs.AllocationSizeMax == rhs.AllocationSizeMax &&
-        lhs.AllocationSizeAvg == rhs.AllocationSizeAvg &&
-        lhs.UnusedRangeSizeMin == rhs.UnusedRangeSizeMin &&
-        lhs.UnusedRangeSizeMax == rhs.UnusedRangeSizeMax &&
-        lhs.UnusedRangeSizeAvg == rhs.UnusedRangeSizeAvg;
+    return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
 }
 
-static void CheckStatInfo(const D3D12MA::StatInfo& statInfo)
+static void CheckStatistics(const D3D12MA::DetailedStatistics& stats)
 {
-    if(statInfo.AllocationCount > 0)
+    if(stats.Stats.AllocationBytes > 0)
     {
-        CHECK_BOOL(statInfo.AllocationSizeAvg >= statInfo.AllocationSizeMin &&
-            statInfo.AllocationSizeAvg <= statInfo.AllocationSizeMax);
+        CHECK_BOOL(stats.Stats.AllocationCount > 0);
     }
-    if(statInfo.UsedBytes > 0)
+    if(stats.UnusedRangeCount > 0)
     {
-        CHECK_BOOL(statInfo.AllocationCount > 0);
-    }
-    if(statInfo.UnusedRangeCount > 0)
-    {
-        CHECK_BOOL(statInfo.UnusedRangeSizeAvg >= statInfo.UnusedRangeSizeMin &&
-            statInfo.UnusedRangeSizeAvg <= statInfo.UnusedRangeSizeMax);
-        CHECK_BOOL(statInfo.UnusedRangeSizeMin > 0);
-        CHECK_BOOL(statInfo.UnusedRangeSizeMax > 0);
+        CHECK_BOOL(stats.UnusedRangeSizeMin > 0);
+        CHECK_BOOL(stats.UnusedRangeSizeMax > 0);
     }
 }
 
@@ -1233,8 +1219,8 @@ static void TestStats(const TestContext& ctx)
 {
     wprintf(L"Test stats\n");
 
-    D3D12MA::Stats begStats = {};
-    ctx.allocator->CalculateStats(&begStats);
+    D3D12MA::TotalStatistics begStats = {};
+    ctx.allocator->CalculateStatistics(&begStats);
 
     const UINT count = 10;
     const UINT64 bufSize = 64ull * 1024;
@@ -1259,40 +1245,40 @@ static void TestStats(const TestContext& ctx)
             IID_PPV_ARGS(&resources[i].resource)) );
     }
 
-    D3D12MA::Stats endStats = {};
-    ctx.allocator->CalculateStats(&endStats);
+    D3D12MA::TotalStatistics endStats = {};
+    ctx.allocator->CalculateStatistics(&endStats);
 
-    CHECK_BOOL(endStats.Total.BlockCount >= begStats.Total.BlockCount);
-    CHECK_BOOL(endStats.Total.AllocationCount == begStats.Total.AllocationCount + count);
-    CHECK_BOOL(endStats.Total.UsedBytes == begStats.Total.UsedBytes + count * bufSize);
+    CHECK_BOOL(endStats.Total.Stats.BlockCount >= begStats.Total.Stats.BlockCount);
+    CHECK_BOOL(endStats.Total.Stats.AllocationCount == begStats.Total.Stats.AllocationCount + count);
+    CHECK_BOOL(endStats.Total.Stats.AllocationBytes == begStats.Total.Stats.AllocationBytes + count * bufSize);
     CHECK_BOOL(endStats.Total.AllocationSizeMin <= bufSize);
     CHECK_BOOL(endStats.Total.AllocationSizeMax >= bufSize);
 
-    CHECK_BOOL(endStats.HeapType[1].BlockCount >= begStats.HeapType[1].BlockCount);
-    CHECK_BOOL(endStats.HeapType[1].AllocationCount >= begStats.HeapType[1].AllocationCount + count);
-    CHECK_BOOL(endStats.HeapType[1].UsedBytes >= begStats.HeapType[1].UsedBytes + count * bufSize);
+    CHECK_BOOL(endStats.HeapType[1].Stats.BlockCount >= begStats.HeapType[1].Stats.BlockCount);
+    CHECK_BOOL(endStats.HeapType[1].Stats.AllocationCount >= begStats.HeapType[1].Stats.AllocationCount + count);
+    CHECK_BOOL(endStats.HeapType[1].Stats.AllocationBytes >= begStats.HeapType[1].Stats.AllocationBytes + count * bufSize);
     CHECK_BOOL(endStats.HeapType[1].AllocationSizeMin <= bufSize);
     CHECK_BOOL(endStats.HeapType[1].AllocationSizeMax >= bufSize);
 
-    CHECK_BOOL(StatInfoEqual(begStats.HeapType[0], endStats.HeapType[0]));
-    CHECK_BOOL(StatInfoEqual(begStats.HeapType[2], endStats.HeapType[2]));
+    CHECK_BOOL(StatisticsEqual(begStats.HeapType[0], endStats.HeapType[0]));
+    CHECK_BOOL(StatisticsEqual(begStats.HeapType[2], endStats.HeapType[2]));
 
-    CheckStatInfo(endStats.Total);
-    CheckStatInfo(endStats.HeapType[0]);
-    CheckStatInfo(endStats.HeapType[1]);
-    CheckStatInfo(endStats.HeapType[2]);
+    CheckStatistics(endStats.Total);
+    CheckStatistics(endStats.HeapType[0]);
+    CheckStatistics(endStats.HeapType[1]);
+    CheckStatistics(endStats.HeapType[2]);
 
     D3D12MA::Budget gpuBudget = {}, cpuBudget = {};
     ctx.allocator->GetBudget(&gpuBudget, &cpuBudget);
     
-    CHECK_BOOL(gpuBudget.AllocationBytes <= gpuBudget.BlockBytes);
-    CHECK_BOOL(gpuBudget.AllocationBytes == endStats.HeapType[0].UsedBytes);
-    CHECK_BOOL(gpuBudget.BlockBytes == endStats.HeapType[0].UsedBytes + endStats.HeapType[0].UnusedBytes);
+    CHECK_BOOL(gpuBudget.Stats.AllocationBytes <= gpuBudget.Stats.BlockBytes);
+    CHECK_BOOL(gpuBudget.Stats.AllocationBytes == endStats.HeapType[0].Stats.AllocationBytes);
+    CHECK_BOOL(gpuBudget.Stats.BlockBytes == endStats.HeapType[0].Stats.BlockBytes);
     
-    CHECK_BOOL(cpuBudget.AllocationBytes <= cpuBudget.BlockBytes);
-    CHECK_BOOL(cpuBudget.AllocationBytes == endStats.HeapType[1].UsedBytes + endStats.HeapType[2].UsedBytes);
-    CHECK_BOOL(cpuBudget.BlockBytes == endStats.HeapType[1].UsedBytes + endStats.HeapType[1].UnusedBytes +
-        endStats.HeapType[2].UsedBytes + endStats.HeapType[2].UnusedBytes);
+    CHECK_BOOL(cpuBudget.Stats.AllocationBytes <= cpuBudget.Stats.BlockBytes);
+    CHECK_BOOL(cpuBudget.Stats.AllocationBytes == endStats.HeapType[1].Stats.AllocationBytes + endStats.HeapType[2].Stats.AllocationBytes);
+    CHECK_BOOL(cpuBudget.Stats.BlockBytes ==
+        endStats.HeapType[1].Stats.BlockBytes + endStats.HeapType[2].Stats.BlockBytes);
 }
 
 static void TestTransfer(const TestContext& ctx)
@@ -1728,11 +1714,11 @@ static void TestLinearAllocator(const TestContext& ctx)
         }
 
         // Validate pool stats.
-        D3D12MA::StatInfo stats;
-        pool->CalculateStats(&stats);
-        CHECK_BOOL(stats.UnusedBytes == poolDesc.BlockSize - allocSumSize);
+        D3D12MA::DetailedStatistics stats;
+        pool->CalculateStatistics(&stats);
+        CHECK_BOOL(stats.Stats.BlockBytes - stats.Stats.AllocationBytes == poolDesc.BlockSize - allocSumSize);
         CHECK_BOOL(allocSumSize >= bufSumSize);
-        CHECK_BOOL(stats.AllocationCount == buffInfo.size());
+        CHECK_BOOL(stats.Stats.AllocationCount == buffInfo.size());
 
         // Destroy the buffers in random order.
         while (!buffInfo.empty())
@@ -2008,9 +1994,9 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         CHECK_BOOL(buffInfo.size() > 2);
 
         // Make sure that pool has now two blocks.
-        D3D12MA::StatInfo poolStats = {};
-        pool->CalculateStats(&poolStats);
-        CHECK_BOOL(poolStats.BlockCount == 2);
+        D3D12MA::DetailedStatistics poolStats = {};
+        pool->CalculateStatistics(&poolStats);
+        CHECK_BOOL(poolStats.Stats.BlockCount == 2);
 
         // Destroy all the buffers in random order.
         while (!buffInfo.empty())
@@ -2020,8 +2006,8 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         }
 
         // Make sure that pool has now at most one block.
-        pool->CalculateStats(&poolStats);
-        CHECK_BOOL(poolStats.BlockCount <= 1);
+        pool->CalculateStatistics(&poolStats);
+        CHECK_BOOL(poolStats.Stats.BlockCount <= 1);
     }
 
     // Test stack.
@@ -2053,9 +2039,9 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         }
 
         // Make sure that pool has now two blocks.
-        D3D12MA::StatInfo poolStats = {};
-        pool->CalculateStats(&poolStats);
-        CHECK_BOOL(poolStats.BlockCount == 2);
+        D3D12MA::DetailedStatistics poolStats = {};
+        pool->CalculateStatistics(&poolStats);
+        CHECK_BOOL(poolStats.Stats.BlockCount == 2);
 
         // Delete half of buffers, LIFO.
         for (size_t i = 0, countToDelete = buffInfo.size() / 2; i < countToDelete; ++i)
@@ -2068,8 +2054,8 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         buffInfo.push_back(std::move(newBuffInfo));
 
         // Make sure that pool has now one block.
-        pool->CalculateStats(&poolStats);
-        CHECK_BOOL(poolStats.BlockCount == 1);
+        pool->CalculateStatistics(&poolStats);
+        CHECK_BOOL(poolStats.Stats.BlockCount == 1);
 
         // Delete all the remaining buffers, LIFO.
         while (!buffInfo.empty())
@@ -2083,8 +2069,8 @@ static void ManuallyTestLinearAllocator(const TestContext& ctx)
 
     RandomNumberGenerator rand{ 645332 };
 
-    D3D12MA::Stats origStats;
-    ctx.allocator->CalculateStats(&origStats);
+    D3D12MA::TotalStatistics origStats;
+    ctx.allocator->CalculateStatistics(&origStats);
 
     D3D12MA::POOL_DESC poolDesc = {};
     poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
@@ -2155,10 +2141,10 @@ static void ManuallyTestLinearAllocator(const TestContext& ctx)
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
-        D3D12MA::Stats currStats;
-        ctx.allocator->CalculateStats(&currStats);
-        D3D12MA::StatInfo poolStats;
-        pool->CalculateStats(&poolStats);
+        D3D12MA::TotalStatistics currStats;
+        ctx.allocator->CalculateStatistics(&currStats);
+        D3D12MA::DetailedStatistics poolStats;
+        pool->CalculateStatistics(&poolStats);
 
         WCHAR* statsStr = nullptr;
         ctx.allocator->BuildStatsString(&statsStr, FALSE);
@@ -2323,7 +2309,7 @@ static void BenchmarkAlgorithms(const TestContext& ctx, FILE* file)
 
         for (UINT32 emptyIndex = 0; emptyIndex < emptyCount; ++emptyIndex)
         {
-            for (UINT32 algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+            for (UINT32 algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
             {
                 D3D12MA::POOL_FLAGS algorithm;
                 switch (algorithmIndex)
@@ -2333,9 +2319,6 @@ static void BenchmarkAlgorithms(const TestContext& ctx, FILE* file)
                     break;
                 case 1:
                     algorithm = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
-                    break;
-                case 2:
-                    algorithm = D3D12MA::POOL_FLAG_ALGORITHM_TLSF;
                     break;
                 default:
                     assert(0);
@@ -2537,12 +2520,12 @@ static void TestVirtualBlocks(const TestContext& ctx)
 
     // # Calculate statistics
 
-    StatInfo statInfo = {};
-    block->CalculateStats(&statInfo);
-    CHECK_BOOL(statInfo.AllocationCount == 2);
-    CHECK_BOOL(statInfo.BlockCount == 1);
-    CHECK_BOOL(statInfo.UsedBytes == blockSize);
-    CHECK_BOOL(statInfo.UnusedBytes + statInfo.UsedBytes == blockSize);
+    DetailedStatistics statInfo = {};
+    block->CalculateStatistics(&statInfo);
+    CHECK_BOOL(statInfo.Stats.AllocationCount == 2);
+    CHECK_BOOL(statInfo.Stats.BlockCount == 1);
+    CHECK_BOOL(statInfo.Stats.AllocationBytes == blockSize);
+    CHECK_BOOL(statInfo.Stats.BlockBytes == blockSize);
 
     // # Generate JSON dump
 
@@ -2595,7 +2578,7 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
     RandomNumberGenerator rand{ 3454335 };
     auto calcRandomAllocSize = [&rand]() -> UINT64 { return rand.Generate() % 20 + 5; };
 
-    for (size_t algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+    for (size_t algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
     {
         // Create the block
         D3D12MA::VIRTUAL_BLOCK_DESC blockDesc = {};
@@ -2603,8 +2586,8 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
         blockDesc.Size = 10'000;
         switch (algorithmIndex)
         {
+        case 0: blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_NONE; break;
         case 1: blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR; break;
-        case 2: blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF; break;
         }
         ComPtr<D3D12MA::VirtualBlock> block;
         CHECK_HR(D3D12MA::CreateVirtualBlock(&blockDesc, &block));
@@ -2717,14 +2700,14 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
                 actualAllocSizeSum += a.allocationSize;
                 });
 
-            D3D12MA::StatInfo statInfo = {};
-            block->CalculateStats(&statInfo);
-            CHECK_BOOL(statInfo.AllocationCount == allocations.size());
-            CHECK_BOOL(statInfo.BlockCount == 1);
-            CHECK_BOOL(statInfo.UsedBytes + statInfo.UnusedBytes == blockDesc.Size);
+            D3D12MA::DetailedStatistics statInfo = {};
+            block->CalculateStatistics(&statInfo);
+            CHECK_BOOL(statInfo.Stats.AllocationCount == allocations.size());
+            CHECK_BOOL(statInfo.Stats.BlockCount == 1);
+            CHECK_BOOL(statInfo.Stats.BlockBytes == blockDesc.Size);
             CHECK_BOOL(statInfo.AllocationSizeMax == actualAllocSizeMax);
             CHECK_BOOL(statInfo.AllocationSizeMin == actualAllocSizeMin);
-            CHECK_BOOL(statInfo.UsedBytes >= actualAllocSizeSum);
+            CHECK_BOOL(statInfo.Stats.AllocationBytes >= actualAllocSizeSum);
         }
 
         // Build JSON dump string
@@ -2774,7 +2757,7 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
         }
         printf("    Alignment=%llu\n", alignment);
 
-        for (UINT8 algorithmIndex = 0; algorithmIndex < 3; ++algorithmIndex)
+        for (UINT8 algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
         {
             switch (algorithmIndex)
             {
@@ -2783,9 +2766,6 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
                 break;
             case 1:
                 blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR;
-                break;
-            case 2:
-                blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF;
                 break;
             default:
                 assert(0);

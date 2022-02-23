@@ -163,7 +163,9 @@ class VirtualBlockPimpl;
 
 class Pool;
 class Allocator;
-struct StatInfo;
+struct Statistics;
+struct DetailedStatistics;
+struct TotalStatistics;
 
 /// \brief Unique identifier of single allocation done inside the memory heap.
 typedef UINT64 AllocHandle;
@@ -198,6 +200,12 @@ enum ALLOCATION_FLAGS
     Set this flag if the allocation should have its own dedicated memory allocation (committed resource with implicit heap).
     
     Use it for special, big resources, like fullscreen textures used as render targets.
+
+    - When used with functions like D3D12MA::Allocator::CreateResource, it will use `ID3D12Device::CreateCommittedResource`,
+      so the created allocation will contain a resource (D3D12MA::Allocation::GetResource() `!= NULL`) but will not have
+      a heap (D3D12MA::Allocation::GetHeap() `== NULL`), as the heap is implicit.
+    - When used with raw memory allocation like D3D12MA::Allocator::AllocateMemory, it will use `ID3D12Device::CreateHeap`,
+      so the created allocation will contain a heap (D3D12MA::Allocation::GetHeap() `!= NULL`) and its offset will always be 0.
     */
     ALLOCATION_FLAG_COMMITTED = 0x1,
 
@@ -214,6 +222,8 @@ enum ALLOCATION_FLAGS
 
     /** Create allocation only if additional memory required for it, if any, won't exceed
     memory budget. Otherwise return `E_OUTOFMEMORY`.
+
+    \warning Currently this feature is not fully implemented yet.
     */
     ALLOCATION_FLAG_WITHIN_BUDGET = 0x4,
 
@@ -453,18 +463,6 @@ enum POOL_FLAGS
     /// Zero
     POOL_FLAG_NONE = 0,
 
-    /** \brief Enables alternative, TLSF allocation algorithm in virtual block.
-
-    This algorithm is based on 2-level lists dividing address space into smaller
-    chunks. The first level is aligned to power of two which serves as buckets for requested
-    memory to fall into, and the second level is lineary subdivided into lists of free memory.
-    This algorithm aims to achieve bounded response time even in the worst case scenario.
-    Allocation time can be sometimes slightly longer than compared to other algorithms
-    but in return the application can avoid stalls in case of fragmentation, giving
-    predictable results, suitable for real-time use cases.
-    */
-    POOL_FLAG_ALGORITHM_TLSF = 0x1,
-
     /** \brief Enables alternative, linear allocation algorithm in this pool.
 
     Specify this flag to enable linear allocation algorithm, which always creates
@@ -476,10 +474,10 @@ enum POOL_FLAGS
     ring buffer, and double stack.
     For details, see documentation chapter \ref linear_algorithm.
     */
-    POOL_FLAG_ALGORITHM_LINEAR = 0x2,
+    POOL_FLAG_ALGORITHM_LINEAR = 0x1,
 
     // Bit mask to extract only `ALGORITHM` bits from entire set of flags.
-    POOL_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_TLSF | POOL_FLAG_ALGORITHM_LINEAR
+    POOL_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_LINEAR
 };
 
 /// \brief Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.
@@ -554,9 +552,13 @@ public:
     */
     POOL_DESC GetDesc() const;
 
-    /** \brief Retrieves statistics from the current state of this pool.
+    /** \brief TODO
     */
-    void CalculateStats(StatInfo* pStats);
+    void GetStatistics(Statistics* pStats);
+
+    /** \brief TODO
+    */
+    void CalculateStatistics(DetailedStatistics* pStats);
 
     /** \brief Associates a name with the pool. This name is for use in debug diagnostics and tools.
 
@@ -649,59 +651,50 @@ struct ALLOCATOR_DESC
 */
 const UINT HEAP_TYPE_COUNT = 4;
 
-/**
-\brief Calculated statistics of memory usage in entire allocator.
+/** \brief TODO
 */
-struct StatInfo
+struct Statistics
 {
     /// Number of memory blocks (heaps) allocated.
     UINT BlockCount;
     /// Number of D3D12MA::Allocation objects allocated.
     UINT AllocationCount;
-    /// Number of free ranges of memory between allocations.
-    UINT UnusedRangeCount;
+    UINT64 BlockBytes;
     /// Total number of bytes occupied by all allocations.
-    UINT64 UsedBytes;
-    /// Total number of bytes occupied by unused ranges.
-    UINT64 UnusedBytes;
+    UINT64 AllocationBytes;
+};
+
+struct DetailedStatistics
+{
+    Statistics Stats;
+    UINT UnusedRangeCount;
     UINT64 AllocationSizeMin;
-    UINT64 AllocationSizeAvg;
     UINT64 AllocationSizeMax;
     UINT64 UnusedRangeSizeMin;
-    UINT64 UnusedRangeSizeAvg;
     UINT64 UnusedRangeSizeMax;
 };
 
 /**
 \brief General statistics from the current state of the allocator.
 */
-struct Stats
+struct TotalStatistics
 {
-    /// Total statistics from all heap types.
-    StatInfo Total;
-    /**
-    One StatInfo for each type of heap located at the following indices:
+    /** \brief
+    One element for each type of heap located at the following indices:
     0 - DEFAULT, 1 - UPLOAD, 2 - READBACK, 3 - CUSTOM.
     */
-    StatInfo HeapType[HEAP_TYPE_COUNT];
+    DetailedStatistics HeapType[HEAP_TYPE_COUNT];
+    /// Total statistics from all heap types.
+    DetailedStatistics Total;
 };
 
 /** \brief Statistics of current memory usage and available budget, in bytes, for GPU or CPU memory.
 */
 struct Budget
 {
-    /** \brief Sum size of all memory blocks allocated from particular heap type, in bytes.
+    /** \brief TODO
     */
-    UINT64 BlockBytes;
-
-    /** \brief Sum size of all allocations created in particular heap type, in bytes.
-
-    Always less or equal than `BlockBytes`.
-    Difference `BlockBytes - AllocationBytes` is the amount of memory allocated but unused -
-    available for new allocations or wasted due to fragmentation.
-    */
-    UINT64 AllocationBytes;
-
+    Statistics Stats;
     /** \brief Estimated current memory usage of the program, in bytes.
 
     Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if enabled.
@@ -711,7 +704,6 @@ struct Budget
     memory blocks allocated outside of this library, if any.
     */
     UINT64 UsageBytes;
-
     /** \brief Estimated amount of memory available to the program, in bytes.
 
     Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if enabled.
@@ -876,9 +868,9 @@ public:
     */
     void SetCurrentFrameIndex(UINT frameIndex);
 
-    /** \brief Retrieves statistics from the current state of the allocator.
+    /** \brief TODO
     */
-    void CalculateStats(Stats* pStats);
+    void CalculateStatistics(TotalStatistics* pStats);
 
     /** \brief Retrieves information about current memory budget.
 
@@ -923,18 +915,6 @@ enum VIRTUAL_BLOCK_FLAGS
 {
     /// Zero
     VIRTUAL_BLOCK_FLAG_NONE = 0,
-
-    /** \brief Enables alternative, TLSF allocation algorithm in virtual block.
-
-    This algorithm is based on 2-level lists dividing address space into smaller
-    chunks. The first level is aligned to power of two which serves as buckets for requested
-    memory to fall into, and the second level is lineary subdivided into lists of free memory.
-    This algorithm aims to achieve bounded response time even in the worst case scenario.
-    Allocation time can be sometimes slightly longer than compared to other algorithms
-    but in return the application can avoid stalls in case of fragmentation, giving
-    predictable results, suitable for real-time use cases.
-    */
-    VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF = POOL_FLAG_ALGORITHM_TLSF,
 
     /** \brief Enables alternative, linear allocation algorithm in this virtual block.
 
@@ -1065,9 +1045,12 @@ public:
     */
     void SetAllocationUserData(VirtualAllocation allocation, void* pUserData);
 
-    /** \brief Retrieves statistics from the current state of the block.
+    /** \brief TODO
     */
-    void CalculateStats(StatInfo* pInfo) const;
+    void GetStatistics(Statistics* pStats) const;
+    /** \brief TODO
+    */
+    void CalculateStatistics(DetailedStatistics* pStats) const;
 
     /** \brief Builds and returns statistics as a string in JSON format, including the list of allocations with their parameters.
     @param[out] ppStatsString Must be freed using VirtualBlock::FreeStatsString.

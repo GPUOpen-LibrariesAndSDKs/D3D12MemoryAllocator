@@ -554,25 +554,55 @@ static const WCHAR* const HeapTypeNames[] = {
 
 // Stat helper functions
 
-static void AddStatInfo(StatInfo& dst, const StatInfo& src)
+static void ClearStatistics(Statistics& outStats)
 {
-    dst.BlockCount += src.BlockCount;
-    dst.AllocationCount += src.AllocationCount;
-    dst.UnusedRangeCount += src.UnusedRangeCount;
-    dst.UsedBytes += src.UsedBytes;
-    dst.UnusedBytes += src.UnusedBytes;
-    dst.AllocationSizeMin = D3D12MA_MIN(dst.AllocationSizeMin, src.AllocationSizeMin);
-    dst.AllocationSizeMax = D3D12MA_MAX(dst.AllocationSizeMax, src.AllocationSizeMax);
-    dst.UnusedRangeSizeMin = D3D12MA_MIN(dst.UnusedRangeSizeMin, src.UnusedRangeSizeMin);
-    dst.UnusedRangeSizeMax = D3D12MA_MAX(dst.UnusedRangeSizeMax, src.UnusedRangeSizeMax);
+    outStats.BlockCount = 0;
+    outStats.AllocationCount = 0;
+    outStats.BlockBytes = 0;
+    outStats.AllocationBytes = 0;
 }
 
-static void PostProcessStatInfo(StatInfo& statInfo)
+static void ClearDetailedStatistics(DetailedStatistics& outStats)
 {
-    statInfo.AllocationSizeAvg = statInfo.AllocationCount ?
-        statInfo.UsedBytes / statInfo.AllocationCount : 0;
-    statInfo.UnusedRangeSizeAvg = statInfo.UnusedRangeCount ?
-        statInfo.UnusedBytes / statInfo.UnusedRangeCount : 0;
+    ClearStatistics(outStats.Stats);
+    outStats.UnusedRangeCount = 0;
+    outStats.AllocationSizeMin = UINT64_MAX;
+    outStats.AllocationSizeMax = 0;
+    outStats.UnusedRangeSizeMin = UINT64_MAX;
+    outStats.UnusedRangeSizeMax = 0;
+}
+
+static void AddStatistics(Statistics& inoutStats, const Statistics& src)
+{
+    inoutStats.BlockCount += src.BlockCount;
+    inoutStats.AllocationCount += src.AllocationCount;
+    inoutStats.BlockBytes += src.BlockBytes;
+    inoutStats.AllocationBytes += src.AllocationBytes;
+}
+
+static void AddDetailedStatistics(DetailedStatistics& inoutStats, const DetailedStatistics& src)
+{
+    AddStatistics(inoutStats.Stats, src.Stats);
+    inoutStats.UnusedRangeCount += src.UnusedRangeCount;
+    inoutStats.AllocationSizeMin = D3D12MA_MIN(inoutStats.AllocationSizeMin, src.AllocationSizeMin);
+    inoutStats.AllocationSizeMax = D3D12MA_MAX(inoutStats.AllocationSizeMax, src.AllocationSizeMax);
+    inoutStats.UnusedRangeSizeMin = D3D12MA_MIN(inoutStats.UnusedRangeSizeMin, src.UnusedRangeSizeMin);
+    inoutStats.UnusedRangeSizeMax = D3D12MA_MAX(inoutStats.UnusedRangeSizeMax, src.UnusedRangeSizeMax);
+}
+
+static void AddDetailedStatisticsAllocation(DetailedStatistics& inoutStats, UINT64 size)
+{
+    inoutStats.Stats.AllocationCount++;
+    inoutStats.Stats.AllocationBytes += size;
+    inoutStats.AllocationSizeMin = D3D12MA_MIN(inoutStats.AllocationSizeMin, size);
+    inoutStats.AllocationSizeMax = D3D12MA_MAX(inoutStats.AllocationSizeMax, size);
+}
+
+static void AddDetailedStatisticsUnusedRange(DetailedStatistics& inoutStats, UINT64 size)
+{
+    inoutStats.UnusedRangeCount++;
+    inoutStats.UnusedRangeSizeMin = D3D12MA_MIN(inoutStats.UnusedRangeSizeMin, size);
+    inoutStats.UnusedRangeSizeMax = D3D12MA_MAX(inoutStats.UnusedRangeSizeMax, size);
 }
 
 static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags)
@@ -2717,7 +2747,8 @@ public:
 
     virtual void SetAllocationUserData(AllocHandle allocHandle, void* userData) = 0;
 
-    virtual void CalcAllocationStatInfo(StatInfo& outInfo) const = 0;
+    virtual void AddStatistics(Statistics& inoutStats) const = 0;
+    virtual void AddDetailedStatistics(DetailedStatistics& inoutStats) const = 0;
     virtual void WriteAllocationInfoToJson(JsonWriter& json) const = 0;
 
 protected:
@@ -2742,6 +2773,7 @@ private:
     D3D12MA_CLASS_NO_COPY(BlockMetadata);
 };
 
+#if 0
 class BlockMetadata_Generic : public BlockMetadata
 {
 public:
@@ -2773,7 +2805,8 @@ public:
 
     void SetAllocationUserData(AllocHandle allocHandle, void* userData) override;
 
-    void CalcAllocationStatInfo(StatInfo& outInfo) const override;
+    void AddStatistics(Statistics& inoutStats) const override;
+    void AddDetailedStatistics(DetailedStatistics& inoutStats) const override;
     void WriteAllocationInfoToJson(JsonWriter& json) const override;
 
 private:
@@ -2813,6 +2846,7 @@ private:
 
     D3D12MA_CLASS_NO_COPY(BlockMetadata_Generic)
 };
+#endif // #if 0
 
 class BlockMetadata_Linear : public BlockMetadata
 {
@@ -2845,7 +2879,8 @@ public:
 
     void SetAllocationUserData(AllocHandle allocHandle, void* userData) override;
 
-    void CalcAllocationStatInfo(StatInfo& outInfo) const override;
+    void AddStatistics(Statistics& inoutStats) const override;
+    void AddDetailedStatistics(DetailedStatistics& inoutStats) const override;
     void WriteAllocationInfoToJson(JsonWriter& json) const override;
 
 private:
@@ -2944,7 +2979,8 @@ public:
 
     void SetAllocationUserData(AllocHandle allocHandle, void* userData) override;
 
-    void CalcAllocationStatInfo(StatInfo& outInfo) const override;
+    void AddStatistics(Statistics& inoutStats) const override;
+    void AddDetailedStatistics(DetailedStatistics& inoutStats) const override;
     void WriteAllocationInfoToJson(JsonWriter& json) const override;
 
 private:
@@ -3136,7 +3172,8 @@ public:
 
     D3D12_HEAP_TYPE GetHeapType() const { return m_HeapType; }
     
-    void CalculateStats(StatInfo& outStats);
+    void AddStatistics(Statistics& inoutStats);
+    void AddDetailedStatistics(DetailedStatistics& inoutStats);
     // Writes JSON array with the list of allocations.
     void BuildStatsString(JsonWriter& json);
 
@@ -3220,8 +3257,8 @@ public:
         void** ppvResource);
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
-    void AddStats(StatInfo& outStats);
-    void AddStats(Stats& outStats);
+    void AddStatistics(Statistics& inoutStats);
+    void AddDetailedStatistics(DetailedStatistics& inoutStats);
 
     void WriteBlockInfoToJson(JsonWriter& json);
 
@@ -3281,6 +3318,8 @@ static const UINT DEFAULT_POOL_MAX_COUNT = 9;
 
 struct CurrentBudgetData
 {
+    D3D12MA_ATOMIC_UINT32 m_BlockCount[HEAP_TYPE_COUNT];
+    D3D12MA_ATOMIC_UINT32 m_AllocationCount[HEAP_TYPE_COUNT];
     D3D12MA_ATOMIC_UINT64 m_BlockBytes[HEAP_TYPE_COUNT];
     D3D12MA_ATOMIC_UINT64 m_AllocationBytes[HEAP_TYPE_COUNT];
 
@@ -3294,6 +3333,8 @@ struct CurrentBudgetData
     {
         for(UINT i = 0; i < HEAP_TYPE_COUNT; ++i)
         {
+            m_BlockCount[i] = 0;
+            m_AllocationCount[i] = 0;
             m_BlockBytes[i] = 0;
             m_AllocationBytes[i] = 0;
             m_BlockBytesAtBudgetFetch[i] = 0;
@@ -3308,22 +3349,26 @@ struct CurrentBudgetData
 
     void AddAllocation(UINT heapTypeIndex, UINT64 allocationSize)
     {
+        ++m_AllocationCount[heapTypeIndex];
         m_AllocationBytes[heapTypeIndex] += allocationSize;
         ++m_OperationsSinceBudgetFetch;
     }
     void RemoveAllocation(UINT heapTypeIndex, UINT64 allocationSize)
     {
         m_AllocationBytes[heapTypeIndex] -= allocationSize;
+        --m_AllocationCount[heapTypeIndex];
         ++m_OperationsSinceBudgetFetch;
     }
     void AddCommittedAllocation(UINT heapTypeIndex, UINT64 allocationSize)
     {
         AddAllocation(heapTypeIndex, allocationSize);
+        ++m_BlockCount[heapTypeIndex];
         m_BlockBytes[heapTypeIndex] += allocationSize;
     }
     void RemoveCommittedAllocation(UINT heapTypeIndex, UINT64 allocationSize)
     {
         m_BlockBytes[heapTypeIndex] -= allocationSize;
+        --m_BlockCount[heapTypeIndex];
         RemoveAllocation(heapTypeIndex, allocationSize);
     }
 };
@@ -3342,8 +3387,9 @@ public:
     BlockVector* GetBlockVector() { return m_BlockVector; }
     CommittedAllocationList* GetCommittedAllocationList() { return SupportsCommittedAllocations() ? &m_CommittedAllocations : NULL; }
 
-    void CalculateStats(StatInfo& outStats);
-    void AddStats(Stats& inoutStats);
+    void GetStatistics(Statistics& outStats);
+    void CalculateStatistics(DetailedStatistics& outStats);
+    void AddDetailedStatistics(DetailedStatistics& inoutStats);
 
     void SetName(LPCWSTR Name);
     LPCWSTR GetName() const { return m_Name; }
@@ -3457,7 +3503,7 @@ public:
 
     UINT GetCurrentFrameIndex() const { return m_CurrentFrameIndex.load(); }
 
-    void CalculateStats(Stats& outStats);
+    void CalculateStatistics(TotalStatistics& outStats);
 
     void GetBudget(Budget* outGpuBudget, Budget* outCpuBudget);
     void GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE heapType);
@@ -3663,6 +3709,7 @@ void BlockMetadata::PrintDetailedMap_End(JsonWriter& json) const
     json.EndObject();
 }
 
+#if 0
 ////////////////////////////////////////////////////////////////////////////////
 // Private class BlockMetadata_Generic implementation
 
@@ -4160,34 +4207,25 @@ void BlockMetadata_Generic::SetAllocationUserData(AllocHandle allocHandle, void*
     suballoc.userData = userData;
 }
 
-void BlockMetadata_Generic::CalcAllocationStatInfo(StatInfo& outInfo) const
+void BlockMetadata_Generic::AddStatistics(Statistics& inoutStats) const
 {
-    outInfo.BlockCount = 1;
+    inoutStats.BlockCount++;
+    inoutStats.AllocationCount += (UINT)m_Suballocations.size() - m_FreeCount;
+    inoutStats.BlockBytes += GetSize();
+    inoutStats.AllocationBytes += GetSize() - m_SumFreeSize;
+}
 
-    const UINT rangeCount = (UINT)m_Suballocations.size();
-    outInfo.AllocationCount = rangeCount - m_FreeCount;
-    outInfo.UnusedRangeCount = m_FreeCount;
-
-    outInfo.UsedBytes = GetSize() - m_SumFreeSize;
-    outInfo.UnusedBytes = m_SumFreeSize;
-
-    outInfo.AllocationSizeMin = UINT64_MAX;
-    outInfo.AllocationSizeMax = 0;
-    outInfo.UnusedRangeSizeMin = UINT64_MAX;
-    outInfo.UnusedRangeSizeMax = 0;
+void BlockMetadata_Generic::AddDetailedStatistics(DetailedStatistics& inoutStats) const
+{
+    inoutStats.Stats.BlockCount++;
+    inoutStats.Stats.BlockBytes += GetSize();
 
     for(const auto& suballoc : m_Suballocations)
     {
         if(suballoc.type == SUBALLOCATION_TYPE_FREE)
-        {
-            outInfo.UnusedRangeSizeMin = D3D12MA_MIN(suballoc.size, outInfo.UnusedRangeSizeMin);
-            outInfo.UnusedRangeSizeMax = D3D12MA_MAX(suballoc.size, outInfo.UnusedRangeSizeMax);
-        }
+            AddDetailedStatisticsUnusedRange(inoutStats, suballoc.size);
         else
-        {
-            outInfo.AllocationSizeMin = D3D12MA_MIN(suballoc.size, outInfo.AllocationSizeMin);
-            outInfo.AllocationSizeMax = D3D12MA_MAX(suballoc.size, outInfo.AllocationSizeMax);
-        }
+            AddDetailedStatisticsAllocation(inoutStats, suballoc.size);
     }
 }
 
@@ -4203,6 +4241,7 @@ void BlockMetadata_Generic::WriteAllocationInfoToJson(JsonWriter& json) const
     }
     PrintDetailedMap_End(json);
 }
+#endif // #if 0
 
 ////////////////////////////////////////////////////////////////////////////////
 // Private class BlockMetadata_Linear implementation
@@ -4580,17 +4619,18 @@ void BlockMetadata_Linear::SetAllocationUserData(AllocHandle allocHandle, void* 
     suballoc.userData = userData;
 }
 
-void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
+void BlockMetadata_Linear::AddStatistics(Statistics& inoutStats) const
 {
-    outInfo.BlockCount = 1;
-    outInfo.AllocationCount = 0;
-    outInfo.UnusedRangeCount = 0;
-    outInfo.UsedBytes = 0;
+    inoutStats.BlockCount++;
+    inoutStats.AllocationCount += (UINT)GetAllocationCount();
+    inoutStats.BlockBytes += GetSize();
+    inoutStats.AllocationBytes += GetSize() - m_SumFreeSize;
+}
 
-    outInfo.AllocationSizeMin = UINT64_MAX;
-    outInfo.AllocationSizeMax = 0;
-    outInfo.UnusedRangeSizeMin = UINT64_MAX;
-    outInfo.UnusedRangeSizeMax = 0;
+void BlockMetadata_Linear::AddDetailedStatistics(DetailedStatistics& inoutStats) const
+{
+    inoutStats.Stats.BlockCount++;
+    inoutStats.Stats.BlockBytes += GetSize();
 
     const UINT64 size = GetSize();
     const SuballocationVectorType& suballocations1st = AccessSuballocations1st();
@@ -4622,17 +4662,12 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
                 {
                     // There is free space from lastOffset to suballoc.offset.
                     const UINT64 unusedRangeSize = suballoc.offset - lastOffset;
-                    ++outInfo.UnusedRangeCount;
-                    outInfo.UnusedRangeSizeMin = D3D12MA_MIN(unusedRangeSize, outInfo.UnusedRangeSizeMin);
-                    outInfo.UnusedRangeSizeMax = D3D12MA_MAX(unusedRangeSize, outInfo.UnusedRangeSizeMax);
+                    AddDetailedStatisticsUnusedRange(inoutStats, unusedRangeSize);
                 }
 
                 // 2. Process this allocation.
                 // There is allocation with suballoc.offset, suballoc.size.
-                outInfo.UsedBytes += suballoc.size;
-                ++outInfo.AllocationCount;
-                outInfo.AllocationSizeMin = D3D12MA_MIN(suballoc.size, outInfo.AllocationSizeMin);
-                outInfo.AllocationSizeMax = D3D12MA_MAX(suballoc.size, outInfo.AllocationSizeMax);
+                AddDetailedStatisticsAllocation(inoutStats, suballoc.size);
 
                 // 3. Prepare for next iteration.
                 lastOffset = suballoc.offset + suballoc.size;
@@ -4645,9 +4680,7 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
                 if (lastOffset < freeSpace2ndTo1stEnd)
                 {
                     const UINT64 unusedRangeSize = freeSpace2ndTo1stEnd - lastOffset;
-                    ++outInfo.UnusedRangeCount;
-                    outInfo.UnusedRangeSizeMin = D3D12MA_MIN(unusedRangeSize, outInfo.UnusedRangeSizeMin);
-                    outInfo.UnusedRangeSizeMax = D3D12MA_MAX(unusedRangeSize, outInfo.UnusedRangeSizeMax);
+                    AddDetailedStatisticsUnusedRange(inoutStats, unusedRangeSize);
                 }
 
                 // End of loop.
@@ -4678,17 +4711,12 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
             {
                 // There is free space from lastOffset to suballoc.offset.
                 const UINT64 unusedRangeSize = suballoc.offset - lastOffset;
-                ++outInfo.UnusedRangeCount;
-                outInfo.UnusedRangeSizeMin = D3D12MA_MIN(unusedRangeSize, outInfo.UnusedRangeSizeMin);
-                outInfo.UnusedRangeSizeMax = D3D12MA_MAX(unusedRangeSize, outInfo.UnusedRangeSizeMax);
+                AddDetailedStatisticsUnusedRange(inoutStats, unusedRangeSize);
             }
 
             // 2. Process this allocation.
             // There is allocation with suballoc.offset, suballoc.size.
-            outInfo.UsedBytes += suballoc.size;
-            ++outInfo.AllocationCount;
-            outInfo.AllocationSizeMin = D3D12MA_MIN(suballoc.size, outInfo.AllocationSizeMin);
-            outInfo.AllocationSizeMax = D3D12MA_MAX(suballoc.size, outInfo.AllocationSizeMax);
+            AddDetailedStatisticsAllocation(inoutStats, suballoc.size);
 
             // 3. Prepare for next iteration.
             lastOffset = suballoc.offset + suballoc.size;
@@ -4701,9 +4729,7 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
             if (lastOffset < freeSpace1stTo2ndEnd)
             {
                 const UINT64 unusedRangeSize = freeSpace1stTo2ndEnd - lastOffset;
-                ++outInfo.UnusedRangeCount;
-                outInfo.UnusedRangeSizeMin = D3D12MA_MIN(unusedRangeSize, outInfo.UnusedRangeSizeMin);
-                outInfo.UnusedRangeSizeMax = D3D12MA_MAX(unusedRangeSize, outInfo.UnusedRangeSizeMax);
+                AddDetailedStatisticsUnusedRange(inoutStats, unusedRangeSize);
             }
 
             // End of loop.
@@ -4733,17 +4759,12 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
                 {
                     // There is free space from lastOffset to suballoc.offset.
                     const UINT64 unusedRangeSize = suballoc.offset - lastOffset;
-                    ++outInfo.UnusedRangeCount;
-                    outInfo.UnusedRangeSizeMin = D3D12MA_MIN(unusedRangeSize, outInfo.UnusedRangeSizeMin);
-                    outInfo.UnusedRangeSizeMax = D3D12MA_MAX(unusedRangeSize, outInfo.UnusedRangeSizeMax);
+                    AddDetailedStatisticsUnusedRange(inoutStats, unusedRangeSize);
                 }
 
                 // 2. Process this allocation.
                 // There is allocation with suballoc.offset, suballoc.size.
-                outInfo.UsedBytes += suballoc.size;
-                ++outInfo.AllocationCount;
-                outInfo.AllocationSizeMin = D3D12MA_MIN(suballoc.size, outInfo.AllocationSizeMin);
-                outInfo.AllocationSizeMax = D3D12MA_MAX(suballoc.size, outInfo.AllocationSizeMax);
+                AddDetailedStatisticsAllocation(inoutStats, suballoc.size);
 
                 // 3. Prepare for next iteration.
                 lastOffset = suballoc.offset + suballoc.size;
@@ -4756,9 +4777,7 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
                 if (lastOffset < size)
                 {
                     const UINT64 unusedRangeSize = size - lastOffset;
-                    ++outInfo.UnusedRangeCount;
-                    outInfo.UnusedRangeSizeMin = D3D12MA_MIN(unusedRangeSize, outInfo.UnusedRangeSizeMin);
-                    outInfo.UnusedRangeSizeMax = D3D12MA_MAX(unusedRangeSize, outInfo.UnusedRangeSizeMax);
+                    AddDetailedStatisticsUnusedRange(inoutStats, unusedRangeSize);
                 }
 
                 // End of loop.
@@ -4766,7 +4785,6 @@ void BlockMetadata_Linear::CalcAllocationStatInfo(StatInfo& outInfo) const
             }
         }
     }
-    outInfo.UnusedBytes = size - outInfo.UsedBytes;
 }
 
 void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
@@ -5765,40 +5783,29 @@ void BlockMetadata_TLSF::SetAllocationUserData(AllocHandle allocHandle, void* us
     block->UserData() = userData;
 }
 
-void BlockMetadata_TLSF::CalcAllocationStatInfo(StatInfo& outInfo) const
+void BlockMetadata_TLSF::AddStatistics(Statistics& inoutStats) const
 {
-    outInfo.BlockCount = 1;
-    outInfo.AllocationCount = static_cast<UINT>(m_AllocCount);
-    outInfo.UnusedRangeCount = static_cast<UINT>(m_BlocksFreeCount);
+    inoutStats.BlockCount++;
+    inoutStats.AllocationCount += static_cast<UINT>(m_AllocCount);
+    inoutStats.BlockBytes += GetSize();
+    inoutStats.AllocationBytes += GetSize() - GetSumFreeSize();
+}
 
-    outInfo.UnusedBytes = GetSumFreeSize();
-    outInfo.UsedBytes = GetSize() - outInfo.UnusedBytes;
-
-    outInfo.AllocationSizeMin = UINT64_MAX;
-    outInfo.AllocationSizeMax = 0;
-    outInfo.UnusedRangeSizeMin = UINT64_MAX;
-    outInfo.UnusedRangeSizeMax = 0;
+void BlockMetadata_TLSF::AddDetailedStatistics(DetailedStatistics& inoutStats) const
+{
+    inoutStats.Stats.BlockCount++;
+    inoutStats.Stats.BlockBytes += GetSize();
 
     for (Block* block = m_NullBlock->prevPhysical; block != NULL; block = block->prevPhysical)
     {
         if (block->IsFree())
-        {
-            outInfo.UnusedRangeSizeMin = D3D12MA_MIN(block->size, outInfo.UnusedRangeSizeMin);
-            outInfo.UnusedRangeSizeMax = D3D12MA_MAX(block->size, outInfo.UnusedRangeSizeMax);
-        }
+            AddDetailedStatisticsUnusedRange(inoutStats, block->size);
         else
-        {
-            outInfo.AllocationSizeMin = D3D12MA_MIN(block->size, outInfo.AllocationSizeMin);
-            outInfo.AllocationSizeMax = D3D12MA_MAX(block->size, outInfo.AllocationSizeMax);
-        }
+            AddDetailedStatisticsAllocation(inoutStats, block->size);
     }
 
     if (m_NullBlock->size > 0)
-    {
-        ++outInfo.UnusedRangeCount;
-        outInfo.UnusedRangeSizeMin = D3D12MA_MIN(m_NullBlock->size, outInfo.UnusedRangeSizeMin);
-        outInfo.UnusedRangeSizeMax = D3D12MA_MAX(m_NullBlock->size, outInfo.UnusedRangeSizeMax);
-    }
+        AddDetailedStatisticsUnusedRange(inoutStats, m_NullBlock->size);
 }
 
 void BlockMetadata_TLSF::WriteAllocationInfoToJson(JsonWriter& json) const
@@ -6023,16 +6030,13 @@ HRESULT NormalBlock::Init(UINT32 algorithm, ID3D12ProtectedResourceSession* pPro
     
     switch (algorithm)
     {
-    case POOL_FLAG_ALGORITHM_TLSF:
-        m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_TLSF)(&m_Allocator->GetAllocs(), false);
-        break;
     case POOL_FLAG_ALGORITHM_LINEAR:
         m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_Linear)(&m_Allocator->GetAllocs(), false);
         break;
     default:
         D3D12MA_ASSERT(0);
     case 0:
-        m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_Generic)(&m_Allocator->GetAllocs(), false);
+        m_pMetadata = D3D12MA_NEW(m_Allocator->GetAllocs(), BlockMetadata_TLSF)(&m_Allocator->GetAllocs(), false);
         break;
     }
     m_pMetadata->Init(m_Size);
@@ -6120,25 +6124,32 @@ CommittedAllocationList::~CommittedAllocationList()
     }
 }
 
-void CommittedAllocationList::CalculateStats(StatInfo& outStats)
+void CommittedAllocationList::AddStatistics(Statistics& inoutStats)
 {
-    ZeroMemory(&outStats, sizeof(outStats));
-    outStats.AllocationSizeMin = UINT64_MAX;
-    outStats.UnusedRangeSizeMin = UINT64_MAX;
-
     MutexLockRead lock(m_Mutex, m_UseMutex);
 
     for(Allocation* alloc = m_AllocationList.Front();
         alloc != NULL; alloc = m_AllocationList.GetNext(alloc))
     {
         const UINT64 size = alloc->GetSize();
-        ++outStats.BlockCount;
-        ++outStats.AllocationCount;
-        outStats.UsedBytes += size;
-        if(size > outStats.AllocationSizeMax)
-            outStats.AllocationSizeMax = size;
-        if(size < outStats.AllocationSizeMin)
-            outStats.AllocationSizeMin = size;
+        inoutStats.BlockCount++;
+        inoutStats.AllocationCount++;
+        inoutStats.BlockBytes += size;
+        inoutStats.AllocationBytes += size;
+    }
+}
+
+void CommittedAllocationList::AddDetailedStatistics(DetailedStatistics& inoutStats)
+{
+    MutexLockRead lock(m_Mutex, m_UseMutex);
+
+    for(Allocation* alloc = m_AllocationList.Front();
+        alloc != NULL; alloc = m_AllocationList.GetNext(alloc))
+    {
+        const UINT64 size = alloc->GetSize();
+        inoutStats.Stats.BlockCount++;
+        inoutStats.Stats.BlockBytes += size;
+        AddDetailedStatisticsAllocation(inoutStats, size);
     }
 }
 
@@ -6659,7 +6670,7 @@ HRESULT BlockVector::CreateBlock(
     return hr;
 }
 
-void BlockVector::AddStats(StatInfo& outStats)
+void BlockVector::AddStatistics(Statistics& inoutStats)
 {
     MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
 
@@ -6668,17 +6679,12 @@ void BlockVector::AddStats(StatInfo& outStats)
         const NormalBlock* const pBlock = m_Blocks[i];
         D3D12MA_ASSERT(pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
-        StatInfo blockStatInfo;
-        pBlock->m_pMetadata->CalcAllocationStatInfo(blockStatInfo);
-        AddStatInfo(outStats, blockStatInfo);
+        pBlock->m_pMetadata->AddStatistics(inoutStats);
     }
 }
 
-void BlockVector::AddStats(Stats& outStats)
+void BlockVector::AddDetailedStatistics(DetailedStatistics& inoutStats)
 {
-    const UINT heapTypeIndex = HeapTypeToIndex(m_HeapProps.Type);
-    StatInfo* const pStatInfo = &outStats.HeapType[heapTypeIndex];
-
     MutexLockRead lock(m_Mutex, m_hAllocator->UseMutex());
 
     for(size_t i = 0; i < m_Blocks.size(); ++i)
@@ -6686,10 +6692,7 @@ void BlockVector::AddStats(Stats& outStats)
         const NormalBlock* const pBlock = m_Blocks[i];
         D3D12MA_ASSERT(pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
-        StatInfo blockStatInfo;
-        pBlock->m_pMetadata->CalcAllocationStatInfo(blockStatInfo);
-        AddStatInfo(outStats.Total, blockStatInfo);
-        AddStatInfo(*pStatInfo, blockStatInfo);
+        pBlock->m_pMetadata->AddDetailedStatistics(inoutStats);
     }
 }
 
@@ -6754,30 +6757,23 @@ PoolPimpl::~PoolPimpl()
     D3D12MA_DELETE(m_Allocator->GetAllocs(), m_BlockVector);
 }
 
-void PoolPimpl::CalculateStats(StatInfo& outStats)
+void PoolPimpl::GetStatistics(Statistics& outStats)
 {
-    ZeroMemory(&outStats, sizeof(outStats));
-    outStats.AllocationSizeMin = UINT64_MAX;
-    outStats.UnusedRangeSizeMin = UINT64_MAX;
-
-    m_BlockVector->AddStats(outStats);
-
-    {
-        StatInfo committedStatInfo; // Uninitialized.
-        m_CommittedAllocations.CalculateStats(committedStatInfo);
-        AddStatInfo(outStats, committedStatInfo);
-    }
-
-    PostProcessStatInfo(outStats);
+    ClearStatistics(outStats);
+    m_BlockVector->AddStatistics(outStats);
+    m_CommittedAllocations.AddStatistics(outStats);
 }
 
-void PoolPimpl::AddStats(Stats& inoutStats)
+void PoolPimpl::CalculateStatistics(DetailedStatistics& outStats)
 {
-    StatInfo poolStatInfo = {};
-    CalculateStats(poolStatInfo);
+    ClearDetailedStatistics(outStats);
+    AddDetailedStatistics(outStats);
+}
 
-    AddStatInfo(inoutStats.Total, poolStatInfo);
-    AddStatInfo(inoutStats.HeapType[HeapTypeToIndex(m_Desc.HeapProperties.Type)], poolStatInfo);
+void PoolPimpl::AddDetailedStatistics(DetailedStatistics& inoutStats)
+{
+    m_BlockVector->AddDetailedStatistics(inoutStats);
+    m_CommittedAllocations.AddDetailedStatistics(inoutStats);
 }
 
 void PoolPimpl::SetName(LPCWSTR Name)
@@ -6820,11 +6816,18 @@ POOL_DESC Pool::GetDesc() const
     return m_Pimpl->GetDesc();
 }
 
-void Pool::CalculateStats(StatInfo* pStats)
+void Pool::GetStatistics(Statistics* pStats)
 {
     D3D12MA_ASSERT(pStats);
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-    m_Pimpl->CalculateStats(*pStats);
+    m_Pimpl->GetStatistics(*pStats);
+}
+
+void Pool::CalculateStatistics(DetailedStatistics* pStats)
+{
+    D3D12MA_ASSERT(pStats);
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    m_Pimpl->CalculateStatistics(*pStats);
 }
 
 void Pool::SetName(LPCWSTR Name)
@@ -7606,26 +7609,21 @@ void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
 #endif
 }
 
-void AllocatorPimpl::CalculateStats(Stats& outStats)
+void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
 {
     // Init stats
-    ZeroMemory(&outStats, sizeof(outStats));
-    outStats.Total.AllocationSizeMin = UINT64_MAX;
-    outStats.Total.UnusedRangeSizeMin = UINT64_MAX;
+    ClearDetailedStatistics(outStats.Total);
     for(size_t i = 0; i < HEAP_TYPE_COUNT; i++)
-    {
-        outStats.HeapType[i].AllocationSizeMin = UINT64_MAX;
-        outStats.HeapType[i].UnusedRangeSizeMin = UINT64_MAX;
-    }
+        ClearDetailedStatistics(outStats.HeapType[i]);
 
-    // Process deafult pools.
+    // Process default pools.
     if(SupportsResourceHeapTier2())
     {
         for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
         {
             BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex];
             D3D12MA_ASSERT(pBlockVector);
-            pBlockVector->AddStats(outStats);
+            pBlockVector->AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
         }
     }
     else
@@ -7636,7 +7634,7 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
             {
                 BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex * 3 + heapSubType];
                 D3D12MA_ASSERT(pBlockVector);
-                pBlockVector->AddStats(outStats);
+                pBlockVector->AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
             }
         }
     }
@@ -7648,23 +7646,17 @@ void AllocatorPimpl::CalculateStats(Stats& outStats)
         PoolList& poolList = m_Pools[heapTypeIndex];
         for(PoolPimpl* pool = poolList.Front(); pool != NULL; pool = poolList.GetNext(pool))
         {
-            pool->AddStats(outStats);
+            pool->AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
         }
     }
 
     // Process committed allocations.
     for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
-    {
-        StatInfo statInfo; // Uninitialized.
-        m_CommittedAllocations[heapTypeIndex].CalculateStats(statInfo);
-        AddStatInfo(outStats.Total, statInfo);
-        AddStatInfo(outStats.HeapType[heapTypeIndex], statInfo);
-    }
+        m_CommittedAllocations[heapTypeIndex].AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
 
-    // Post process
-    PostProcessStatInfo(outStats.Total);
+    // Postprocess
     for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
-        PostProcessStatInfo(outStats.HeapType[i]);
+        AddDetailedStatistics(outStats.Total, outStats.HeapType[i]);
 }
 
 void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
@@ -7672,14 +7664,19 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
     if(outGpuBudget)
     {
         // Taking DEFAULT.
-        outGpuBudget->BlockBytes = m_Budget.m_BlockBytes[0];
-        outGpuBudget->AllocationBytes = m_Budget.m_AllocationBytes[0];
+        outGpuBudget->Stats.BlockCount = m_Budget.m_BlockCount[0];
+        outGpuBudget->Stats.AllocationCount = m_Budget.m_AllocationCount[0];
+        outGpuBudget->Stats.BlockBytes = m_Budget.m_BlockBytes[0];
+        outGpuBudget->Stats.AllocationBytes = m_Budget.m_AllocationBytes[0];
+
     }
     if(outCpuBudget)
     {
         // Taking UPLOAD + READBACK.
-        outCpuBudget->BlockBytes = m_Budget.m_BlockBytes[1] + m_Budget.m_BlockBytes[2];
-        outCpuBudget->AllocationBytes = m_Budget.m_AllocationBytes[1] + m_Budget.m_AllocationBytes[2];
+        outCpuBudget->Stats.BlockCount = m_Budget.m_BlockCount[1] + m_Budget.m_BlockCount[2];
+        outCpuBudget->Stats.AllocationCount = m_Budget.m_AllocationCount[1] + m_Budget.m_AllocationCount[2];
+        outCpuBudget->Stats.BlockBytes = m_Budget.m_BlockBytes[1] + m_Budget.m_BlockBytes[2];
+        outCpuBudget->Stats.AllocationBytes = m_Budget.m_AllocationBytes[1] + m_Budget.m_AllocationBytes[2];
     }
     // TODO: What to do with CUSTOM?
 
@@ -7692,10 +7689,10 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
             if(outGpuBudget)
             {
 
-                if(m_Budget.m_D3D12UsageLocal + outGpuBudget->BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[0])
+                if(m_Budget.m_D3D12UsageLocal + outGpuBudget->Stats.BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[0])
                 {
                     outGpuBudget->UsageBytes = m_Budget.m_D3D12UsageLocal +
-                        outGpuBudget->BlockBytes - m_Budget.m_BlockBytesAtBudgetFetch[0];
+                        outGpuBudget->Stats.BlockBytes - m_Budget.m_BlockBytesAtBudgetFetch[0];
                 }
                 else
                 {
@@ -7705,10 +7702,10 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
             }
             if(outCpuBudget)
             {
-                if(m_Budget.m_D3D12UsageNonLocal + outCpuBudget->BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2])
+                if(m_Budget.m_D3D12UsageNonLocal + outCpuBudget->Stats.BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2])
                 {
                     outCpuBudget->UsageBytes = m_Budget.m_D3D12UsageNonLocal +
-                        outCpuBudget->BlockBytes - (m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2]);
+                        outCpuBudget->Stats.BlockBytes - (m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2]);
                 }
                 else
                 {
@@ -7729,13 +7726,13 @@ void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
         if(outGpuBudget)
         {
             const UINT64 gpuMemorySize = m_AdapterDesc.DedicatedVideoMemory + m_AdapterDesc.DedicatedSystemMemory; // TODO: Is this right?
-            outGpuBudget->UsageBytes = outGpuBudget->BlockBytes;
+            outGpuBudget->UsageBytes = outGpuBudget->Stats.BlockBytes;
             outGpuBudget->BudgetBytes = gpuMemorySize * 8 / 10; // 80% heuristics.
         }
         if(outCpuBudget)
         {
             const UINT64 cpuMemorySize = m_AdapterDesc.SharedSystemMemory; // TODO: Is this right?
-            outCpuBudget->UsageBytes = outCpuBudget->BlockBytes;
+            outCpuBudget->UsageBytes = outCpuBudget->Stats.BlockBytes;
             outCpuBudget->BudgetBytes = cpuMemorySize * 8 / 10; // 80% heuristics.
         }
     }
@@ -7756,38 +7753,34 @@ void AllocatorPimpl::GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE hea
     }
 }
 
-static void AddStatInfoToJson(JsonWriter& json, const StatInfo& statInfo)
+static void AddDetailedStatisticsInfoToJson(JsonWriter& json, const DetailedStatistics& stats)
 {
     json.BeginObject();
-    json.WriteString(L"Blocks");
-    json.WriteNumber(statInfo.BlockCount);
-    json.WriteString(L"Allocations");
-    json.WriteNumber(statInfo.AllocationCount);
-    json.WriteString(L"UnusedRanges");
-    json.WriteNumber(statInfo.UnusedRangeCount);
-    json.WriteString(L"UsedBytes");
-    json.WriteNumber(statInfo.UsedBytes);
-    json.WriteString(L"UnusedBytes");
-    json.WriteNumber(statInfo.UnusedBytes);
+    json.WriteString(L"BlockCount");
+    json.WriteNumber(stats.Stats.BlockCount);
+    json.WriteString(L"AllocationCount");
+    json.WriteNumber(stats.Stats.AllocationCount);
+    json.WriteString(L"UnusedRangeCount");
+    json.WriteNumber(stats.UnusedRangeCount);
+    json.WriteString(L"BlockBytes");
+    json.WriteNumber(stats.Stats.BlockBytes);
+    json.WriteString(L"AllocationBytes");
+    json.WriteNumber(stats.Stats.AllocationBytes);
 
     json.WriteString(L"AllocationSize");
     json.BeginObject(true);
     json.WriteString(L"Min");
-    json.WriteNumber(statInfo.AllocationSizeMin);
-    json.WriteString(L"Avg");
-    json.WriteNumber(statInfo.AllocationSizeAvg);
+    json.WriteNumber(stats.AllocationSizeMin);
     json.WriteString(L"Max");
-    json.WriteNumber(statInfo.AllocationSizeMax);
+    json.WriteNumber(stats.AllocationSizeMax);
     json.EndObject();
 
     json.WriteString(L"UnusedRangeSize");
     json.BeginObject(true);
     json.WriteString(L"Min");
-    json.WriteNumber(statInfo.UnusedRangeSizeMin);
-    json.WriteString(L"Avg");
-    json.WriteNumber(statInfo.UnusedRangeSizeAvg);
+    json.WriteNumber(stats.UnusedRangeSizeMin);
     json.WriteString(L"Max");
-    json.WriteNumber(statInfo.UnusedRangeSizeMax);
+    json.WriteNumber(stats.UnusedRangeSizeMax);
     json.EndObject();
 
     json.EndObject();
@@ -7802,17 +7795,17 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
         Budget gpuBudget = {}, cpuBudget = {};
         GetBudget(&gpuBudget, &cpuBudget);
 
-        Stats stats;
-        CalculateStats(stats);
+        TotalStatistics stats;
+        CalculateStatistics(stats);
 
         json.BeginObject();
         
         json.WriteString(L"Total");
-        AddStatInfoToJson(json, stats.Total);
+        AddDetailedStatisticsInfoToJson(json, stats.Total);
         for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
         {
             json.WriteString(HeapTypeNames[heapType]);
-            AddStatInfoToJson(json, stats.HeapType[heapType]);
+            AddDetailedStatisticsInfoToJson(json, stats.HeapType[heapType]);
         }
 
         json.WriteString(L"Budget");
@@ -8057,10 +8050,14 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
 {
     json.BeginObject();
     {
+        json.WriteString(L"BlockCount");
+        json.WriteNumber(budget.Stats.BlockCount);
+        json.WriteString(L"AllocationCount");
+        json.WriteNumber(budget.Stats.AllocationCount);
         json.WriteString(L"BlockBytes");
-        json.WriteNumber(budget.BlockBytes);
+        json.WriteNumber(budget.Stats.BlockBytes);
         json.WriteString(L"AllocationBytes");
-        json.WriteNumber(budget.AllocationBytes);
+        json.WriteNumber(budget.Stats.AllocationBytes);
         json.WriteString(L"UsageBytes");
         json.WriteNumber(budget.UsageBytes);
         json.WriteString(L"BudgetBytes");
@@ -8452,11 +8449,11 @@ void Allocator::SetCurrentFrameIndex(UINT frameIndex)
     m_Pimpl->SetCurrentFrameIndex(frameIndex);
 }
 
-void Allocator::CalculateStats(Stats* pStats)
+void Allocator::CalculateStatistics(TotalStatistics* pStats)
 {
     D3D12MA_ASSERT(pStats);
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-    m_Pimpl->CalculateStats(*pStats);
+    m_Pimpl->CalculateStatistics(*pStats);
 }
 
 void Allocator::GetBudget(Budget* pGpuBudget, Budget* pCpuBudget)
@@ -8505,16 +8502,13 @@ VirtualBlockPimpl::VirtualBlockPimpl(const ALLOCATION_CALLBACKS& allocationCallb
 {
     switch (desc.Flags & VIRTUAL_BLOCK_FLAG_ALGORITHM_MASK)
     {
-    case VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF:
-        m_Metadata = D3D12MA_NEW(allocationCallbacks, BlockMetadata_TLSF)(&m_AllocationCallbacks, true);
-        break;
     case VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR:
         m_Metadata = D3D12MA_NEW(allocationCallbacks, BlockMetadata_Linear)(&m_AllocationCallbacks, true);
         break;
     default:
         D3D12MA_ASSERT(0);
     case 0:
-        m_Metadata = D3D12MA_NEW(allocationCallbacks, BlockMetadata_Generic)(&m_AllocationCallbacks, true);
+        m_Metadata = D3D12MA_NEW(allocationCallbacks, BlockMetadata_TLSF)(&m_AllocationCallbacks, true);
         break;
     }
     m_Metadata->Init(m_Size);
@@ -8627,14 +8621,22 @@ void VirtualBlock::SetAllocationUserData(VirtualAllocation allocation, void* pUs
     m_Pimpl->m_Metadata->SetAllocationUserData(allocation.AllocHandle, pUserData);
 }
 
-void VirtualBlock::CalculateStats(StatInfo* pInfo) const
+void VirtualBlock::GetStatistics(Statistics* pStats) const
 {
-    D3D12MA_ASSERT(pInfo);
-
+    D3D12MA_ASSERT(pStats);
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-
     D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata->Validate());
-    m_Pimpl->m_Metadata->CalcAllocationStatInfo(*pInfo);
+    ClearStatistics(*pStats);
+    m_Pimpl->m_Metadata->AddStatistics(*pStats);
+}
+
+void VirtualBlock::CalculateStatistics(DetailedStatistics* pStats) const
+{
+    D3D12MA_ASSERT(pStats);
+    D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
+    D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata->Validate());
+    ClearDetailedStatistics(*pStats);
+    m_Pimpl->m_Metadata->AddDetailedStatistics(*pStats);
 }
 
 void VirtualBlock::BuildStatsString(WCHAR** ppStatsString) const
