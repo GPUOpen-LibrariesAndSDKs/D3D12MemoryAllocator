@@ -293,8 +293,12 @@ Public Member Functions</h2></td></tr>
 
 <p>Returns <code>TRUE</code> if the memory of the allocation was filled with zeros when the allocation was created. </p>
 <p >Returns <code>TRUE</code> only if the allocator is sure that the entire memory where the allocation was created was filled with zeros at the moment the allocation was made.</p>
-<p >Returns <code>FALSE</code> if the memory could potentially contain garbage data. If it's a render-target or depth-stencil texture, it then needs proper initialization with <code>ClearRenderTargetView</code>, <code>ClearDepthStencilView</code>, <code>DiscardResource</code>, or a copy operation, as described on page: <a href="https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createplacedresource#notes-on-the-required-resource-initialization">ID3D12Device::CreatePlacedResource method - Notes on the required resource initialization</a>. Please note that rendering a fullscreen triangle or quad to the texture as a render target is not a proper way of initialization!</p>
-<p >See also articles: <a href="https://devblogs.microsoft.com/directx/coming-to-directx-12-more-control-over-memory-allocation/">"Coming to DirectX 12: More control over memory allocation"</a>, <a href="https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing">"Initializing DX12 Textures After Allocation and Aliasing"</a>. </p>
+<p >Returns <code>FALSE</code> if the memory could potentially contain garbage data. If it's a render-target or depth-stencil texture, it then needs proper initialization with <code>ClearRenderTargetView</code>, <code>ClearDepthStencilView</code>, <code>DiscardResource</code>, or a copy operation, as described on page "ID3D12Device::CreatePlacedResource method - Notes on the required resource initialization" in Microsoft documentation. Please note that rendering a fullscreen triangle or quad to the texture as a render target is not a proper way of initialization!</p>
+<p >See also articles:</p>
+<ul>
+<li>"Coming to DirectX 12: More control over memory allocation" on DirectX Developer Blog</li>
+<li><a href="https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing">"Initializing DX12 Textures After Allocation and Aliasing"</a>. </li>
+</ul>
 
 </div>
 </div>

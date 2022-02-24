@@ -476,14 +476,15 @@ public:
     Returns `FALSE` if the memory could potentially contain garbage data.
     If it's a render-target or depth-stencil texture, it then needs proper
     initialization with `ClearRenderTargetView`, `ClearDepthStencilView`, `DiscardResource`,
-    or a copy operation, as described on page:
-    [ID3D12Device::CreatePlacedResource method - Notes on the required resource initialization](https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createplacedresource#notes-on-the-required-resource-initialization).
+    or a copy operation, as described on page
+    "ID3D12Device::CreatePlacedResource method - Notes on the required resource initialization" in Microsoft documentation.
     Please note that rendering a fullscreen triangle or quad to the texture as
     a render target is not a proper way of initialization!
 
     See also articles:
-    ["Coming to DirectX 12: More control over memory allocation"](https://devblogs.microsoft.com/directx/coming-to-directx-12-more-control-over-memory-allocation/),
-    ["Initializing DX12 Textures After Allocation and Aliasing"](https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing).
+
+    - "Coming to DirectX 12: More control over memory allocation" on DirectX Developer Blog
+    - ["Initializing DX12 Textures After Allocation and Aliasing"](https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing).
     */
     BOOL WasZeroInitialized() const { return m_PackedData.WasZeroInitialized(); }
 
@@ -791,18 +792,20 @@ public:
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const;
     /** \brief Returns true if `D3D12_FEATURE_DATA_ARCHITECTURE1::UMA` was found to be true.
     
-    For more information about how to use it, see articles in Microsoft Docs:
-    - https://docs.microsoft.com/en-us/windows/win32/direct3d12/default-texture-mapping
-    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_architecture
-    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties
+    For more information about how to use it, see articles in Microsoft Docs articles:
+
+    - "UMA Optimizations: CPU Accessible Textures and Standard Swizzle"
+    - "D3D12_FEATURE_DATA_ARCHITECTURE structure (d3d12.h)"
+    - "ID3D12Device::GetCustomHeapProperties method (d3d12.h)"
     */
     BOOL IsUMA() const;
     /** \brief Returns true if `D3D12_FEATURE_DATA_ARCHITECTURE1::CacheCoherentUMA` was found to be true.
 
-    For more information about how to use it, see articles in Microsoft Docs:
-    - https://docs.microsoft.com/en-us/windows/win32/direct3d12/default-texture-mapping
-    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_architecture
-    - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties
+    For more information about how to use it, see articles in Microsoft Docs articles:
+
+    - "UMA Optimizations: CPU Accessible Textures and Standard Swizzle"
+    - "D3D12_FEATURE_DATA_ARCHITECTURE structure (d3d12.h)"
+    - "ID3D12Device::GetCustomHeapProperties method (d3d12.h)"
     */
     BOOL IsCacheCoherentUMA() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.
@@ -1326,7 +1329,7 @@ manually.
 
 The process of getting regular CPU-side pointer to the memory of a resource in
 Direct3D is called "mapping". There are rules and restrictions to this process,
-as described in D3D12 documentation of [ID3D12Resource::Map method](https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/nf-d3d12-id3d12resource-map).
+as described in D3D12 documentation of ID3D12Resource::Map method.
 
 Mapping happens on the level of particular resources, not entire memory heaps,
 and so it is out of scope of this library. Just as the linked documentation says:
@@ -1624,7 +1627,7 @@ Additional considerations:
 
 - D3D12 also allows to interpret contents of memory between aliasing resources consistently in some cases,
   which is called "data inheritance". For details, see
-  Microsoft documentation, chapter [Memory Aliasing and Data Inheritance](https://docs.microsoft.com/en-us/windows/win32/direct3d12/memory-aliasing-and-data-inheritance).
+  Microsoft documentation chapter "Memory Aliasing and Data Inheritance".
 - You can create more complex layout where different textures and buffers are bound
   at different offsets inside one large allocation. For example, one can imagine
   a big texture used in some render passes, aliasing with a set of many small buffers
