@@ -6089,12 +6089,20 @@ HRESULT MemoryBlock::Init(ID3D12ProtectedResourceSession* pProtectedSession)
     heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags);
     heapDesc.Flags = m_HeapFlags;
 
+    HRESULT hr;
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
-    HRESULT hr = m_Allocator->GetDevice4()->CreateHeap1(&heapDesc, pProtectedSession, D3D12MA_IID_PPV_ARGS(&m_Heap));
-#else
-    D3D12MA_ASSERT(pProtectedSession == NULL);
-    HRESULT hr = m_Allocator->GetDevice()->CreateHeap(&heapDesc, D3D12MA_IID_PPV_ARGS(&m_Heap));
+    ID3D12Device4* const device4 = m_Allocator->GetDevice4();
+    if(device4)
+        hr = m_Allocator->GetDevice4()->CreateHeap1(&heapDesc, pProtectedSession, D3D12MA_IID_PPV_ARGS(&m_Heap));
+    else
 #endif
+    {
+        if(pProtectedSession == NULL)
+            hr = m_Allocator->GetDevice()->CreateHeap(&heapDesc, D3D12MA_IID_PPV_ARGS(&m_Heap));
+        else
+            hr = E_NOINTERFACE;
+    }
+    
     if(SUCCEEDED(hr))
     {
         m_Allocator->m_Budget.m_BlockBytes[HeapTypeToIndex(m_HeapProps.Type)] += m_Size;
@@ -7239,23 +7247,31 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
      * 
      * [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
     */
+    HRESULT hr;
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
-    if(m_Device4 == NULL)
-        return E_NOINTERFACE;
-
-    HRESULT hr = m_Device4->CreateCommittedResource1(
-        &committedAllocParams.m_HeapProperties,
-        committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
-        pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, committedAllocParams.m_ProtectedSession, D3D12MA_IID_PPV_ARGS(&res));
-#else
-    D3D12MA_ASSERT(committedAllocParams.m_ProtectedSession == NULL);
-    HRESULT hr = m_Device->CreateCommittedResource(
-        &committedAllocParams.m_HeapProperties,
-        committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, 
-        pResourceDesc, InitialResourceState,
-        pOptimizedClearValue, D3D12MA_IID_PPV_ARGS(&res));
+    if(m_Device4)
+    {
+        hr = m_Device4->CreateCommittedResource1(
+            &committedAllocParams.m_HeapProperties,
+            committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
+            pResourceDesc, InitialResourceState,
+            pOptimizedClearValue, committedAllocParams.m_ProtectedSession, D3D12MA_IID_PPV_ARGS(&res));
+    }
+    else
 #endif
+    {
+        if(committedAllocParams.m_ProtectedSession == NULL)
+        {
+            hr = m_Device->CreateCommittedResource(
+                &committedAllocParams.m_HeapProperties,
+                committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, 
+                pResourceDesc, InitialResourceState,
+                pOptimizedClearValue, D3D12MA_IID_PPV_ARGS(&res));
+        }
+        else
+            hr = E_NOINTERFACE;
+    }
+    
     if(SUCCEEDED(hr))
     {
         if(ppvResource != NULL)
@@ -7361,16 +7377,20 @@ HRESULT AllocatorPimpl::AllocateHeap(
     heapDesc.Alignment = allocInfo.Alignment;
     heapDesc.Flags = committedAllocParams.m_HeapFlags;
 
+    HRESULT hr;
     ID3D12Heap* heap = nullptr;
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
-    if(m_Device4 == NULL)
-        return E_NOINTERFACE;
-
-    HRESULT hr = m_Device4->CreateHeap1(&heapDesc, committedAllocParams.m_ProtectedSession, D3D12MA_IID_PPV_ARGS(&heap));
-#else
-    D3D12MA_ASSERT(committedAllocParams.m_ProtectedSession == NULL);
-    HRESULT hr = m_Device->CreateHeap(&heapDesc, D3D12MA_IID_PPV_ARGS(&heap));
+    if(m_Device4)
+        hr = m_Device4->CreateHeap1(&heapDesc, committedAllocParams.m_ProtectedSession, D3D12MA_IID_PPV_ARGS(&heap));
+    else
 #endif
+    {
+        if(committedAllocParams.m_ProtectedSession == NULL)
+            hr = m_Device->CreateHeap(&heapDesc, D3D12MA_IID_PPV_ARGS(&heap));
+        else
+            hr = E_NOINTERFACE;
+    }
+
     if(SUCCEEDED(hr))
     {
         const BOOL wasZeroInitialized = TRUE;
