@@ -14,7 +14,7 @@
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE tation of ID3D12Resource::Map methFOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
@@ -1329,10 +1329,10 @@ manually.
 
 The process of getting regular CPU-side pointer to the memory of a resource in
 Direct3D is called "mapping". There are rules and restrictions to this process,
-as described in D3D12 documentation of ID3D12Resource::Map method.
+as described in D3D12 documentation of `ID3D12Resource::Map` method.
 
 Mapping happens on the level of particular resources, not entire memory heaps,
-and so it is out of scope of this library. Just as the linked documentation says:
+and so it is out of scope of this library. Just as the documentation of the `Map` function says:
 
 - Returned pointer refers to data of particular subresource, not entire memory heap.
 - You can map same resource multiple times. It is ref-counted internally.
