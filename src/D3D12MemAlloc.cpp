@@ -3330,6 +3330,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Private class AllocatorPimpl definition
 
+static constexpr UINT HEAP_TYPE_COUNT = 4;
 static constexpr UINT STANDARD_HEAP_TYPE_COUNT = 3; // Only DEFAULT, UPLOAD, READBACK.
 static constexpr UINT DEFAULT_POOL_MAX_COUNT = 9;
 

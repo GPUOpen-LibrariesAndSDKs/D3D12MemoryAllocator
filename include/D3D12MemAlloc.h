@@ -776,11 +776,6 @@ struct ALLOCATOR_DESC
 };
 
 /**
-\brief Number of D3D12 memory heap types supported.
-*/
-const UINT HEAP_TYPE_COUNT = 4;
-
-/**
 \brief Represents main object of this library initialized for particular `ID3D12Device`.
 
 Fill structure D3D12MA::ALLOCATOR_DESC and call function CreateAllocator() to create it.
