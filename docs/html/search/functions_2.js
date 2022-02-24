@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['calculatestats_0',['CalculateStats',['../class_d3_d12_m_a_1_1_pool.html#a8e4cc5fb13aa33398d391296336c457e',1,'D3D12MA::Pool::CalculateStats()'],['../class_d3_d12_m_a_1_1_allocator.html#addedcd0067319ec566042f5cb520843b',1,'D3D12MA::Allocator::CalculateStats()'],['../class_d3_d12_m_a_1_1_virtual_block.html#a039ee8426818d0126cf7f44c1c658526',1,'D3D12MA::VirtualBlock::CalculateStats(StatInfo *pInfo) const']]],
+  ['calculatestatistics_0',['CalculateStatistics',['../class_d3_d12_m_a_1_1_pool.html#ad07999ac5dc8f0c63187afd45d551910',1,'D3D12MA::Pool::CalculateStatistics()'],['../class_d3_d12_m_a_1_1_allocator.html#a99db00df909963573a976c203b107d22',1,'D3D12MA::Allocator::CalculateStatistics()'],['../class_d3_d12_m_a_1_1_virtual_block.html#a614a82247ce6cf29c38895e16eb971d9',1,'D3D12MA::VirtualBlock::CalculateStatistics(DetailedStatistics *pStats) const']]],
   ['clear_1',['Clear',['../class_d3_d12_m_a_1_1_virtual_block.html#ae22b18c0b7c31b44c1d740f886369189',1,'D3D12MA::VirtualBlock']]],
   ['createaliasingresource_2',['CreateAliasingResource',['../class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717',1,'D3D12MA::Allocator']]],
   ['createallocator_3',['CreateAllocator',['../namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0',1,'D3D12MA']]],

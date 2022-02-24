@@ -89,9 +89,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aaab59af46d922d6b81fce8d8be987028"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html">POOL_DESC</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#aaab59af46d922d6b81fce8d8be987028">GetDesc</a> () const</td></tr>
 <tr class="memdesc:aaab59af46d922d6b81fce8d8be987028"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns copy of parameters of the pool.  <a href="class_d3_d12_m_a_1_1_pool.html#aaab59af46d922d6b81fce8d8be987028">More...</a><br /></td></tr>
 <tr class="separator:aaab59af46d922d6b81fce8d8be987028"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8e4cc5fb13aa33398d391296336c457e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#a8e4cc5fb13aa33398d391296336c457e">CalculateStats</a> (<a class="el" href="struct_d3_d12_m_a_1_1_stat_info.html">StatInfo</a> *pStats)</td></tr>
-<tr class="memdesc:a8e4cc5fb13aa33398d391296336c457e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves statistics from the current state of this pool.  <a href="class_d3_d12_m_a_1_1_pool.html#a8e4cc5fb13aa33398d391296336c457e">More...</a><br /></td></tr>
-<tr class="separator:a8e4cc5fb13aa33398d391296336c457e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa9d849dc4667314b2a53eddf02f5af91"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#aa9d849dc4667314b2a53eddf02f5af91">GetStatistics</a> (<a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">Statistics</a> *pStats)</td></tr>
+<tr class="memdesc:aa9d849dc4667314b2a53eddf02f5af91"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves basic statistics of the custom pool that are fast to calculate.  <a href="class_d3_d12_m_a_1_1_pool.html#aa9d849dc4667314b2a53eddf02f5af91">More...</a><br /></td></tr>
+<tr class="separator:aa9d849dc4667314b2a53eddf02f5af91"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad07999ac5dc8f0c63187afd45d551910"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#ad07999ac5dc8f0c63187afd45d551910">CalculateStatistics</a> (<a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a> *pStats)</td></tr>
+<tr class="memdesc:ad07999ac5dc8f0c63187afd45d551910"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves detailed statistics of the custom pool that are slower to calculate.  <a href="class_d3_d12_m_a_1_1_pool.html#ad07999ac5dc8f0c63187afd45d551910">More...</a><br /></td></tr>
+<tr class="separator:ad07999ac5dc8f0c63187afd45d551910"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a20617cfec0461cf8c2b92115b5140c5b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_pool.html#a20617cfec0461cf8c2b92115b5140c5b">SetName</a> (LPCWSTR Name)</td></tr>
 <tr class="memdesc:a20617cfec0461cf8c2b92115b5140c5b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Associates a name with the pool. This name is for use in debug diagnostics and tools.  <a href="class_d3_d12_m_a_1_1_pool.html#a20617cfec0461cf8c2b92115b5140c5b">More...</a><br /></td></tr>
 <tr class="separator:a20617cfec0461cf8c2b92115b5140c5b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -104,23 +107,29 @@ Public Member Functions</h2></td></tr>
 <p >Represents a separate set of heaps (memory blocks) that can be used to create <a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">D3D12MA::Allocation</a>-s and resources in it. Usually there is no need to create custom pools - creating resources in default pool is sufficient.</p>
 <p >To create custom pool, fill <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html" title="Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.">D3D12MA::POOL_DESC</a> and call <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aac7b1f6bf53cbf4c4ce2264cb72ca515" title="Creates custom pool.">D3D12MA::Allocator::CreatePool</a>. </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="a8e4cc5fb13aa33398d391296336c457e" name="a8e4cc5fb13aa33398d391296336c457e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a8e4cc5fb13aa33398d391296336c457e">&#9670;&nbsp;</a></span>CalculateStats()</h2>
+<a id="ad07999ac5dc8f0c63187afd45d551910" name="ad07999ac5dc8f0c63187afd45d551910"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad07999ac5dc8f0c63187afd45d551910">&#9670;&nbsp;</a></span>CalculateStatistics()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void D3D12MA::Pool::CalculateStats </td>
+          <td class="memname">void D3D12MA::Pool::CalculateStatistics </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_stat_info.html">StatInfo</a> *&#160;</td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a> *&#160;</td>
           <td class="paramname"><em>pStats</em></td><td>)</td>
           <td></td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Retrieves statistics from the current state of this pool. </p>
+<p>Retrieves detailed statistics of the custom pool that are slower to calculate. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">pStats</td><td>Statistics of the current pool. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -162,6 +171,32 @@ Public Member Functions</h2></td></tr>
 <p>Returns the name associated with the pool object. </p>
 <p >Returned string points to an internal copy.</p>
 <p >If no name was associated with the allocation, returns NULL. </p>
+
+</div>
+</div>
+<a id="aa9d849dc4667314b2a53eddf02f5af91" name="aa9d849dc4667314b2a53eddf02f5af91"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa9d849dc4667314b2a53eddf02f5af91">&#9670;&nbsp;</a></span>GetStatistics()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void D3D12MA::Pool::GetStatistics </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">Statistics</a> *&#160;</td>
+          <td class="paramname"><em>pStats</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Retrieves basic statistics of the custom pool that are fast to calculate. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">pStats</td><td>Statistics of the current pool. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>

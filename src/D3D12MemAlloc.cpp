@@ -484,6 +484,14 @@ private:
 // Minimum size of a free suballocation to register it in the free suballocation collection.
 static const UINT64 MIN_FREE_SUBALLOCATION_SIZE_TO_REGISTER = 16;
 
+// Local copy of this enum, as it is provided only by <dxgi1_4.h>, so it may not be available.
+enum DXGI_MEMORY_SEGMENT_GROUP_COPY
+{
+    DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY = 0,
+    DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY = 1,
+    DXGI_MEMORY_SEGMENT_GROUP_COUNT
+};
+
 /*
 Performs binary search and returns iterator to first element that is greater or
 equal to `key`, according to comparison `cmp`.
@@ -543,6 +551,13 @@ static UINT HeapTypeToIndex(D3D12_HEAP_TYPE type)
     case D3D12_HEAP_TYPE_CUSTOM:   return 3;
     default: D3D12MA_ASSERT(0); return UINT_MAX;
     }
+}
+
+static D3D12_HEAP_TYPE IndexToHeapType(UINT heapTypeIndex)
+{
+    D3D12MA_ASSERT(heapTypeIndex < 4);
+    // D3D12_HEAP_TYPE_DEFAULT starts at 1.
+    return (D3D12_HEAP_TYPE)(heapTypeIndex + 1);
 }
 
 static const WCHAR* const HeapTypeNames[] = {
@@ -3171,6 +3186,8 @@ public:
     ~CommittedAllocationList();
 
     D3D12_HEAP_TYPE GetHeapType() const { return m_HeapType; }
+    PoolPimpl* GetPool() const { return m_Pool; }
+    UINT GetMemorySegmentGroup(AllocatorPimpl* allocator) const;
     
     void AddStatistics(Statistics& inoutStats);
     void AddDetailedStatistics(DetailedStatistics& inoutStats);
@@ -3313,64 +3330,70 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Private class AllocatorPimpl definition
 
-static const UINT STANDARD_HEAP_TYPE_COUNT = 3; // Only DEFAULT, UPLOAD, READBACK.
-static const UINT DEFAULT_POOL_MAX_COUNT = 9;
+static constexpr UINT STANDARD_HEAP_TYPE_COUNT = 3; // Only DEFAULT, UPLOAD, READBACK.
+static constexpr UINT DEFAULT_POOL_MAX_COUNT = 9;
 
-struct CurrentBudgetData
+class CurrentBudgetData
 {
-    D3D12MA_ATOMIC_UINT32 m_BlockCount[HEAP_TYPE_COUNT];
-    D3D12MA_ATOMIC_UINT32 m_AllocationCount[HEAP_TYPE_COUNT];
-    D3D12MA_ATOMIC_UINT64 m_BlockBytes[HEAP_TYPE_COUNT];
-    D3D12MA_ATOMIC_UINT64 m_AllocationBytes[HEAP_TYPE_COUNT];
+public:
+    void GetStatistics(Statistics& outStats, UINT group) const
+    {
+        outStats.BlockCount = m_BlockCount[group];
+        outStats.AllocationCount = m_AllocationCount[group];
+        outStats.BlockBytes = m_BlockBytes[group];
+        outStats.AllocationBytes = m_AllocationBytes[group];
+    }
+    void GetBudget(bool useMutex,
+        UINT64* outLocalUsage, UINT64* outLocalBudget,
+        UINT64* outNonLocalUsage, UINT64* outNonLocalBudget);
 
-    D3D12MA_ATOMIC_UINT32 m_OperationsSinceBudgetFetch;
+    void AddAllocation(UINT group, UINT64 allocationBytes)
+    {
+        ++m_AllocationCount[group];
+        m_AllocationBytes[group] += allocationBytes;
+        ++m_OperationsSinceBudgetFetch;
+    }
+    void RemoveAllocation(UINT group, UINT64 allocationBytes)
+    {
+        D3D12MA_ASSERT(m_AllocationBytes[group] >= allocationBytes);
+        D3D12MA_ASSERT(m_AllocationCount[group] > 0);
+        m_AllocationBytes[group] -= allocationBytes;
+        --m_AllocationCount[group];
+        ++m_OperationsSinceBudgetFetch;
+    }
+    void AddBlock(UINT group, UINT64 blockBytes)
+    {
+        ++m_BlockCount[group];
+        m_BlockBytes[group] += blockBytes;
+        ++m_OperationsSinceBudgetFetch;
+    }
+    void RemoveBlock(UINT group, UINT64 blockBytes)
+    {
+        D3D12MA_ASSERT(m_BlockBytes[group] >= blockBytes);
+        D3D12MA_ASSERT(m_BlockCount[group] > 0);
+        m_BlockBytes[group] -= blockBytes;
+        --m_BlockCount[group];
+        ++m_OperationsSinceBudgetFetch;
+    }
+    bool ShouldUpdateBudget() const
+    {
+        return m_OperationsSinceBudgetFetch >= 30;
+    }
+#if D3D12MA_DXGI_1_4
+    HRESULT UpdateBudget(IDXGIAdapter3* adapter3, bool useMutex);
+#endif
+
+private:
+    D3D12MA_ATOMIC_UINT32 m_BlockCount[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
+    D3D12MA_ATOMIC_UINT32 m_AllocationCount[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
+    D3D12MA_ATOMIC_UINT64 m_BlockBytes[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
+    D3D12MA_ATOMIC_UINT64 m_AllocationBytes[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
+
+    D3D12MA_ATOMIC_UINT32 m_OperationsSinceBudgetFetch = 0;
     D3D12MA_RW_MUTEX m_BudgetMutex;
-    UINT64 m_D3D12UsageLocal, m_D3D12UsageNonLocal;
-    UINT64 m_D3D12BudgetLocal, m_D3D12BudgetNonLocal;
-    UINT64 m_BlockBytesAtBudgetFetch[HEAP_TYPE_COUNT];
-
-    CurrentBudgetData()
-    {
-        for(UINT i = 0; i < HEAP_TYPE_COUNT; ++i)
-        {
-            m_BlockCount[i] = 0;
-            m_AllocationCount[i] = 0;
-            m_BlockBytes[i] = 0;
-            m_AllocationBytes[i] = 0;
-            m_BlockBytesAtBudgetFetch[i] = 0;
-        }
-
-        m_D3D12UsageLocal = 0;
-        m_D3D12UsageNonLocal = 0;
-        m_D3D12BudgetLocal = 0;
-        m_D3D12BudgetNonLocal = 0;
-        m_OperationsSinceBudgetFetch = 0;
-    }
-
-    void AddAllocation(UINT heapTypeIndex, UINT64 allocationSize)
-    {
-        ++m_AllocationCount[heapTypeIndex];
-        m_AllocationBytes[heapTypeIndex] += allocationSize;
-        ++m_OperationsSinceBudgetFetch;
-    }
-    void RemoveAllocation(UINT heapTypeIndex, UINT64 allocationSize)
-    {
-        m_AllocationBytes[heapTypeIndex] -= allocationSize;
-        --m_AllocationCount[heapTypeIndex];
-        ++m_OperationsSinceBudgetFetch;
-    }
-    void AddCommittedAllocation(UINT heapTypeIndex, UINT64 allocationSize)
-    {
-        AddAllocation(heapTypeIndex, allocationSize);
-        ++m_BlockCount[heapTypeIndex];
-        m_BlockBytes[heapTypeIndex] += allocationSize;
-    }
-    void RemoveCommittedAllocation(UINT heapTypeIndex, UINT64 allocationSize)
-    {
-        m_BlockBytes[heapTypeIndex] -= allocationSize;
-        --m_BlockCount[heapTypeIndex];
-        RemoveAllocation(heapTypeIndex, allocationSize);
-    }
+    UINT64 m_D3D12Usage[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
+    UINT64 m_D3D12Budget[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
+    UINT64 m_BlockBytesAtD3D12Fetch[DXGI_MEMORY_SEGMENT_GROUP_COUNT] = {};
 };
 
 class PoolPimpl
@@ -3454,6 +3477,9 @@ public:
     bool UseMutex() const { return m_UseMutex; }
     AllocationObjectAllocator& GetAllocationObjectAllocator() { return m_AllocationObjectAllocator; }
     bool HeapFlagsFulfillResourceHeapTier(D3D12_HEAP_FLAGS flags) const;
+    UINT StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE heapType) const;
+    UINT HeapPropertiesToMemorySegmentGroup(const D3D12_HEAP_PROPERTIES& heapProps) const;
+    UINT64 GetMemoryCapacity(UINT memorySegmentGroup) const;
 
     HRESULT CreateResource(
         const ALLOCATION_DESC* pAllocDesc,
@@ -3505,7 +3531,7 @@ public:
 
     void CalculateStatistics(TotalStatistics& outStats);
 
-    void GetBudget(Budget* outGpuBudget, Budget* outCpuBudget);
+    void GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget);
     void GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE heapType);
 
     void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap);
@@ -6074,8 +6100,9 @@ MemoryBlock::~MemoryBlock()
 {
     if(m_Heap)
     {
-        m_Allocator->m_Budget.m_BlockBytes[HeapTypeToIndex(m_HeapProps.Type)] -= m_Size;
         m_Heap->Release();
+        m_Allocator->m_Budget.RemoveBlock(
+            m_Allocator->HeapPropertiesToMemorySegmentGroup(m_HeapProps), m_Size);
     }
 }
 
@@ -6105,7 +6132,8 @@ HRESULT MemoryBlock::Init(ID3D12ProtectedResourceSession* pProtectedSession)
     
     if(SUCCEEDED(hr))
     {
-        m_Allocator->m_Budget.m_BlockBytes[HeapTypeToIndex(m_HeapProps.Type)] += m_Size;
+        m_Allocator->m_Budget.AddBlock(
+            m_Allocator->HeapPropertiesToMemorySegmentGroup(m_HeapProps), m_Size);
     }
     return hr;
 }
@@ -6130,6 +6158,14 @@ CommittedAllocationList::~CommittedAllocationList()
     {
         D3D12MA_ASSERT(0 && "Unfreed committed allocations found!");
     }
+}
+
+UINT CommittedAllocationList::GetMemorySegmentGroup(AllocatorPimpl* allocator) const
+{
+    if(m_Pool)
+        return allocator->HeapPropertiesToMemorySegmentGroup(m_Pool->GetDesc().HeapProperties);
+    else
+        return allocator->StandardHeapTypeToMemorySegmentGroup(m_HeapType);
 }
 
 void CommittedAllocationList::AddStatistics(Statistics& inoutStats)
@@ -6645,7 +6681,7 @@ HRESULT BlockVector::AllocateFromBlock(
         pBlock->m_pMetadata->Alloc(currRequest, size, *pAllocation);
         (*pAllocation)->InitPlaced(currRequest.allocHandle, alignment, pBlock);
         D3D12MA_HEAVY_ASSERT(pBlock->Validate());
-        m_hAllocator->m_Budget.AddAllocation(HeapTypeToIndex(m_HeapProps.Type), size);
+        m_hAllocator->m_Budget.AddAllocation(m_hAllocator->HeapPropertiesToMemorySegmentGroup(m_HeapProps), size);
         return S_OK;
     }
     return E_OUTOFMEMORY;
@@ -6807,6 +6843,72 @@ void PoolPimpl::FreeName()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Private class CurrentBudgetData implementation
+
+void CurrentBudgetData::GetBudget(bool useMutex,
+    UINT64* outLocalUsage, UINT64* outLocalBudget,
+    UINT64* outNonLocalUsage, UINT64* outNonLocalBudget)
+{
+    MutexLockRead lockRead(m_BudgetMutex, useMutex);
+
+    if(outLocalUsage)
+    {
+        const UINT64 D3D12Usage = m_D3D12Usage[DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY];
+        const UINT64 blockBytes = m_BlockBytes[DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY];
+        const UINT64 blockBytesAtD3D12Fetch = m_BlockBytesAtD3D12Fetch[DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY];
+        *outLocalUsage = D3D12Usage + blockBytes > blockBytesAtD3D12Fetch ?
+            D3D12Usage + blockBytes - blockBytesAtD3D12Fetch : 0;
+    }
+    if(outLocalBudget)
+        *outLocalBudget = m_D3D12Budget[DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY];
+
+    if(outNonLocalUsage)
+    {
+        const UINT64 D3D12Usage = m_D3D12Usage[DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY];
+        const UINT64 blockBytes = m_BlockBytes[DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY];
+        const UINT64 blockBytesAtD3D12Fetch = m_BlockBytesAtD3D12Fetch[DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY];
+        *outNonLocalUsage = D3D12Usage + blockBytes > blockBytesAtD3D12Fetch ?
+            D3D12Usage + blockBytes - blockBytesAtD3D12Fetch : 0;
+    }
+    if(outNonLocalBudget)
+        *outNonLocalBudget = m_D3D12Budget[DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY];
+}
+
+#if D3D12MA_DXGI_1_4
+HRESULT CurrentBudgetData::UpdateBudget(IDXGIAdapter3* adapter3, bool useMutex)
+{
+    D3D12MA_ASSERT(adapter3);
+
+    DXGI_QUERY_VIDEO_MEMORY_INFO infoLocal = {};
+    DXGI_QUERY_VIDEO_MEMORY_INFO infoNonLocal = {};
+    const HRESULT hrLocal = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &infoLocal);
+    const HRESULT hrNonLocal = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &infoNonLocal);
+
+    if(SUCCEEDED(hrLocal) || SUCCEEDED(hrNonLocal))
+    {
+        MutexLockWrite lockWrite(m_BudgetMutex, useMutex);
+
+        if(SUCCEEDED(hrLocal))
+        {
+            m_D3D12Usage[0] = infoLocal.CurrentUsage;
+            m_D3D12Budget[0] = infoLocal.Budget;
+        }
+        if(SUCCEEDED(hrNonLocal))
+        {
+            m_D3D12Usage[1] = infoNonLocal.CurrentUsage;
+            m_D3D12Budget[1] = infoNonLocal.Budget;
+        }
+
+        m_BlockBytesAtD3D12Fetch[0] = m_BlockBytes[0];
+        m_BlockBytesAtD3D12Fetch[1] = m_BlockBytes[1];
+        m_OperationsSinceBudgetFetch = 0;
+    }
+
+    return FAILED(hrLocal) ? hrLocal : hrNonLocal;
+}
+#endif // #if D3D12MA_DXGI_1_4
+
+////////////////////////////////////////////////////////////////////////////////
 // Public class Pool implementation
 
 void Pool::ReleaseThis()
@@ -6951,10 +7053,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
     }
 
 #if D3D12MA_DXGI_1_4
-    if(m_Adapter3)
-    {
-        UpdateD3D12Budget();
-    }
+    UpdateD3D12Budget();
 #endif
 
     return S_OK;
@@ -7289,8 +7388,9 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
 
             committedAllocParams.m_List->Register(alloc);
 
-            const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-            m_Budget.AddCommittedAllocation(heapTypeIndex, resourceSize);
+            const UINT memSegmentGroup = HeapPropertiesToMemorySegmentGroup(committedAllocParams.m_HeapProperties);
+            m_Budget.AddBlock(memSegmentGroup, resourceSize);
+            m_Budget.AddAllocation(memSegmentGroup, resourceSize);
         }
         else
         {
@@ -7344,8 +7444,9 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
 
             committedAllocParams.m_List->Register(alloc);
 
-            const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-            m_Budget.AddCommittedAllocation(heapTypeIndex, resourceSize);
+            const UINT memSegmentGroup = HeapPropertiesToMemorySegmentGroup(committedAllocParams.m_HeapProperties);
+            m_Budget.AddBlock(memSegmentGroup, resourceSize);
+            m_Budget.AddAllocation(memSegmentGroup, resourceSize);
         }
         else
         {
@@ -7398,8 +7499,9 @@ HRESULT AllocatorPimpl::AllocateHeap(
         (*ppAllocation)->InitHeap(committedAllocParams.m_List, heap);
         committedAllocParams.m_List->Register(*ppAllocation);
 
-        const UINT heapTypeIndex = HeapTypeToIndex(committedAllocParams.m_HeapProperties.Type);
-        m_Budget.AddCommittedAllocation(heapTypeIndex, allocInfo.SizeInBytes);
+        const UINT memSegmentGroup = HeapPropertiesToMemorySegmentGroup(committedAllocParams.m_HeapProperties);
+        m_Budget.AddBlock(memSegmentGroup, allocInfo.SizeInBytes);
+        m_Budget.AddAllocation(memSegmentGroup, allocInfo.SizeInBytes);
     }
     return hr;
 }
@@ -7587,9 +7689,10 @@ void AllocatorPimpl::FreeCommittedMemory(Allocation* allocation)
     CommittedAllocationList* const allocList = allocation->m_Committed.list;
     allocList->Unregister(allocation);
 
-    const UINT64 allocationSize = allocation->GetSize();
-    const UINT heapTypeIndex = HeapTypeToIndex(allocList->GetHeapType());
-    m_Budget.RemoveCommittedAllocation(heapTypeIndex, allocationSize);
+    const UINT memSegmentGroup = allocList->GetMemorySegmentGroup(this);
+    const UINT64 allocSize = allocation->GetSize();
+    m_Budget.RemoveAllocation(memSegmentGroup, allocSize);
+    m_Budget.RemoveBlock(memSegmentGroup, allocSize);
 }
 
 void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
@@ -7600,7 +7703,7 @@ void AllocatorPimpl::FreePlacedMemory(Allocation* allocation)
     D3D12MA_ASSERT(block);
     BlockVector* const blockVector = block->GetBlockVector();
     D3D12MA_ASSERT(blockVector);
-    m_Budget.RemoveAllocation(HeapTypeToIndex(block->GetHeapProperties().Type), allocation->GetSize());
+    m_Budget.RemoveAllocation(HeapPropertiesToMemorySegmentGroup(block->GetHeapProperties()), allocation->GetSize());
     blockVector->Free(allocation);
 }
 
@@ -7612,9 +7715,10 @@ void AllocatorPimpl::FreeHeapMemory(Allocation* allocation)
     allocList->Unregister(allocation);
     SAFE_RELEASE(allocation->m_Heap.heap);
 
-    const UINT heapTypeIndex = HeapTypeToIndex(allocList->GetHeapType());
-    const UINT64 allocationSize = allocation->GetSize();
-    m_Budget.RemoveCommittedAllocation(heapTypeIndex, allocationSize);
+    const UINT memSegmentGroup = allocList->GetMemorySegmentGroup(this);
+    const UINT64 allocSize = allocation->GetSize();
+    m_Budget.RemoveAllocation(memSegmentGroup, allocSize);
+    m_Budget.RemoveBlock(memSegmentGroup, allocSize);
 }
 
 void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
@@ -7622,23 +7726,23 @@ void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
     m_CurrentFrameIndex.store(frameIndex);
 
 #if D3D12MA_DXGI_1_4
-    if(m_Adapter3)
-    {
-        UpdateD3D12Budget();
-    }
+    UpdateD3D12Budget();
 #endif
 }
 
 void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
 {
     // Init stats
-    ClearDetailedStatistics(outStats.Total);
     for(size_t i = 0; i < HEAP_TYPE_COUNT; i++)
         ClearDetailedStatistics(outStats.HeapType[i]);
+    for(size_t i = 0; i < DXGI_MEMORY_SEGMENT_GROUP_COUNT; i++)
+        ClearDetailedStatistics(outStats.MemorySegmentGroup[i]);
+    ClearDetailedStatistics(outStats.Total);
 
-    // Process default pools.
+    // Process default pools. 3 standard heap types only. Add them to outStats.HeapType[i].
     if(SupportsResourceHeapTier2())
     {
+        // DEFAULT, UPLOAD, READBACK.
         for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
         {
             BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex];
@@ -7648,6 +7752,7 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
     }
     else
     {
+        // DEFAULT, UPLOAD, READBACK.
         for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
         {
             for(size_t heapSubType = 0; heapSubType < 3; ++heapSubType)
@@ -7659,101 +7764,114 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
         }
     }
 
-    // Process custom pools
+    // Sum them up to memory segment groups.
+    AddDetailedStatistics(
+        outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE_DEFAULT)],
+        outStats.HeapType[0]);
+    AddDetailedStatistics(
+        outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE_UPLOAD)],
+        outStats.HeapType[1]);
+    AddDetailedStatistics(
+        outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE_READBACK)],
+        outStats.HeapType[2]);
+
+    // Process custom pools.
+    DetailedStatistics tmpStats;
     for(size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
         MutexLockRead lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
         PoolList& poolList = m_Pools[heapTypeIndex];
         for(PoolPimpl* pool = poolList.Front(); pool != NULL; pool = poolList.GetNext(pool))
         {
-            pool->AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
+            const D3D12_HEAP_PROPERTIES& poolHeapProps = pool->GetDesc().HeapProperties;
+            ClearDetailedStatistics(tmpStats);
+            pool->AddDetailedStatistics(tmpStats);
+            AddDetailedStatistics(
+                outStats.HeapType[heapTypeIndex], tmpStats);
+            AddDetailedStatistics(
+                outStats.MemorySegmentGroup[HeapPropertiesToMemorySegmentGroup(poolHeapProps)], tmpStats);
         }
     }
 
-    // Process committed allocations.
-    for(size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
-        m_CommittedAllocations[heapTypeIndex].AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
+    // Process committed allocations. 3 standard heap types only.
+    for(UINT heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
+    {
+        ClearDetailedStatistics(tmpStats);
+        m_CommittedAllocations[heapTypeIndex].AddDetailedStatistics(tmpStats);
+        AddDetailedStatistics(
+            outStats.HeapType[heapTypeIndex], tmpStats);
+        AddDetailedStatistics(
+            outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(IndexToHeapType(heapTypeIndex))], tmpStats);
+    }
 
-    // Postprocess
-    for(size_t i = 0; i < HEAP_TYPE_COUNT; ++i)
-        AddDetailedStatistics(outStats.Total, outStats.HeapType[i]);
+    // Sum up memory segment groups to totals.
+    AddDetailedStatistics(outStats.Total, outStats.MemorySegmentGroup[0]);
+    AddDetailedStatistics(outStats.Total, outStats.MemorySegmentGroup[1]);
+
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockCount =
+        outStats.MemorySegmentGroup[0].Stats.BlockCount + outStats.MemorySegmentGroup[1].Stats.BlockCount);
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount =
+        outStats.MemorySegmentGroup[0].Stats.AllocationCount + outStats.MemorySegmentGroup[1].Stats.AllocationCount);
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes =
+        outStats.MemorySegmentGroup[0].Stats.BlockBytes + outStats.MemorySegmentGroup[1].Stats.BlockBytes);
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes =
+        outStats.MemorySegmentGroup[0].Stats.AllocationBytes + outStats.MemorySegmentGroup[1].Stats.AllocationBytes);
+    D3D12MA_ASSERT(outStats.Total.UnusedRangeCount =
+        outStats.MemorySegmentGroup[0].UnusedRangeCount + outStats.MemorySegmentGroup[1].UnusedRangeCount);
+
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockCount =
+        outStats.HeapType[0].Stats.BlockCount + outStats.HeapType[1].Stats.BlockCount +
+        outStats.HeapType[2].Stats.BlockCount + outStats.HeapType[3].Stats.BlockCount);
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount =
+        outStats.HeapType[0].Stats.AllocationCount + outStats.HeapType[1].Stats.AllocationCount +
+        outStats.HeapType[2].Stats.AllocationCount + outStats.HeapType[3].Stats.AllocationCount);
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes =
+        outStats.HeapType[0].Stats.BlockBytes + outStats.HeapType[1].Stats.BlockBytes +
+        outStats.HeapType[2].Stats.BlockBytes + outStats.HeapType[3].Stats.BlockBytes);
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes =
+        outStats.HeapType[0].Stats.AllocationBytes + outStats.HeapType[1].Stats.AllocationBytes +
+        outStats.HeapType[2].Stats.AllocationBytes + outStats.HeapType[3].Stats.AllocationBytes);
+    D3D12MA_ASSERT(outStats.Total.UnusedRangeCount =
+        outStats.HeapType[0].UnusedRangeCount + outStats.HeapType[1].UnusedRangeCount +
+        outStats.HeapType[2].UnusedRangeCount + outStats.HeapType[3].UnusedRangeCount);
 }
 
-void AllocatorPimpl::GetBudget(Budget* outGpuBudget, Budget* outCpuBudget)
+void AllocatorPimpl::GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget)
 {
-    if(outGpuBudget)
-    {
-        // Taking DEFAULT.
-        outGpuBudget->Stats.BlockCount = m_Budget.m_BlockCount[0];
-        outGpuBudget->Stats.AllocationCount = m_Budget.m_AllocationCount[0];
-        outGpuBudget->Stats.BlockBytes = m_Budget.m_BlockBytes[0];
-        outGpuBudget->Stats.AllocationBytes = m_Budget.m_AllocationBytes[0];
-
-    }
-    if(outCpuBudget)
-    {
-        // Taking UPLOAD + READBACK.
-        outCpuBudget->Stats.BlockCount = m_Budget.m_BlockCount[1] + m_Budget.m_BlockCount[2];
-        outCpuBudget->Stats.AllocationCount = m_Budget.m_AllocationCount[1] + m_Budget.m_AllocationCount[2];
-        outCpuBudget->Stats.BlockBytes = m_Budget.m_BlockBytes[1] + m_Budget.m_BlockBytes[2];
-        outCpuBudget->Stats.AllocationBytes = m_Budget.m_AllocationBytes[1] + m_Budget.m_AllocationBytes[2];
-    }
-    // TODO: What to do with CUSTOM?
+    if(outLocalBudget)
+        m_Budget.GetStatistics(outLocalBudget->Stats, DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY);
+    if(outNonLocalBudget)
+        m_Budget.GetStatistics(outNonLocalBudget->Stats, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY);
 
 #if D3D12MA_DXGI_1_4
     if(m_Adapter3)
     {
-        if(m_Budget.m_OperationsSinceBudgetFetch < 30)
+        if(!m_Budget.ShouldUpdateBudget())
         {
-            MutexLockRead lockRead(m_Budget.m_BudgetMutex, m_UseMutex);
-            if(outGpuBudget)
-            {
-
-                if(m_Budget.m_D3D12UsageLocal + outGpuBudget->Stats.BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[0])
-                {
-                    outGpuBudget->UsageBytes = m_Budget.m_D3D12UsageLocal +
-                        outGpuBudget->Stats.BlockBytes - m_Budget.m_BlockBytesAtBudgetFetch[0];
-                }
-                else
-                {
-                    outGpuBudget->UsageBytes = 0;
-                }
-                outGpuBudget->BudgetBytes = m_Budget.m_D3D12BudgetLocal;
-            }
-            if(outCpuBudget)
-            {
-                if(m_Budget.m_D3D12UsageNonLocal + outCpuBudget->Stats.BlockBytes > m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2])
-                {
-                    outCpuBudget->UsageBytes = m_Budget.m_D3D12UsageNonLocal +
-                        outCpuBudget->Stats.BlockBytes - (m_Budget.m_BlockBytesAtBudgetFetch[1] + m_Budget.m_BlockBytesAtBudgetFetch[2]);
-                }
-                else
-                {
-                    outCpuBudget->UsageBytes = 0;
-                }
-                outCpuBudget->BudgetBytes = m_Budget.m_D3D12BudgetNonLocal;
-            }
+            m_Budget.GetBudget(m_UseMutex,
+                outLocalBudget ? &outLocalBudget->UsageBytes : NULL,
+                outLocalBudget ? &outLocalBudget->BudgetBytes : NULL,
+                outNonLocalBudget ? &outNonLocalBudget->UsageBytes : NULL,
+                outNonLocalBudget ? &outNonLocalBudget->BudgetBytes : NULL);
         }
         else
         {
-            UpdateD3D12Budget(); // Outside of mutex lock
-            GetBudget(outGpuBudget, outCpuBudget); // Recursion
+            UpdateD3D12Budget();
+            GetBudget(outLocalBudget, outNonLocalBudget); // Recursion
         }
     }
     else
 #endif
     {
-        if(outGpuBudget)
+        if(outLocalBudget)
         {
-            const UINT64 gpuMemorySize = m_AdapterDesc.DedicatedVideoMemory + m_AdapterDesc.DedicatedSystemMemory; // TODO: Is this right?
-            outGpuBudget->UsageBytes = outGpuBudget->Stats.BlockBytes;
-            outGpuBudget->BudgetBytes = gpuMemorySize * 8 / 10; // 80% heuristics.
+            outLocalBudget->UsageBytes = outLocalBudget->Stats.BlockBytes;
+            outLocalBudget->BudgetBytes = GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY) * 8 / 10; // 80% heuristics.
         }
-        if(outCpuBudget)
+        if(outNonLocalBudget)
         {
-            const UINT64 cpuMemorySize = m_AdapterDesc.SharedSystemMemory; // TODO: Is this right?
-            outCpuBudget->UsageBytes = outCpuBudget->Stats.BlockBytes;
-            outCpuBudget->BudgetBytes = cpuMemorySize * 8 / 10; // 80% heuristics.
+            outNonLocalBudget->UsageBytes = outNonLocalBudget->Stats.BlockBytes;
+            outNonLocalBudget->BudgetBytes = GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY) * 8 / 10; // 80% heuristics.
         }
     }
 }
@@ -7812,8 +7930,8 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
     {
         JsonWriter json(GetAllocs(), sb);
 
-        Budget gpuBudget = {}, cpuBudget = {};
-        GetBudget(&gpuBudget, &cpuBudget);
+        Budget localBudget = {}, nonLocalBudget = {};
+        GetBudget(&localBudget, &nonLocalBudget);
 
         TotalStatistics stats;
         CalculateStatistics(stats);
@@ -7831,10 +7949,10 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
         json.WriteString(L"Budget");
         json.BeginObject();
         {
-            json.WriteString(L"GPU");
-            WriteBudgetToJson(json, gpuBudget);
-            json.WriteString(L"CPU");
-            WriteBudgetToJson(json, cpuBudget);
+            json.WriteString(L"Local");
+            WriteBudgetToJson(json, localBudget);
+            json.WriteString(L"NonLocal");
+            WriteBudgetToJson(json, nonLocalBudget);
         }
         json.EndObject();
 
@@ -7961,36 +8079,10 @@ void AllocatorPimpl::FreeStatsString(WCHAR* pStatsString)
 HRESULT AllocatorPimpl::UpdateD3D12Budget()
 {
 #if D3D12MA_DXGI_1_4
-    D3D12MA_ASSERT(m_Adapter3);
-
-    DXGI_QUERY_VIDEO_MEMORY_INFO infoLocal = {};
-    DXGI_QUERY_VIDEO_MEMORY_INFO infoNonLocal = {};
-    HRESULT hrLocal = m_Adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &infoLocal);
-    HRESULT hrNonLocal = m_Adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &infoNonLocal);
-
-    {
-        MutexLockWrite lockWrite(m_Budget.m_BudgetMutex, m_UseMutex);
-
-        if(SUCCEEDED(hrLocal))
-        {
-            m_Budget.m_D3D12UsageLocal = infoLocal.CurrentUsage;
-            m_Budget.m_D3D12BudgetLocal = infoLocal.Budget;
-        }
-        if(SUCCEEDED(hrNonLocal))
-        {
-            m_Budget.m_D3D12UsageNonLocal = infoNonLocal.CurrentUsage;
-            m_Budget.m_D3D12BudgetNonLocal = infoNonLocal.Budget;
-        }
-
-        for(UINT i = 0; i < HEAP_TYPE_COUNT; ++i)
-        {
-            m_Budget.m_BlockBytesAtBudgetFetch[i] = m_Budget.m_BlockBytes[i].load();
-        }
-
-        m_Budget.m_OperationsSinceBudgetFetch = 0;
-    }
-
-    return FAILED(hrLocal) ? hrLocal : hrNonLocal;
+    if(m_Adapter3)
+        return m_Budget.UpdateBudget(m_Adapter3, m_UseMutex);
+    else
+        return E_NOINTERFACE;
 #else
     return S_OK;
 #endif
@@ -8084,6 +8176,40 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
         json.WriteNumber(budget.BudgetBytes);
     }
     json.EndObject();
+}
+
+UINT AllocatorPimpl::StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE heapType) const
+{
+    D3D12MA_ASSERT(IsHeapTypeStandard(heapType));
+    if(IsUMA())
+        return DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY;
+    return heapType == D3D12_HEAP_TYPE_DEFAULT ?
+        DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY : DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY;
+}
+
+UINT AllocatorPimpl::HeapPropertiesToMemorySegmentGroup(const D3D12_HEAP_PROPERTIES& heapProps) const
+{
+    if(IsUMA())
+        return DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY;
+    if(heapProps.MemoryPoolPreference == D3D12_MEMORY_POOL_UNKNOWN)
+        return StandardHeapTypeToMemorySegmentGroup(heapProps.Type);
+    return heapProps.MemoryPoolPreference == D3D12_MEMORY_POOL_L1 ?
+        DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY : DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY;
+}
+
+UINT64 AllocatorPimpl::GetMemoryCapacity(UINT memorySegmentGroup) const
+{
+    switch(memorySegmentGroup)
+    {
+    case DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY:
+        return IsUMA() ?
+            m_AdapterDesc.DedicatedVideoMemory + m_AdapterDesc.SharedSystemMemory : m_AdapterDesc.DedicatedVideoMemory;
+    case DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY:
+        return IsUMA() ? 0 : m_AdapterDesc.SharedSystemMemory;
+    default:
+        D3D12MA_ASSERT(0);
+        return UINT64_MAX;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -8347,6 +8473,11 @@ BOOL Allocator::IsCacheCoherentUMA() const
     return m_Pimpl->IsCacheCoherentUMA();
 }
 
+UINT64 Allocator::GetMemoryCapacity(UINT memorySegmentGroup) const
+{
+    return m_Pimpl->GetMemoryCapacity(memorySegmentGroup);
+}
+
 HRESULT Allocator::CreateResource(
     const ALLOCATION_DESC* pAllocDesc,
     const D3D12_RESOURCE_DESC* pResourceDesc,
@@ -8476,14 +8607,14 @@ void Allocator::CalculateStatistics(TotalStatistics* pStats)
     m_Pimpl->CalculateStatistics(*pStats);
 }
 
-void Allocator::GetBudget(Budget* pGpuBudget, Budget* pCpuBudget)
+void Allocator::GetBudget(Budget* pLocalBudget, Budget* pNonLocalBudget)
 {
-    if(pGpuBudget == NULL && pCpuBudget == NULL)
+    if(pLocalBudget == NULL && pNonLocalBudget == NULL)
     {
         return;
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-    m_Pimpl->GetBudget(pGpuBudget, pCpuBudget);
+    m_Pimpl->GetBudget(pLocalBudget, pNonLocalBudget);
 }
 
 void Allocator::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap) const

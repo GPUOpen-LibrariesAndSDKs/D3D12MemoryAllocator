@@ -94,7 +94,7 @@ Features and benefits</h1>
 <p >While it is recommended to use default pools whenever possible for simplicity and to give the allocator more opportunities for internal optimizations, custom pools may be useful in following cases:</p>
 <ul>
 <li>To keep some resources separate from others in memory.</li>
-<li>To keep track of memory usage of just a specific group of resources. Statistics can be queried using <a class="el" href="class_d3_d12_m_a_1_1_pool.html#a8e4cc5fb13aa33398d391296336c457e" title="Retrieves statistics from the current state of this pool.">D3D12MA::Pool::CalculateStats</a>.</li>
+<li>To keep track of memory usage of just a specific group of resources. Statistics can be queried using D3D12MA::Pool::CalculateStats.</li>
 <li>To use specific size of a memory block (<code>ID3D12Heap</code>). To set it, use member <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#af7284cc51a8ed5b551075584256de23c" title="Size of a single heap (memory block) to be allocated as part of this pool, in bytes....">D3D12MA::POOL_DESC::BlockSize</a>. When set to 0, the library uses automatically determined, variable block sizes.</li>
 <li>To reserve some minimum amount of memory allocated. To use it, set member <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a6f10db3911a3bea1becfc9a0dfa5bac8" title="Minimum number of heaps (memory blocks) to be always allocated in this pool, even if they stay empty....">D3D12MA::POOL_DESC::MinBlockCount</a>.</li>
 <li>To limit maximum amount of memory allocated. To use it, set member <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#abbce3a99f253928f9c3c09fa16015f9e" title="Maximum number of heaps (memory blocks) that can be allocated in this pool. Optional.">D3D12MA::POOL_DESC::MaxBlockCount</a>.</li>
@@ -110,7 +110,7 @@ Features and benefits</h1>
 <div class="line">ID3D12Resource* res;</div>
 <div class="line">hr = allocator-&gt;CreateResource(&amp;allocDesc, &amp;resDesc,</div>
 <div class="line">    D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
-<div class="ttc" id="anamespace_d3_d12_m_a_html_abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675"><div class="ttname"><a href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a></div><div class="ttdeci">@ ALLOCATION_FLAG_COMMITTED</div><div class="ttdef"><b>Definition:</b> D3D12MemAlloc.h:202</div></div>
+<div class="ttc" id="anamespace_d3_d12_m_a_html_abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675"><div class="ttname"><a href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a></div><div class="ttdeci">@ ALLOCATION_FLAG_COMMITTED</div><div class="ttdef"><b>Definition:</b> D3D12MemAlloc.h:210</div></div>
 </div><!-- fragment --><p >This feature may seem unnecessary, but creating committed allocations from custom pools may be useful in some cases, e.g. to have separate memory usage statistics for some group of resources or to use extended allocation parameters, like custom <code>D3D12_HEAP_PROPERTIES</code>, which are available only in custom pools. </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->

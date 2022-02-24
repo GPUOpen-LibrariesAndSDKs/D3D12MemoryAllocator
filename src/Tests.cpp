@@ -1204,14 +1204,16 @@ static inline bool StatisticsEqual(const D3D12MA::DetailedStatistics& lhs, const
 
 static void CheckStatistics(const D3D12MA::DetailedStatistics& stats)
 {
+    CHECK_BOOL(stats.Stats.AllocationBytes <= stats.Stats.BlockBytes);
     if(stats.Stats.AllocationBytes > 0)
     {
         CHECK_BOOL(stats.Stats.AllocationCount > 0);
+        CHECK_BOOL(stats.AllocationSizeMin <= stats.AllocationSizeMax);
     }
     if(stats.UnusedRangeCount > 0)
     {
-        CHECK_BOOL(stats.UnusedRangeSizeMin > 0);
         CHECK_BOOL(stats.UnusedRangeSizeMax > 0);
+        CHECK_BOOL(stats.UnusedRangeSizeMin <= stats.UnusedRangeSizeMax);
     }
 }
 

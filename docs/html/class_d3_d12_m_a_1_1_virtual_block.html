@@ -104,9 +104,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a9faeb1ad64ffd04b86a314fe04a8c81d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a9faeb1ad64ffd04b86a314fe04a8c81d">SetAllocationUserData</a> (<a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">VirtualAllocation</a> allocation, void *pUserData)</td></tr>
 <tr class="memdesc:a9faeb1ad64ffd04b86a314fe04a8c81d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Changes custom pointer for an allocation to a new value.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a9faeb1ad64ffd04b86a314fe04a8c81d">More...</a><br /></td></tr>
 <tr class="separator:a9faeb1ad64ffd04b86a314fe04a8c81d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a039ee8426818d0126cf7f44c1c658526"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a039ee8426818d0126cf7f44c1c658526">CalculateStats</a> (<a class="el" href="struct_d3_d12_m_a_1_1_stat_info.html">StatInfo</a> *pInfo) const</td></tr>
-<tr class="memdesc:a039ee8426818d0126cf7f44c1c658526"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves statistics from the current state of the block.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a039ee8426818d0126cf7f44c1c658526">More...</a><br /></td></tr>
-<tr class="separator:a039ee8426818d0126cf7f44c1c658526"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0f1dda0e019e218b021f64987a74b110"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a0f1dda0e019e218b021f64987a74b110">GetStatistics</a> (<a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">Statistics</a> *pStats) const</td></tr>
+<tr class="memdesc:a0f1dda0e019e218b021f64987a74b110"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves basic statistics of the virtual block that are fast to calculate.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a0f1dda0e019e218b021f64987a74b110">More...</a><br /></td></tr>
+<tr class="separator:a0f1dda0e019e218b021f64987a74b110"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a614a82247ce6cf29c38895e16eb971d9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a614a82247ce6cf29c38895e16eb971d9">CalculateStatistics</a> (<a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a> *pStats) const</td></tr>
+<tr class="memdesc:a614a82247ce6cf29c38895e16eb971d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves detailed statistics of the virtual block that are slower to calculate.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a614a82247ce6cf29c38895e16eb971d9">More...</a><br /></td></tr>
+<tr class="separator:a614a82247ce6cf29c38895e16eb971d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a828a27070bfa762cae796d4c8f2ef703"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a828a27070bfa762cae796d4c8f2ef703">BuildStatsString</a> (WCHAR **ppStatsString) const</td></tr>
 <tr class="memdesc:a828a27070bfa762cae796d4c8f2ef703"><td class="mdescLeft">&#160;</td><td class="mdescRight">Builds and returns statistics as a string in JSON format, including the list of allocations with their parameters.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#a828a27070bfa762cae796d4c8f2ef703">More...</a><br /></td></tr>
 <tr class="separator:a828a27070bfa762cae796d4c8f2ef703"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -192,23 +195,29 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a039ee8426818d0126cf7f44c1c658526" name="a039ee8426818d0126cf7f44c1c658526"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a039ee8426818d0126cf7f44c1c658526">&#9670;&nbsp;</a></span>CalculateStats()</h2>
+<a id="a614a82247ce6cf29c38895e16eb971d9" name="a614a82247ce6cf29c38895e16eb971d9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a614a82247ce6cf29c38895e16eb971d9">&#9670;&nbsp;</a></span>CalculateStatistics()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void D3D12MA::VirtualBlock::CalculateStats </td>
+          <td class="memname">void D3D12MA::VirtualBlock::CalculateStatistics </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_stat_info.html">StatInfo</a> *&#160;</td>
-          <td class="paramname"><em>pInfo</em></td><td>)</td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a> *&#160;</td>
+          <td class="paramname"><em>pStats</em></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Retrieves statistics from the current state of the block. </p>
+<p>Retrieves detailed statistics of the virtual block that are slower to calculate. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">pStats</td><td>Statistics of the virtual block. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -299,6 +308,32 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Returns information about an allocation - its offset, size and custom pointer. </p>
+
+</div>
+</div>
+<a id="a0f1dda0e019e218b021f64987a74b110" name="a0f1dda0e019e218b021f64987a74b110"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0f1dda0e019e218b021f64987a74b110">&#9670;&nbsp;</a></span>GetStatistics()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void D3D12MA::VirtualBlock::GetStatistics </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">Statistics</a> *&#160;</td>
+          <td class="paramname"><em>pStats</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Retrieves basic statistics of the virtual block that are fast to calculate. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[out]</td><td class="paramname">pStats</td><td>Statistics of the virtual block. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>

@@ -33,15 +33,15 @@ Documentation of all members: D3D12MemAlloc.h
 
 \section main_table_of_contents Table of contents
 
-- <b>User guide</b>
-    - \subpage quick_start
-        - [Project setup](@ref quick_start_project_setup)
-        - [Creating resources](@ref quick_start_creating_resources)
-        - [Mapping memory](@ref quick_start_mapping_memory)
-    - \subpage custom_pools
-    - \subpage resource_aliasing
-    - \subpage linear_algorithm
-    - \subpage virtual_allocator
+- \subpage quick_start
+    - [Project setup](@ref quick_start_project_setup)
+    - [Creating resources](@ref quick_start_creating_resources)
+    - [Mapping memory](@ref quick_start_mapping_memory)
+- \subpage custom_pools
+- \subpage statistics
+- \subpage resource_aliasing
+- \subpage linear_algorithm
+- \subpage virtual_allocator
 - \subpage configuration
   - [Custom CPU memory allocator](@ref custom_memory_allocator)
   - [Debug margins](@ref debug_margins)
@@ -268,6 +268,131 @@ struct ALLOCATION_DESC
     It will then never be created as committed.
     */
     Pool* CustomPool;
+};
+
+/** \brief Calculated statistics of memory usage e.g. in a specific memory heap type,
+memory segment group, custom pool, or total.
+
+These are fast to calculate.
+See functions: D3D12MA::Allocator::GetBudget(), D3D12MA::Pool::GetStatistics().
+*/
+struct Statistics
+{
+    /** \brief Number of D3D12 memory blocks allocated - `ID3D12Heap` objects and committed resources.
+    */
+    UINT BlockCount;
+    /** \brief Number of D3D12MA::Allocation objects allocated.
+
+    Committed allocations have their own blocks, so each one adds 1 to `AllocationCount` as well as `BlockCount`.
+    */
+    UINT AllocationCount;
+    /** \brief Number of bytes allocated in memory blocks.
+    */
+    UINT64 BlockBytes;
+    /** \brief Total number of bytes occupied by all D3D12MA::Allocation objects.
+
+    Always less or equal than `BlockBytes`.
+    Difference `(BlockBytes - AllocationBytes)` is the amount of memory allocated from D3D12
+    but unused by any D3D12MA::Allocation.
+    */
+    UINT64 AllocationBytes;
+};
+
+/** \brief More detailed statistics than D3D12MA::Statistics.
+
+These are slower to calculate. Use for debugging purposes.
+See functions: D3D12MA::Allocator::CalculateStatistics(), D3D12MA::Pool::CalculateStatistics().
+
+Averages are not provided because they can be easily calculated as:
+
+\code
+UINT64 AllocationSizeAvg = DetailedStats.Statistics.AllocationBytes / detailedStats.Statistics.AllocationCount;
+UINT64 UnusedBytes = DetailedStats.Statistics.BlockBytes - DetailedStats.Statistics.AllocationBytes;
+UINT64 UnusedRangeSizeAvg = UnusedBytes / DetailedStats.UnusedRangeCount;
+\endcode
+*/
+struct DetailedStatistics
+{
+    /// Basic statistics.
+    Statistics Stats;
+    /// Number of free ranges of memory between allocations.
+    UINT UnusedRangeCount;
+    /// Smallest allocation size. `UINT64_MAX` if there are 0 allocations.
+    UINT64 AllocationSizeMin;
+    /// Largest allocation size. 0 if there are 0 allocations.
+    UINT64 AllocationSizeMax;
+    /// Smallest empty range size. `UINT64_MAX` if there are 0 empty ranges.
+    UINT64 UnusedRangeSizeMin;
+    /// Largest empty range size. 0 if there are 0 empty ranges.
+    UINT64 UnusedRangeSizeMax;
+};
+
+/** \brief  General statistics from current state of the allocator -
+total memory usage across all memory heaps and segments.
+
+These are slower to calculate. Use for debugging purposes.
+See function D3D12MA::Allocator::CalculateStatistics().
+*/
+struct TotalStatistics
+{
+    /** \brief One element for each type of heap located at the following indices:
+
+    - 0 = `D3D12_HEAP_TYPE_DEFAULT`
+    - 1 = `D3D12_HEAP_TYPE_UPLOAD`
+    - 2 = `D3D12_HEAP_TYPE_READBACK`
+    - 3 = `D3D12_HEAP_TYPE_CUSTOM`
+    */
+    DetailedStatistics HeapType[4];
+    /** \brief One element for each memory segment group located at the following indices:
+
+    - 0 = `DXGI_MEMORY_SEGMENT_GROUP_LOCAL`
+    - 1 = `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`
+
+    Meaning of these segment groups is:
+
+    - When `IsUMA() == FALSE` (discrete graphics card):
+      - `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` (index 0) represents GPU memory
+      (resources allocated in `D3D12_HEAP_TYPE_DEFAULT` or `D3D12_MEMORY_POOL_L1`).
+      - `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL` (index 1) represents system memory
+      (resources allocated in `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`, or `D3D12_MEMORY_POOL_L0`).
+    - When `IsUMA() == TRUE` (integrated graphics chip):
+      - `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` = (index 0) represents memory shared for all the resources.
+      - `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL` = (index 1) is unused and always 0.
+    */
+    DetailedStatistics MemorySegmentGroup[2];
+    /// Total statistics from all memory allocated from D3D12.
+    DetailedStatistics Total;
+};
+
+/** \brief %Statistics of current memory usage and available budget for a specific memory segment group.
+
+These are fast to calculate. See function D3D12MA::Allocator::GetBudget().
+*/
+struct Budget
+{
+    /** \brief %Statistics fetched from the library.
+    */
+    Statistics Stats;
+    /** \brief Estimated current memory usage of the program.
+
+    Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if possible.
+
+    It might be different than `BlockBytes` (usually higher) due to additional implicit objects
+    also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or
+    heaps and resources allocated outside of this library, if any.
+    */
+    UINT64 UsageBytes;
+    /** \brief Estimated amount of memory available to the program.
+
+    Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if possible.
+
+    It might be different (most probably smaller) than memory capacity returned
+    by D3D12MA::Allocator::GetMemoryCapacity() due to factors
+    external to the program, like other programs also consuming system resources.
+    Difference `BudgetBytes - UsageBytes` is the amount of additional memory that can probably
+    be allocated without problems. Exceeding the budget may result in various problems.
+    */
+    UINT64 BudgetBytes;
 };
 
 /// \brief Represents single memory allocation done inside VirtualBlock.
@@ -552,11 +677,15 @@ public:
     */
     POOL_DESC GetDesc() const;
 
-    /** \brief TODO
+    /** \brief Retrieves basic statistics of the custom pool that are fast to calculate.
+
+    \param[out] pStats %Statistics of the current pool.
     */
     void GetStatistics(Statistics* pStats);
 
-    /** \brief TODO
+    /** \brief Retrieves detailed statistics of the custom pool that are slower to calculate.
+
+    \param[out] pStats %Statistics of the current pool.
     */
     void CalculateStatistics(DetailedStatistics* pStats);
 
@@ -651,71 +780,6 @@ struct ALLOCATOR_DESC
 */
 const UINT HEAP_TYPE_COUNT = 4;
 
-/** \brief TODO
-*/
-struct Statistics
-{
-    /// Number of memory blocks (heaps) allocated.
-    UINT BlockCount;
-    /// Number of D3D12MA::Allocation objects allocated.
-    UINT AllocationCount;
-    UINT64 BlockBytes;
-    /// Total number of bytes occupied by all allocations.
-    UINT64 AllocationBytes;
-};
-
-struct DetailedStatistics
-{
-    Statistics Stats;
-    UINT UnusedRangeCount;
-    UINT64 AllocationSizeMin;
-    UINT64 AllocationSizeMax;
-    UINT64 UnusedRangeSizeMin;
-    UINT64 UnusedRangeSizeMax;
-};
-
-/**
-\brief General statistics from the current state of the allocator.
-*/
-struct TotalStatistics
-{
-    /** \brief
-    One element for each type of heap located at the following indices:
-    0 - DEFAULT, 1 - UPLOAD, 2 - READBACK, 3 - CUSTOM.
-    */
-    DetailedStatistics HeapType[HEAP_TYPE_COUNT];
-    /// Total statistics from all heap types.
-    DetailedStatistics Total;
-};
-
-/** \brief Statistics of current memory usage and available budget, in bytes, for GPU or CPU memory.
-*/
-struct Budget
-{
-    /** \brief TODO
-    */
-    Statistics Stats;
-    /** \brief Estimated current memory usage of the program, in bytes.
-
-    Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if enabled.
-
-    It might be different than `BlockBytes` (usually higher) due to additional implicit objects
-    also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or
-    memory blocks allocated outside of this library, if any.
-    */
-    UINT64 UsageBytes;
-    /** \brief Estimated amount of memory available to the program, in bytes.
-
-    Fetched from system using `IDXGIAdapter3::QueryVideoMemoryInfo` if enabled.
-
-    It might be different (most probably smaller) than memory sizes reported in `DXGI_ADAPTER_DESC` due to factors
-    external to the program, like other programs also consuming system resources.
-    Difference `BudgetBytes - UsageBytes` is the amount of additional memory that can probably
-    be allocated without problems. Exceeding the budget may result in various problems.
-    */
-    UINT64 BudgetBytes;
-};
-
 /**
 \brief Represents main object of this library initialized for particular `ID3D12Device`.
 
@@ -746,6 +810,23 @@ public:
     - https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getcustomheapproperties
     */
     BOOL IsCacheCoherentUMA() const;
+    /** \brief Returns total amount of memory of specific segment group, in bytes.
+    
+    \param memorySegmentGroup use `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.
+
+    This information is taken from `DXGI_ADAPTER_DESC`.
+    It is not recommended to use this number.
+    You should preferably call GetBudget() and limit memory usage to D3D12MA::Budget::BudgetBytes instead.
+
+    - When IsUMA() `== FALSE` (discrete graphics card):
+      - `GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL)` returns the size of the video memory.
+      - `GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL)` returns the size of the system memory available for D3D12 resources.
+    - When IsUMA() `== TRUE` (integrated graphics chip):
+      - `GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL)` returns the size of the shared memory available for all D3D12 resources.
+        All memory is considered "local".
+      - `GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL)` is not applicable and returns 0.
+    */
+    UINT64 GetMemoryCapacity(UINT memorySegmentGroup) const;
 
     /** \brief Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation function.
 
@@ -868,22 +949,38 @@ public:
     */
     void SetCurrentFrameIndex(UINT frameIndex);
 
-    /** \brief TODO
-    */
-    void CalculateStatistics(TotalStatistics* pStats);
+    /** \brief Retrieves information about current memory usage and budget.
 
-    /** \brief Retrieves information about current memory budget.
+    \param[out] pLocalBudget Optional, can be null.
+    \param[out] pNonLocalBudget Optional, can be null.
 
-    \param[out] pGpuBudget Optional, can be null.
-    \param[out] pCpuBudget Optional, can be null.
+    - When IsUMA() `== FALSE` (discrete graphics card):
+      - `pLocalBudget` returns the budget of the video memory.
+      - `pNonLocalBudget` returns the budget of the system memory available for D3D12 resources.
+    - When IsUMA() `== TRUE` (integrated graphics chip):
+      - `pLocalBudget` returns the budget of the shared memory available for all D3D12 resources.
+        All memory is considered "local".
+      - `pNonLocalBudget` is not applicable and returns zeros.
 
     This function is called "get" not "calculate" because it is very fast, suitable to be called
-    every frame or every allocation. For more detailed statistics use CalculateStats().
+    every frame or every allocation. For more detailed statistics use CalculateStatistics().
 
     Note that when using allocator from multiple threads, returned information may immediately
     become outdated.
     */
-    void GetBudget(Budget* pGpuBudget, Budget* pCpuBudget);
+    void GetBudget(Budget* pLocalBudget, Budget* pNonLocalBudget);
+
+    /** \brief Retrieves statistics from current state of the allocator.
+
+    This function is called "calculate" not "get" because it has to traverse all
+    internal data structures, so it may be quite slow. Use it for debugging purposes.
+    For faster but more brief statistics suitable to be called every frame or every allocation,
+    use GetBudget().
+
+    Note that when using allocator from multiple threads, returned information may immediately
+    become outdated.
+    */
+    void CalculateStatistics(TotalStatistics* pStats);
 
     /// Builds and returns statistics as a string in JSON format.
     /** @param[out] ppStatsString Must be freed using Allocator::FreeStatsString.
@@ -1044,11 +1141,14 @@ public:
     /** \brief Changes custom pointer for an allocation to a new value.
     */
     void SetAllocationUserData(VirtualAllocation allocation, void* pUserData);
+    /** \brief Retrieves basic statistics of the virtual block that are fast to calculate.
 
-    /** \brief TODO
+    \param[out] pStats %Statistics of the virtual block.
     */
     void GetStatistics(Statistics* pStats) const;
-    /** \brief TODO
+    /** \brief Retrieves detailed statistics of the virtual block that are slower to calculate.
+
+    \param[out] pStats %Statistics of the virtual block.
     */
     void CalculateStatistics(DetailedStatistics* pStats) const;
 
@@ -1334,7 +1434,7 @@ While it is recommended to use default pools whenever possible for simplicity an
 more opportunities for internal optimizations, custom pools may be useful in following cases:
 
 - To keep some resources separate from others in memory.
-- To keep track of memory usage of just a specific group of resources. Statistics can be queried using
+- To keep track of memory usage of just a specific group of resources. %Statistics can be queried using
   D3D12MA::Pool::CalculateStats.
 - To use specific size of a memory block (`ID3D12Heap`). To set it, use member D3D12MA::POOL_DESC::BlockSize.
   When set to 0, the library uses automatically determined, variable block sizes.
@@ -1366,6 +1466,64 @@ hr = allocator->CreateResource(&allocDesc, &resDesc,
 This feature may seem unnecessary, but creating committed allocations from custom pools may be useful
 in some cases, e.g. to have separate memory usage statistics for some group of resources or to use
 extended allocation parameters, like custom `D3D12_HEAP_PROPERTIES`, which are available only in custom pools.
+
+
+\page statistics Statistics
+
+This library contains several functions that return information about its internal state,
+especially the amount of memory allocated from D3D12.
+
+\section statistics_numeric_statistics Numeric statistics
+
+If you need to obtain basic statistics about memory usage per memory segment group, together with current budget,
+you can call function D3D12MA::Allocator::GetBudget() and inspect structure D3D12MA::Budget.
+This is useful to keep track of memory usage and stay withing budget.
+Example:
+
+\code
+D3D12MA::Budget localBudget;
+allocator->GetBudget(&localBudget, NULL);
+
+printf("My GPU memory currently has %u allocations taking %llu B,\n",
+    localBudget.Statistics.AllocationCount,
+    localBudget.Statistics.AllocationBytes);
+printf("allocated out of %u D3D12 memory heaps taking %llu B,\n",
+    localBudget.Statistics.BlockCount,
+    localBudget.Statistics.BlockBytes);
+printf("D3D12 reports total usage %llu B with budget %llu B.\n",
+    localBudget.UsageBytes,
+    localBudget.BudgetBytes);
+\endcode
+
+You can query for more detailed statistics per heap type, memory segment group, and totals,
+including minimum and maximum allocation size and unused range size,
+by calling function D3D12MA::Allocator::CalculateStatistics() and inspecting structure D3D12MA::TotalStatistics.
+This function is slower though, as it has to traverse all the internal data structures,
+so it should be used only for debugging purposes.
+
+You can query for statistics of a custom pool using function D3D12MA::Pool::GetStatistics()
+or D3D12MA::Pool::CalculateStatistics().
+
+You can query for information about a specific allocation using functions of the D3D12MA::Allocation class,
+e.g. `GetSize()`, `GetOffset()`, `GetHeap()`.
+
+\section statistics_json_dump JSON dump
+
+You can dump internal state of the allocator to a string in JSON format using function D3D12MA::Allocator::BuildStatsString().
+The result is guaranteed to be correct JSON.
+It uses Windows Unicode (UTF-16) encoding.
+Any strings provided by user (see D3D12MA::Allocation::SetName())
+are copied as-is and properly escaped for JSON.
+It must be freed using function D3D12MA::Allocator::FreeStatsString().
+
+The format of this JSON string is not part of official documentation of the library,
+but it will not change in backward-incompatible way without increasing library major version number
+and appropriate mention in changelog.
+
+The JSON string contains all the data that can be obtained using D3D12MA::Allocator::CalculateStatistics().
+It can also contain detailed map of allocated memory blocks and their regions -
+free and occupied by allocations.
+This allows e.g. to visualize the memory or assess fragmentation.
 
 
 \page resource_aliasing Resource aliasing (overlap)
@@ -1699,16 +1857,19 @@ It might be more convenient, but you need to make sure to use this new unit cons
 
 \section virtual_allocator_statistics Statistics
 
-You can obtain statistics of a virtual block using D3D12MA::VirtualBlock::CalculateStats.
-The function fills structure D3D12MA::StatInfo - same as used by the normal D3D12 memory allocator.
+You can obtain brief statistics of a virtual block using D3D12MA::VirtualBlock::GetStatistics().
+The function fills structure D3D12MA::Statistics - same as used by the normal D3D12 memory allocator.
 Example:
 
 \code
-D3D12MA::StatInfo statInfo;
-block->CalculateStats(&statInfo);
+D3D12MA::Statistics stats;
+block->GetStatistics(&stats);
 printf("My virtual block has %llu bytes used by %u virtual allocations\n",
-    statInfo.UsedBytes, statInfo.AllocationCount);
+    stats.AllocationBytes, stats.AllocationCount);
 \endcode
+
+More detailed statistics can be obtained using function D3D12MA::VirtualBlock::CalculateStatistics(),
+but they are slower to calculate.
 
 You can also request a full list of allocations and free regions as a string in JSON format by calling
 D3D12MA::VirtualBlock::BuildStatsString.

@@ -73,62 +73,27 @@ $(function() {
 </div><!--header-->
 <div class="contents">
 
-<p>Statistics of current memory usage and available budget, in bytes, for GPU or CPU memory.  
+<p>Statistics of current memory usage and available budget for a specific memory segment group.  
  <a href="struct_d3_d12_m_a_1_1_budget.html#details">More...</a></p>
 
 <p><code>#include &lt;D3D12MemAlloc.h&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:ad1ad5d8521993cb623255ee1709a1c4c"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html#ad1ad5d8521993cb623255ee1709a1c4c">BlockBytes</a></td></tr>
-<tr class="memdesc:ad1ad5d8521993cb623255ee1709a1c4c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sum size of all memory blocks allocated from particular heap type, in bytes.  <a href="struct_d3_d12_m_a_1_1_budget.html#ad1ad5d8521993cb623255ee1709a1c4c">More...</a><br /></td></tr>
-<tr class="separator:ad1ad5d8521993cb623255ee1709a1c4c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abcb043908bd528852f8ef3867ad76099"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html#abcb043908bd528852f8ef3867ad76099">AllocationBytes</a></td></tr>
-<tr class="memdesc:abcb043908bd528852f8ef3867ad76099"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sum size of all allocations created in particular heap type, in bytes.  <a href="struct_d3_d12_m_a_1_1_budget.html#abcb043908bd528852f8ef3867ad76099">More...</a><br /></td></tr>
-<tr class="separator:abcb043908bd528852f8ef3867ad76099"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1255508930766db238cfb1312b15f1cf"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">Statistics</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html#a1255508930766db238cfb1312b15f1cf">Stats</a></td></tr>
+<tr class="memdesc:a1255508930766db238cfb1312b15f1cf"><td class="mdescLeft">&#160;</td><td class="mdescRight">Statistics fetched from the library.  <a href="struct_d3_d12_m_a_1_1_budget.html#a1255508930766db238cfb1312b15f1cf">More...</a><br /></td></tr>
+<tr class="separator:a1255508930766db238cfb1312b15f1cf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a77a8c9e32d6602f95b7d1c285cddd253"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253">UsageBytes</a></td></tr>
-<tr class="memdesc:a77a8c9e32d6602f95b7d1c285cddd253"><td class="mdescLeft">&#160;</td><td class="mdescRight">Estimated current memory usage of the program, in bytes.  <a href="struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253">More...</a><br /></td></tr>
+<tr class="memdesc:a77a8c9e32d6602f95b7d1c285cddd253"><td class="mdescLeft">&#160;</td><td class="mdescRight">Estimated current memory usage of the program.  <a href="struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253">More...</a><br /></td></tr>
 <tr class="separator:a77a8c9e32d6602f95b7d1c285cddd253"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a326515f08d89ee2e31dcfdd5c1e8ac71"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71">BudgetBytes</a></td></tr>
-<tr class="memdesc:a326515f08d89ee2e31dcfdd5c1e8ac71"><td class="mdescLeft">&#160;</td><td class="mdescRight">Estimated amount of memory available to the program, in bytes.  <a href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71">More...</a><br /></td></tr>
+<tr class="memdesc:a326515f08d89ee2e31dcfdd5c1e8ac71"><td class="mdescLeft">&#160;</td><td class="mdescRight">Estimated amount of memory available to the program.  <a href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71">More...</a><br /></td></tr>
 <tr class="separator:a326515f08d89ee2e31dcfdd5c1e8ac71"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p >Statistics of current memory usage and available budget, in bytes, for GPU or CPU memory. </p>
+<div class="textblock"><p >Statistics of current memory usage and available budget for a specific memory segment group. </p>
+<p >These are fast to calculate. See function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a1ac113daec5f6ef28ecb1786cf544144" title="Retrieves information about current memory usage and budget.">D3D12MA::Allocator::GetBudget()</a>. </p>
 </div><h2 class="groupheader">Member Data Documentation</h2>
-<a id="abcb043908bd528852f8ef3867ad76099" name="abcb043908bd528852f8ef3867ad76099"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#abcb043908bd528852f8ef3867ad76099">&#9670;&nbsp;</a></span>AllocationBytes</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">UINT64 D3D12MA::Budget::AllocationBytes</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Sum size of all allocations created in particular heap type, in bytes. </p>
-<p >Always less or equal than <code>BlockBytes</code>. Difference <code>BlockBytes - AllocationBytes</code> is the amount of memory allocated but unused - available for new allocations or wasted due to fragmentation. </p>
-
-</div>
-</div>
-<a id="ad1ad5d8521993cb623255ee1709a1c4c" name="ad1ad5d8521993cb623255ee1709a1c4c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad1ad5d8521993cb623255ee1709a1c4c">&#9670;&nbsp;</a></span>BlockBytes</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">UINT64 D3D12MA::Budget::BlockBytes</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Sum size of all memory blocks allocated from particular heap type, in bytes. </p>
-
-</div>
-</div>
 <a id="a326515f08d89ee2e31dcfdd5c1e8ac71" name="a326515f08d89ee2e31dcfdd5c1e8ac71"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a326515f08d89ee2e31dcfdd5c1e8ac71">&#9670;&nbsp;</a></span>BudgetBytes</h2>
 
@@ -141,9 +106,25 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Estimated amount of memory available to the program, in bytes. </p>
-<p >Fetched from system using <code>IDXGIAdapter3::QueryVideoMemoryInfo</code> if enabled.</p>
-<p >It might be different (most probably smaller) than memory sizes reported in <code>DXGI_ADAPTER_DESC</code> due to factors external to the program, like other programs also consuming system resources. Difference <code>BudgetBytes - UsageBytes</code> is the amount of additional memory that can probably be allocated without problems. Exceeding the budget may result in various problems. </p>
+<p>Estimated amount of memory available to the program. </p>
+<p >Fetched from system using <code>IDXGIAdapter3::QueryVideoMemoryInfo</code> if possible.</p>
+<p >It might be different (most probably smaller) than memory capacity returned by <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a434ae3147209953253da26687bfd62dc" title="Returns total amount of memory of specific segment group, in bytes.">D3D12MA::Allocator::GetMemoryCapacity()</a> due to factors external to the program, like other programs also consuming system resources. Difference <code>BudgetBytes - UsageBytes</code> is the amount of additional memory that can probably be allocated without problems. Exceeding the budget may result in various problems. </p>
+
+</div>
+</div>
+<a id="a1255508930766db238cfb1312b15f1cf" name="a1255508930766db238cfb1312b15f1cf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1255508930766db238cfb1312b15f1cf">&#9670;&nbsp;</a></span>Stats</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">Statistics</a> D3D12MA::Budget::Stats</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Statistics fetched from the library. </p>
 
 </div>
 </div>
@@ -159,9 +140,9 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Estimated current memory usage of the program, in bytes. </p>
-<p >Fetched from system using <code>IDXGIAdapter3::QueryVideoMemoryInfo</code> if enabled.</p>
-<p >It might be different than <code>BlockBytes</code> (usually higher) due to additional implicit objects also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or memory blocks allocated outside of this library, if any. </p>
+<p>Estimated current memory usage of the program. </p>
+<p >Fetched from system using <code>IDXGIAdapter3::QueryVideoMemoryInfo</code> if possible.</p>
+<p >It might be different than <code>BlockBytes</code> (usually higher) due to additional implicit objects also occupying the memory, like swapchain, pipeline state objects, descriptor heaps, command lists, or heaps and resources allocated outside of this library, if any. </p>
 
 </div>
 </div>

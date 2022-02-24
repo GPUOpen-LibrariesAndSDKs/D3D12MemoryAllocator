@@ -95,6 +95,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a08210561b92c4bd7ede9dd7beba4bb80"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a08210561b92c4bd7ede9dd7beba4bb80">IsCacheCoherentUMA</a> () const</td></tr>
 <tr class="memdesc:a08210561b92c4bd7ede9dd7beba4bb80"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <code>D3D12_FEATURE_DATA_ARCHITECTURE1::CacheCoherentUMA</code> was found to be true.  <a href="class_d3_d12_m_a_1_1_allocator.html#a08210561b92c4bd7ede9dd7beba4bb80">More...</a><br /></td></tr>
 <tr class="separator:a08210561b92c4bd7ede9dd7beba4bb80"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a434ae3147209953253da26687bfd62dc"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a434ae3147209953253da26687bfd62dc">GetMemoryCapacity</a> (UINT memorySegmentGroup) const</td></tr>
+<tr class="memdesc:a434ae3147209953253da26687bfd62dc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns total amount of memory of specific segment group, in bytes.  <a href="class_d3_d12_m_a_1_1_allocator.html#a434ae3147209953253da26687bfd62dc">More...</a><br /></td></tr>
+<tr class="separator:a434ae3147209953253da26687bfd62dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa37d6b9fe8ea0864f7a35b9d68e8345a"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">CreateResource</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
 <tr class="memdesc:aa37d6b9fe8ea0864f7a35b9d68e8345a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation function.  <a href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">More...</a><br /></td></tr>
 <tr class="separator:aa37d6b9fe8ea0864f7a35b9d68e8345a"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -113,12 +116,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a468ba0c93121eaaee402b08775f1dd11"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a468ba0c93121eaaee402b08775f1dd11">SetCurrentFrameIndex</a> (UINT frameIndex)</td></tr>
 <tr class="memdesc:a468ba0c93121eaaee402b08775f1dd11"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets the index of the current frame.  <a href="class_d3_d12_m_a_1_1_allocator.html#a468ba0c93121eaaee402b08775f1dd11">More...</a><br /></td></tr>
 <tr class="separator:a468ba0c93121eaaee402b08775f1dd11"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:addedcd0067319ec566042f5cb520843b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#addedcd0067319ec566042f5cb520843b">CalculateStats</a> (<a class="el" href="struct_d3_d12_m_a_1_1_stats.html">Stats</a> *pStats)</td></tr>
-<tr class="memdesc:addedcd0067319ec566042f5cb520843b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves statistics from the current state of the allocator.  <a href="class_d3_d12_m_a_1_1_allocator.html#addedcd0067319ec566042f5cb520843b">More...</a><br /></td></tr>
-<tr class="separator:addedcd0067319ec566042f5cb520843b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abe927bd3ad6930111d4d9408515b9601"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#abe927bd3ad6930111d4d9408515b9601">GetBudget</a> (<a class="el" href="struct_d3_d12_m_a_1_1_budget.html">Budget</a> *pGpuBudget, <a class="el" href="struct_d3_d12_m_a_1_1_budget.html">Budget</a> *pCpuBudget)</td></tr>
-<tr class="memdesc:abe927bd3ad6930111d4d9408515b9601"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves information about current memory budget.  <a href="class_d3_d12_m_a_1_1_allocator.html#abe927bd3ad6930111d4d9408515b9601">More...</a><br /></td></tr>
-<tr class="separator:abe927bd3ad6930111d4d9408515b9601"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1ac113daec5f6ef28ecb1786cf544144"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a1ac113daec5f6ef28ecb1786cf544144">GetBudget</a> (<a class="el" href="struct_d3_d12_m_a_1_1_budget.html">Budget</a> *pLocalBudget, <a class="el" href="struct_d3_d12_m_a_1_1_budget.html">Budget</a> *pNonLocalBudget)</td></tr>
+<tr class="memdesc:a1ac113daec5f6ef28ecb1786cf544144"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves information about current memory usage and budget.  <a href="class_d3_d12_m_a_1_1_allocator.html#a1ac113daec5f6ef28ecb1786cf544144">More...</a><br /></td></tr>
+<tr class="separator:a1ac113daec5f6ef28ecb1786cf544144"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a99db00df909963573a976c203b107d22"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a99db00df909963573a976c203b107d22">CalculateStatistics</a> (<a class="el" href="struct_d3_d12_m_a_1_1_total_statistics.html">TotalStatistics</a> *pStats)</td></tr>
+<tr class="memdesc:a99db00df909963573a976c203b107d22"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieves statistics from current state of the allocator.  <a href="class_d3_d12_m_a_1_1_allocator.html#a99db00df909963573a976c203b107d22">More...</a><br /></td></tr>
+<tr class="separator:a99db00df909963573a976c203b107d22"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a29716b3084916abed7793bf2ec4b65db"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a29716b3084916abed7793bf2ec4b65db">BuildStatsString</a> (WCHAR **ppStatsString, BOOL DetailedMap) const</td></tr>
 <tr class="memdesc:a29716b3084916abed7793bf2ec4b65db"><td class="mdescLeft">&#160;</td><td class="mdescRight">Builds and returns statistics as a string in JSON format.  <a href="class_d3_d12_m_a_1_1_allocator.html#a29716b3084916abed7793bf2ec4b65db">More...</a><br /></td></tr>
 <tr class="separator:a29716b3084916abed7793bf2ec4b65db"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -208,23 +211,25 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="addedcd0067319ec566042f5cb520843b" name="addedcd0067319ec566042f5cb520843b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#addedcd0067319ec566042f5cb520843b">&#9670;&nbsp;</a></span>CalculateStats()</h2>
+<a id="a99db00df909963573a976c203b107d22" name="a99db00df909963573a976c203b107d22"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a99db00df909963573a976c203b107d22">&#9670;&nbsp;</a></span>CalculateStatistics()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void D3D12MA::Allocator::CalculateStats </td>
+          <td class="memname">void D3D12MA::Allocator::CalculateStatistics </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_stats.html">Stats</a> *&#160;</td>
+          <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_total_statistics.html">TotalStatistics</a> *&#160;</td>
           <td class="paramname"><em>pStats</em></td><td>)</td>
           <td></td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Retrieves statistics from the current state of the allocator. </p>
+<p>Retrieves statistics from current state of the allocator. </p>
+<p >This function is called "calculate" not "get" because it has to traverse all internal data structures, so it may be quite slow. Use it for debugging purposes. For faster but more brief statistics suitable to be called every frame or every allocation, use <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a1ac113daec5f6ef28ecb1786cf544144" title="Retrieves information about current memory usage and budget.">GetBudget()</a>.</p>
+<p >Note that when using allocator from multiple threads, returned information may immediately become outdated. </p>
 
 </div>
 </div>
@@ -489,8 +494,8 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="abe927bd3ad6930111d4d9408515b9601" name="abe927bd3ad6930111d4d9408515b9601"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#abe927bd3ad6930111d4d9408515b9601">&#9670;&nbsp;</a></span>GetBudget()</h2>
+<a id="a1ac113daec5f6ef28ecb1786cf544144" name="a1ac113daec5f6ef28ecb1786cf544144"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1ac113daec5f6ef28ecb1786cf544144">&#9670;&nbsp;</a></span>GetBudget()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -499,13 +504,13 @@ Public Member Functions</h2></td></tr>
           <td class="memname">void D3D12MA::Allocator::GetBudget </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html">Budget</a> *&#160;</td>
-          <td class="paramname"><em>pGpuBudget</em>, </td>
+          <td class="paramname"><em>pLocalBudget</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html">Budget</a> *&#160;</td>
-          <td class="paramname"><em>pCpuBudget</em>&#160;</td>
+          <td class="paramname"><em>pNonLocalBudget</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -515,15 +520,27 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Retrieves information about current memory budget. </p>
+<p>Retrieves information about current memory usage and budget. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramdir">[out]</td><td class="paramname">pGpuBudget</td><td>Optional, can be null. </td></tr>
-    <tr><td class="paramdir">[out]</td><td class="paramname">pCpuBudget</td><td>Optional, can be null.</td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">pLocalBudget</td><td>Optional, can be null. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">pNonLocalBudget</td><td>Optional, can be null.</td></tr>
   </table>
   </dd>
 </dl>
-<p>This function is called "get" not "calculate" because it is very fast, suitable to be called every frame or every allocation. For more detailed statistics use <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#addedcd0067319ec566042f5cb520843b" title="Retrieves statistics from the current state of the allocator.">CalculateStats()</a>.</p>
+<ul>
+<li>When <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a9e742884bd45dd7f01193d13fcd05af0" title="Returns true if D3D12_FEATURE_DATA_ARCHITECTURE1::UMA was found to be true.">IsUMA()</a> <code>== FALSE</code> (discrete graphics card):<ul>
+<li><code>pLocalBudget</code> returns the budget of the video memory.</li>
+<li><code>pNonLocalBudget</code> returns the budget of the system memory available for D3D12 resources.</li>
+</ul>
+</li>
+<li>When <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a9e742884bd45dd7f01193d13fcd05af0" title="Returns true if D3D12_FEATURE_DATA_ARCHITECTURE1::UMA was found to be true.">IsUMA()</a> <code>== TRUE</code> (integrated graphics chip):<ul>
+<li><code>pLocalBudget</code> returns the budget of the shared memory available for all D3D12 resources. All memory is considered "local".</li>
+<li><code>pNonLocalBudget</code> is not applicable and returns zeros.</li>
+</ul>
+</li>
+</ul>
+<p >This function is called "get" not "calculate" because it is very fast, suitable to be called every frame or every allocation. For more detailed statistics use <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a99db00df909963573a976c203b107d22" title="Retrieves statistics from current state of the allocator.">CalculateStatistics()</a>.</p>
 <p >Note that when using allocator from multiple threads, returned information may immediately become outdated. </p>
 
 </div>
@@ -544,6 +561,45 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Returns cached options retrieved from D3D12 device. </p>
+
+</div>
+</div>
+<a id="a434ae3147209953253da26687bfd62dc" name="a434ae3147209953253da26687bfd62dc"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a434ae3147209953253da26687bfd62dc">&#9670;&nbsp;</a></span>GetMemoryCapacity()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">UINT64 D3D12MA::Allocator::GetMemoryCapacity </td>
+          <td>(</td>
+          <td class="paramtype">UINT&#160;</td>
+          <td class="paramname"><em>memorySegmentGroup</em></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns total amount of memory of specific segment group, in bytes. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">memorySegmentGroup</td><td>use <code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.</td></tr>
+  </table>
+  </dd>
+</dl>
+<p>This information is taken from <code>DXGI_ADAPTER_DESC</code>. It is not recommended to use this number. You should preferably call <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a1ac113daec5f6ef28ecb1786cf544144" title="Retrieves information about current memory usage and budget.">GetBudget()</a> and limit memory usage to <a class="el" href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71" title="Estimated amount of memory available to the program.">D3D12MA::Budget::BudgetBytes</a> instead.</p>
+<ul>
+<li>When <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a9e742884bd45dd7f01193d13fcd05af0" title="Returns true if D3D12_FEATURE_DATA_ARCHITECTURE1::UMA was found to be true.">IsUMA()</a> <code>== FALSE</code> (discrete graphics card):<ul>
+<li><code>GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL)</code> returns the size of the video memory.</li>
+<li><code>GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL)</code> returns the size of the system memory available for D3D12 resources.</li>
+</ul>
+</li>
+<li>When <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a9e742884bd45dd7f01193d13fcd05af0" title="Returns true if D3D12_FEATURE_DATA_ARCHITECTURE1::UMA was found to be true.">IsUMA()</a> <code>== TRUE</code> (integrated graphics chip):<ul>
+<li><code>GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL)</code> returns the size of the shared memory available for all D3D12 resources. All memory is considered "local".</li>
+<li><code>GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL)</code> is not applicable and returns 0. </li>
+</ul>
+</li>
+</ul>
 
 </div>
 </div>

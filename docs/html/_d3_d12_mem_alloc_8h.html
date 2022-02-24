@@ -88,6 +88,18 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parameters of created <a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">D3D12MA::Allocation</a> object. To be used with <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>.  <a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_statistics.html">D3D12MA::Statistics</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Calculated statistics of memory usage e.g. in a specific memory heap type, memory segment group, custom pool, or total.  <a href="struct_d3_d12_m_a_1_1_statistics.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">D3D12MA::DetailedStatistics</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">More detailed statistics than <a class="el" href="struct_d3_d12_m_a_1_1_statistics.html" title="Calculated statistics of memory usage e.g. in a specific memory heap type, memory segment group,...">D3D12MA::Statistics</a>.  <a href="struct_d3_d12_m_a_1_1_detailed_statistics.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_total_statistics.html">D3D12MA::TotalStatistics</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">General statistics from current state of the allocator - total memory usage across all memory heaps and segments.  <a href="struct_d3_d12_m_a_1_1_total_statistics.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html">D3D12MA::Budget</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Statistics of current memory usage and available budget for a specific memory segment group.  <a href="struct_d3_d12_m_a_1_1_budget.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">D3D12MA::VirtualAllocation</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Represents single memory allocation done inside <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html" title="Represents pure allocation algorithm and a data structure with allocations in some memory block,...">VirtualBlock</a>.  <a href="struct_d3_d12_m_a_1_1_virtual_allocation.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -102,15 +114,6 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html">D3D12MA::ALLOCATOR_DESC</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parameters of created <a class="el" href="class_d3_d12_m_a_1_1_allocator.html" title="Represents main object of this library initialized for particular ID3D12Device.">Allocator</a> object. To be used with <a class="el" href="namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0" title="Creates new main D3D12MA::Allocator object and returns it through ppAllocator.">CreateAllocator()</a>.  <a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_stat_info.html">D3D12MA::StatInfo</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Calculated statistics of memory usage in entire allocator.  <a href="struct_d3_d12_m_a_1_1_stat_info.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_stats.html">D3D12MA::Stats</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">General statistics from the current state of the allocator.  <a href="struct_d3_d12_m_a_1_1_stats.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_budget.html">D3D12MA::Budget</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Statistics of current memory usage and available budget, in bytes, for GPU or CPU memory.  <a href="struct_d3_d12_m_a_1_1_budget.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html">D3D12MA::Allocator</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Represents main object of this library initialized for particular <code>ID3D12Device</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#details">More...</a><br /></td></tr>
@@ -166,9 +169,8 @@ Enumerations</h2></td></tr>
 <tr class="memdesc:abbad31a7e0b3d09d77f3fb704b77645e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with ALLOCATION_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e">More...</a><br /></td></tr>
 <tr class="separator:abbad31a7e0b3d09d77f3fb704b77645e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a919d8545365d6b7209a964f2b99936d1"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">D3D12MA::POOL_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02">D3D12MA::POOL_FLAG_NONE</a> = 0
-, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a0dbdb7cee4b4e381851275aa5ca2164a">D3D12MA::POOL_FLAG_ALGORITHM_TLSF</a> = 0x1
-, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a">D3D12MA::POOL_FLAG_ALGORITHM_LINEAR</a> = 0x2
-, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7">D3D12MA::POOL_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_TLSF | POOL_FLAG_ALGORITHM_LINEAR
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a">D3D12MA::POOL_FLAG_ALGORITHM_LINEAR</a> = 0x1
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7">D3D12MA::POOL_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_LINEAR
  }</td></tr>
 <tr class="memdesc:a919d8545365d6b7209a964f2b99936d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with POOL_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">More...</a><br /></td></tr>
 <tr class="separator:a919d8545365d6b7209a964f2b99936d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -179,7 +181,6 @@ Enumerations</h2></td></tr>
 <tr class="memdesc:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with ALLOCATOR_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916">More...</a><br /></td></tr>
 <tr class="separator:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a578329923a103be086ac52e3bed2085d"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085d">D3D12MA::VIRTUAL_BLOCK_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dafc882884f8bacd5cab3087567df8c53d">D3D12MA::VIRTUAL_BLOCK_FLAG_NONE</a> = 0
-, <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dab6eea831fa737a4160a81d9c0b2cf3cf">D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_TLSF</a> = POOL_FLAG_ALGORITHM_TLSF
 , <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085dabd9968af113acc9a756254ab9f1dc13d">D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR</a> = POOL_FLAG_ALGORITHM_LINEAR
 , <a class="el" href="namespace_d3_d12_m_a.html#a578329923a103be086ac52e3bed2085da0fee243cbf2902a68123ac85caa21e3e">D3D12MA::VIRTUAL_BLOCK_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_MASK
  }</td></tr>
