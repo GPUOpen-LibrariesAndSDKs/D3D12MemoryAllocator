@@ -47,6 +47,7 @@ Documentation of all members: D3D12MemAlloc.h
   - [Debug margins](@ref debug_margins)
 - \subpage general_considerations
   - [Thread safety](@ref general_considerations_thread_safety)
+  - [Versioning and compatibility](@ref general_considerations_versioning_and_compatibility)
   - [Features not supported](@ref general_considerations_features_not_supported)
 		
 \section main_see_also See also
@@ -388,7 +389,7 @@ struct Budget
 
     It might be different (most probably smaller) than memory capacity returned
     by D3D12MA::Allocator::GetMemoryCapacity() due to factors
-    external to the program, like other programs also consuming system resources.
+    external to the program, decided by the operating system.
     Difference `BudgetBytes - UsageBytes` is the amount of additional memory that can probably
     be allocated without problems. Exceeding the budget may result in various problems.
     */
@@ -1284,7 +1285,7 @@ resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
 D3D12MA::ALLOCATION_DESC allocationDesc = {};
-allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
 D3D12Resource* resource;
 D3D12MA::Allocation* allocation;
@@ -1433,7 +1434,7 @@ more opportunities for internal optimizations, custom pools may be useful in fol
 
 - To keep some resources separate from others in memory.
 - To keep track of memory usage of just a specific group of resources. %Statistics can be queried using
-  D3D12MA::Pool::CalculateStats.
+  D3D12MA::Pool::CalculateStatistics.
 - To use specific size of a memory block (`ID3D12Heap`). To set it, use member D3D12MA::POOL_DESC::BlockSize.
   When set to 0, the library uses automatically determined, variable block sizes.
 - To reserve some minimum amount of memory allocated. To use it, set member D3D12MA::POOL_DESC::MinBlockCount.
@@ -1974,6 +1975,28 @@ Margins do not apply to \ref virtual_allocator.
   calls to methods of D3D12MA::Allocator class must be made from a single thread or synchronized by the user.
   Using this flag may improve performance.
 - D3D12MA::VirtualBlock is not safe to be used from multiple threads simultaneously.
+
+\section general_considerations_versioning_and_compatibility Versioning and compatibility
+
+The library uses [**Semantic Versioning**](https://semver.org/),
+which means version numbers follow convention: Major.Minor.Patch (e.g. 2.3.0), where:
+
+- Incremented Patch version means a release is backward- and forward-compatible,
+  introducing only some internal improvements, bug fixes, optimizations etc.
+  or changes that are out of scope of the official API described in this documentation.
+- Incremented Minor version means a release is backward-compatible,
+  so existing code that uses the library should continue to work, while some new
+  symbols could have been added: new structures, functions, new values in existing
+  enums and bit flags, new structure members, but not new function parameters.
+- Incrementing Major version means a release could break some backward compatibility.
+
+All changes between official releases are documented in file "CHANGELOG.md".
+
+\warning Backward compatiblity is considered on the level of C++ source code, not binary linkage.
+Adding new members to existing structures is treated as backward compatible if initializing
+the new members to binary zero results in the old behavior.
+You should always fully initialize all library structures to zeros and not rely on their
+exact binary size.
 
 \section general_considerations_features_not_supported Features not supported
 

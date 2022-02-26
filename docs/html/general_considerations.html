@@ -77,6 +77,16 @@ Thread safety</h1>
 <li>When the allocator is created with <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52">D3D12MA::ALLOCATOR_FLAG_SINGLETHREADED</a>, calls to methods of <a class="el" href="class_d3_d12_m_a_1_1_allocator.html" title="Represents main object of this library initialized for particular ID3D12Device.">D3D12MA::Allocator</a> class must be made from a single thread or synchronized by the user. Using this flag may improve performance.</li>
 <li><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html" title="Represents pure allocation algorithm and a data structure with allocations in some memory block,...">D3D12MA::VirtualBlock</a> is not safe to be used from multiple threads simultaneously.</li>
 </ul>
+<h1><a class="anchor" id="general_considerations_versioning_and_compatibility"></a>
+Versioning and compatibility</h1>
+<p >The library uses <a href="https://semver.org/"><b>Semantic Versioning</b></a>, which means version numbers follow convention: Major.Minor.Patch (e.g. 2.3.0), where:</p>
+<ul>
+<li>Incremented Patch version means a release is backward- and forward-compatible, introducing only some internal improvements, bug fixes, optimizations etc. or changes that are out of scope of the official API described in this documentation.</li>
+<li>Incremented Minor version means a release is backward-compatible, so existing code that uses the library should continue to work, while some new symbols could have been added: new structures, functions, new values in existing enums and bit flags, new structure members, but not new function parameters.</li>
+<li>Incrementing Major version means a release could break some backward compatibility.</li>
+</ul>
+<p >All changes between official releases are documented in file "CHANGELOG.md".</p>
+<dl class="section warning"><dt>Warning</dt><dd>Backward compatiblity is considered on the level of C++ source code, not binary linkage. Adding new members to existing structures is treated as backward compatible if initializing the new members to binary zero results in the old behavior. You should always fully initialize all library structures to zeros and not rely on their exact binary size.</dd></dl>
 <h1><a class="anchor" id="general_considerations_features_not_supported"></a>
 Features not supported</h1>
 <p >Features deliberately excluded from the scope of this library:</p>
