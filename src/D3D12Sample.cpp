@@ -153,13 +153,13 @@ static void* g_ConstantBufferAddress[FRAME_BUFFER_COUNT];
 static ComPtr<ID3D12Resource> g_Texture;
 static D3D12MA::Allocation* g_TextureAllocation;
 
-static void* const CUSTOM_ALLOCATION_USER_DATA = (void*)(uintptr_t)0xDEADC0DE;
+static void* const CUSTOM_ALLOCATION_PRIVATE_DATA = (void*)(uintptr_t)0xDEADC0DE;
 
 static std::atomic<size_t> g_CpuAllocationCount{0};
 
-static void* CustomAllocate(size_t Size, size_t Alignment, void* pUserData)
+static void* CustomAllocate(size_t Size, size_t Alignment, void* pPrivateData)
 {
-    assert(pUserData == CUSTOM_ALLOCATION_USER_DATA);
+    assert(pPrivateData == CUSTOM_ALLOCATION_PRIVATE_DATA);
     void* memory = _aligned_malloc(Size, Alignment);
     if(ENABLE_CPU_ALLOCATION_CALLBACKS_PRINT)
     {
@@ -169,9 +169,9 @@ static void* CustomAllocate(size_t Size, size_t Alignment, void* pUserData)
     return memory;
 }
 
-static void CustomFree(void* pMemory, void* pUserData)
+static void CustomFree(void* pMemory, void* pPrivateData)
 {
-    assert(pUserData == CUSTOM_ALLOCATION_USER_DATA);
+    assert(pPrivateData == CUSTOM_ALLOCATION_PRIVATE_DATA);
     if(pMemory)
     {
         --g_CpuAllocationCount;
@@ -655,7 +655,7 @@ static void InitD3D() // initializes direct3d 12
         {
             g_AllocationCallbacks.pAllocate = &CustomAllocate;
             g_AllocationCallbacks.pFree = &CustomFree;
-            g_AllocationCallbacks.pUserData = CUSTOM_ALLOCATION_USER_DATA;
+            g_AllocationCallbacks.pPrivateData = CUSTOM_ALLOCATION_PRIVATE_DATA;
             desc.pAllocationCallbacks = &g_AllocationCallbacks;
         }
 

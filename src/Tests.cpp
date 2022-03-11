@@ -93,6 +93,23 @@ static const char* VirtualAlgorithmToStr(D3D12MA::VIRTUAL_BLOCK_FLAGS algorithm)
     }
 }
 
+static const wchar_t* DefragmentationAlgorithmToStr(UINT32 algorithm)
+{
+    switch (algorithm)
+    {
+    case D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_BALANCED:
+        return L"Balanced";
+    case D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FAST:
+        return L"Fast";
+    case D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FULL:
+        return L"Full";
+    case 0:
+        return L"Default";
+    default:
+        assert(0);
+        return L"";
+    }
+}
 
 struct ResourceWithAllocation
 {
@@ -138,6 +155,66 @@ static void FillData(void* outPtr, const UINT64 sizeInBytes, UINT seed)
     }
 }
 
+static void FillAllocationsData(const ComPtr<D3D12MA::Allocation>* allocs, size_t allocCount, UINT seed)
+{
+    std::for_each(allocs, allocs + allocCount, [seed](const ComPtr<D3D12MA::Allocation>& alloc)
+        {
+            D3D12_RANGE range = {};
+            void* ptr;
+            CHECK_HR(alloc->GetResource()->Map(0, &range, &ptr));
+            FillData(ptr, alloc->GetSize(), seed);
+            alloc->GetResource()->Unmap(0, nullptr);
+        });
+}
+
+static void FillAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D12MA::Allocation>* allocs, size_t allocCount, UINT seed)
+{
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAGS::ALLOCATION_FLAG_COMMITTED;
+
+    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    std::vector<ComPtr<D3D12MA::Allocation>> uploadAllocs;
+    barriers.reserve(allocCount);
+    uploadAllocs.reserve(allocCount);
+
+    // Move resource into right state
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+
+    ID3D12GraphicsCommandList* cl = BeginCommandList();
+    std::for_each(allocs, allocs + allocCount, [&](const ComPtr<D3D12MA::Allocation>& alloc)
+        {
+            // Copy only buffers for now
+            D3D12_RESOURCE_DESC resDesc = alloc->GetResource()->GetDesc();
+            if (resDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+            {
+                ComPtr<D3D12MA::Allocation> uploadAlloc;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr, &uploadAlloc, IID_NULL, nullptr));
+
+                D3D12_RANGE range = {};
+                void* ptr;
+                CHECK_HR(uploadAlloc->GetResource()->Map(0, &range, &ptr));
+                FillData(ptr, resDesc.Width, seed);
+                uploadAlloc->GetResource()->Unmap(0, nullptr);
+
+                cl->CopyResource(alloc->GetResource(), uploadAlloc->GetResource());
+                uploadAllocs.emplace_back(std::move(uploadAlloc));
+            }
+
+            barrier.Transition.pResource = alloc->GetResource();
+            barrier.Transition.StateAfter = (D3D12_RESOURCE_STATES)(uintptr_t)alloc->GetPrivateData();
+            barriers.emplace_back(barrier);
+        });
+    cl->ResourceBarrier(static_cast<UINT>(allocCount), barriers.data());
+    EndCommandList(cl);
+}
+
 static bool ValidateData(const void* ptr, const UINT64 sizeInBytes, UINT seed)
 {
     const UINT* values = (const UINT*)ptr;
@@ -169,6 +246,82 @@ static bool ValidateDataZero(const void* ptr, const UINT64 sizeInBytes)
     return true;
 }
 
+static void ValidateAllocationsData(const ComPtr<D3D12MA::Allocation>* allocs, size_t allocCount, UINT seed)
+{
+    std::for_each(allocs, allocs + allocCount, [seed](const ComPtr<D3D12MA::Allocation>& alloc)
+        {
+            D3D12_RANGE range = {};
+            void* ptr;
+            CHECK_HR(alloc->GetResource()->Map(0, &range, &ptr));
+            CHECK_BOOL(ValidateData(ptr, alloc->GetSize(), seed));
+            alloc->GetResource()->Unmap(0, nullptr);
+        });
+}
+
+static void ValidateAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D12MA::Allocation>* allocs, size_t allocCount, UINT seed)
+{
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;
+    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAGS::ALLOCATION_FLAG_COMMITTED;
+
+    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    std::vector<ComPtr<D3D12MA::Allocation>> downloadAllocs;
+    barriers.reserve(allocCount);
+    downloadAllocs.reserve(allocCount);
+
+    // Move resource into right state
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+
+    ID3D12GraphicsCommandList* cl = BeginCommandList();
+    size_t resCount = allocCount;
+    std::for_each(allocs, allocs + allocCount, [&](const ComPtr<D3D12MA::Allocation>& alloc)
+        {
+            // Check only buffers for now
+            D3D12_RESOURCE_DESC resDesc = alloc->GetResource()->GetDesc();
+            if (resDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+            {
+                ComPtr<D3D12MA::Allocation> downloadAlloc;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+                    nullptr, &downloadAlloc, IID_NULL, nullptr));
+
+                barrier.Transition.pResource = alloc->GetResource();
+                barrier.Transition.StateBefore = (D3D12_RESOURCE_STATES)(uintptr_t)alloc->GetPrivateData();
+                barriers.emplace_back(barrier);
+                downloadAllocs.emplace_back(std::move(downloadAlloc));
+            }
+            else
+                --resCount;
+        });
+
+    cl->ResourceBarrier(static_cast<UINT>(resCount), barriers.data());
+    for (size_t i = 0, j = 0; i < resCount; ++j)
+    {
+        if (allocs[j]->GetResource()->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+        {
+            cl->CopyResource(downloadAllocs.at(i)->GetResource(), allocs[j]->GetResource());
+            barriers.at(i).Transition.StateAfter = barriers.at(i).Transition.StateBefore;
+            barriers.at(i).Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+            ++i;
+        }
+    }
+    cl->ResourceBarrier(static_cast<UINT>(resCount), barriers.data());
+    EndCommandList(cl);
+
+    for (auto& alloc : downloadAllocs)
+    {
+        D3D12_RANGE range = {};
+        void* ptr;
+        CHECK_HR(alloc->GetResource()->Map(0, &range, &ptr));
+        CHECK_BOOL(ValidateData(ptr, alloc->GetResource()->GetDesc().Width, seed));
+        alloc->GetResource()->Unmap(0, nullptr);
+    }
+}
+
 static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFilePath)
 {
     WCHAR* s = nullptr;
@@ -176,6 +329,7 @@ static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFile
     SaveFile(dstFilePath, s, wcslen(s) * sizeof(WCHAR));
     ctx.allocator->FreeStatsString(s);
 }
+
 
 static void TestDebugMargin(const TestContext& ctx)
 {
@@ -2473,7 +2627,7 @@ static void TestVirtualBlocks(const TestContext& ctx)
 
     VIRTUAL_ALLOCATION_DESC allocDesc = {};
     allocDesc.Alignment = alignment;
-    allocDesc.pUserData = (void*)(uintptr_t)1;
+    allocDesc.pPrivateData = (void*)(uintptr_t)1;
     allocDesc.Size = 8 * MEGABYTE;
     VirtualAllocation alloc0;
     CHECK_HR(block->Allocate(&allocDesc, &alloc0, nullptr));
@@ -2484,13 +2638,13 @@ static void TestVirtualBlocks(const TestContext& ctx)
     block->GetAllocationInfo(alloc0, &alloc0Info);
     CHECK_BOOL(alloc0Info.Offset < blockSize);
     CHECK_BOOL(alloc0Info.Size == allocDesc.Size);
-    CHECK_BOOL(alloc0Info.pUserData == allocDesc.pUserData);
+    CHECK_BOOL(alloc0Info.pPrivateData == allocDesc.pPrivateData);
 
     // # Check SetUserData
 
-    block->SetAllocationUserData(alloc0, (void*)(uintptr_t)2);
+    block->SetAllocationPrivateData(alloc0, (void*)(uintptr_t)2);
     block->GetAllocationInfo(alloc0, &alloc0Info);
-    CHECK_BOOL(alloc0Info.pUserData == (void*)(uintptr_t)2);
+    CHECK_BOOL(alloc0Info.pPrivateData == (void*)(uintptr_t)2);
 
     // # Allocate 4 MB
 
@@ -2535,8 +2689,8 @@ static void TestVirtualBlocks(const TestContext& ctx)
     block->BuildStatsString(&json);
     {
         std::wstring str(json);
-        CHECK_BOOL(str.find(L"\"UserData\": 1") != std::wstring::npos);
-        CHECK_BOOL(str.find(L"\"UserData\": 2") != std::wstring::npos);
+        CHECK_BOOL(str.find(L"\"PrivateData\": 1") != std::wstring::npos);
+        CHECK_BOOL(str.find(L"\"PrivateData\": 2") != std::wstring::npos);
     }
     block->FreeStatsString(json);
 
@@ -2606,7 +2760,7 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
         {
             D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
             allocDesc.Size = calcRandomAllocSize();
-            allocDesc.pUserData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            allocDesc.pPrivateData = (void*)(uintptr_t)(allocDesc.Size * 10);
             if (i < 10) {}
             else if (i < 20 && algorithmIndex == 1) allocDesc.Flags = D3D12MA::VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS;
 
@@ -2636,7 +2790,7 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
         {
             D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
             allocDesc.Size = calcRandomAllocSize();
-            allocDesc.pUserData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            allocDesc.pPrivateData = (void*)(uintptr_t)(allocDesc.Size * 10);
 
             AllocData alloc = {};
             alloc.requestedSize = allocDesc.Size;
@@ -2657,7 +2811,7 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
             D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
             allocDesc.Size = calcRandomAllocSize();
             allocDesc.Alignment = 16;
-            allocDesc.pUserData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            allocDesc.pPrivateData = (void*)(uintptr_t)(allocDesc.Size * 10);
 
             AllocData alloc = {};
             alloc.requestedSize = allocDesc.Size;
@@ -2681,16 +2835,16 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
             CHECK_BOOL(allocations[i + 1].allocOffset >= allocations[i].allocOffset + allocations[i].allocationSize);
         }
 
-        // Check pUserData
+        // Check pPrivateData
         {
             const AllocData& alloc = allocations.back();
             D3D12MA::VIRTUAL_ALLOCATION_INFO allocInfo;
             block->GetAllocationInfo(alloc.allocation, &allocInfo);
-            CHECK_BOOL((uintptr_t)allocInfo.pUserData == alloc.requestedSize * 10);
+            CHECK_BOOL((uintptr_t)allocInfo.pPrivateData == alloc.requestedSize * 10);
 
-            block->SetAllocationUserData(alloc.allocation, (void*)(uintptr_t)666);
+            block->SetAllocationPrivateData(alloc.allocation, (void*)(uintptr_t)666);
             block->GetAllocationInfo(alloc.allocation, &allocInfo);
-            CHECK_BOOL((uintptr_t)allocInfo.pUserData == 666);
+            CHECK_BOOL((uintptr_t)allocInfo.pPrivateData == 666);
         }
 
         // Calculate statistics
@@ -2806,6 +2960,870 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
     }
 }
 
+static void ProcessDefragmentationPass(const TestContext& ctx, D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO& stepInfo)
+{
+    std::vector<D3D12_RESOURCE_BARRIER> startBarriers;
+    std::vector<D3D12_RESOURCE_BARRIER> finalBarriers;
+
+    bool defaultHeap = false;
+    for (UINT32 i = 0; i < stepInfo.MoveCount; ++i)
+    {
+        if (stepInfo.pMoves[i].Operation == D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_COPY)
+        {
+            const bool isDefaultHeap = stepInfo.pMoves[i].pSrcAllocation->GetHeap()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_DEFAULT;
+            // Create new resource
+            D3D12_RESOURCE_DESC desc = stepInfo.pMoves[i].pSrcAllocation->GetResource()->GetDesc();
+            ComPtr<ID3D12Resource> dstRes;
+            CHECK_HR(ctx.device->CreatePlacedResource(stepInfo.pMoves[i].pDstTmpAllocation->GetHeap(),
+                stepInfo.pMoves[i].pDstTmpAllocation->GetOffset(), &desc,
+                isDefaultHeap ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr, IID_PPV_ARGS(&dstRes)));
+            stepInfo.pMoves[i].pDstTmpAllocation->SetResource(dstRes.Get());
+
+            // Perform barriers only if not in right state
+            if (isDefaultHeap)
+            {
+                defaultHeap = true;
+                // Move new resource into previous state
+                D3D12_RESOURCE_BARRIER barrier = {};
+                barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                barrier.Transition.pResource = dstRes.Get();
+                barrier.Transition.StateAfter = (D3D12_RESOURCE_STATES)(uintptr_t)stepInfo.pMoves[i].pSrcAllocation->GetPrivateData();
+                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+                finalBarriers.emplace_back(barrier);
+
+                // Move resource into right state
+                barrier.Transition.pResource = stepInfo.pMoves[i].pSrcAllocation->GetResource();
+                barrier.Transition.StateBefore = barrier.Transition.StateAfter;
+                barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+                startBarriers.emplace_back(barrier);
+            }
+        }
+    }
+
+    if (defaultHeap)
+    {
+        ID3D12GraphicsCommandList* cl = BeginCommandList();
+        cl->ResourceBarrier(static_cast<UINT>(startBarriers.size()), startBarriers.data());
+
+        // Copy resources
+        for (UINT32 i = 0; i < stepInfo.MoveCount; ++i)
+        {
+            if (stepInfo.pMoves[i].Operation == D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_COPY)
+            {
+                ID3D12Resource* dstRes = stepInfo.pMoves[i].pDstTmpAllocation->GetResource();
+                ID3D12Resource* srcRes = stepInfo.pMoves[i].pSrcAllocation->GetResource();
+
+                if (stepInfo.pMoves[i].pDstTmpAllocation->GetHeap()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_DEFAULT)
+                {
+                    cl->CopyResource(dstRes, srcRes);
+                }
+                else
+                {
+                    D3D12_RANGE range = {};
+                    void* dst;
+                    CHECK_HR(dstRes->Map(0, &range, &dst));
+                    void* src;
+                    CHECK_HR(srcRes->Map(0, &range, &src));
+                    memcpy(dst, src, stepInfo.pMoves[i].pSrcAllocation->GetSize());
+                    dstRes->Unmap(0, nullptr);
+                    srcRes->Unmap(0, nullptr);
+                }
+            }
+        }
+
+        cl->ResourceBarrier(static_cast<UINT>(finalBarriers.size()), finalBarriers.data());
+        EndCommandList(cl);
+    }
+    else
+    {
+        // Copy only CPU-side
+        for (UINT32 i = 0; i < stepInfo.MoveCount; ++i)
+        {
+            if (stepInfo.pMoves[i].Operation == D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_COPY)
+            {
+                D3D12_RANGE range = {};
+
+                void* dst;
+                ID3D12Resource* dstRes = stepInfo.pMoves[i].pDstTmpAllocation->GetResource();
+                CHECK_HR(dstRes->Map(0, &range, &dst));
+
+                void* src;
+                ID3D12Resource* srcRes = stepInfo.pMoves[i].pSrcAllocation->GetResource();
+                CHECK_HR(srcRes->Map(0, &range, &src));
+
+                memcpy(dst, src, stepInfo.pMoves[i].pSrcAllocation->GetSize());
+                dstRes->Unmap(0, nullptr);
+                srcRes->Unmap(0, nullptr);
+            }
+        }
+    }
+}
+
+static void Defragment(const TestContext& ctx,
+    D3D12MA::DEFRAGMENTATION_DESC& defragDesc,
+    D3D12MA::Pool* pool,
+    D3D12MA::DEFRAGMENTATION_STATS* defragStats = nullptr)
+{
+    ComPtr<D3D12MA::DefragmentationContext> defragCtx;
+    if (pool != nullptr)
+    {
+        CHECK_HR(pool->BeginDefragmentation(&defragDesc, &defragCtx));
+    }
+    else
+        ctx.allocator->BeginDefragmentation(&defragDesc, &defragCtx);
+
+    HRESULT hr = S_OK;
+    D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+    while ((hr = defragCtx->BeginPass(&pass)) == S_FALSE)
+    {
+        ProcessDefragmentationPass(ctx, pass);
+
+        if ((hr = defragCtx->EndPass(&pass)) == S_OK)
+            break;
+        CHECK_BOOL(hr == S_FALSE);
+    }
+    CHECK_HR(hr);
+    if (defragStats != nullptr)
+        defragCtx->GetStats(defragStats);
+}
+
+static void TestDefragmentationSimple(const TestContext& ctx)
+{
+    wprintf(L"Test defragmentation simple\n");
+
+    RandomNumberGenerator rand(667);
+
+    const UINT ALLOC_SEED = 20220310;
+    const UINT64 BUF_SIZE = 0x10000;
+    const UINT64 BLOCK_SIZE = BUF_SIZE * 8;
+
+    const UINT64 MIN_BUF_SIZE = 32;
+    const UINT64 MAX_BUF_SIZE = BUF_SIZE * 4;
+    auto RandomBufSize = [&]() -> UINT64
+    {
+        return AlignUp<UINT64>(rand.Generate() % (MAX_BUF_SIZE - MIN_BUF_SIZE + 1) + MIN_BUF_SIZE, 64);
+    };
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.BlockSize = BLOCK_SIZE;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForBuffer(resDesc, BUF_SIZE);
+
+    D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+    defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FAST;
+
+    // Defragmentation of empty pool.
+    {
+        ComPtr<D3D12MA::DefragmentationContext> defragCtx = nullptr;
+        CHECK_HR(pool->BeginDefragmentation(&defragDesc, &defragCtx));
+
+        D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+        CHECK_BOOL(defragCtx->BeginPass(&pass) == S_OK);
+
+        D3D12MA::DEFRAGMENTATION_STATS defragStats = {};
+        defragCtx->GetStats(&defragStats);
+        CHECK_BOOL(defragStats.AllocationsMoved == 0 && defragStats.BytesFreed == 0 &&
+            defragStats.BytesMoved == 0 && defragStats.HeapsFreed == 0);
+    }
+
+    D3D12_RANGE mapRange = {};
+    void* mapPtr;
+    std::vector<ComPtr<D3D12MA::Allocation>> allocations;
+
+    // persistentlyMappedOption = 0 - not persistently mapped.
+    // persistentlyMappedOption = 1 - persistently mapped.
+    for (UINT8 persistentlyMappedOption = 0; persistentlyMappedOption < 2; ++persistentlyMappedOption)
+    {
+        wprintf(L"  Persistently mapped option = %u\n", persistentlyMappedOption);
+        const bool persistentlyMapped = persistentlyMappedOption != 0;
+
+        // # Test 1
+        // Buffers of fixed size.
+        // Fill 2 blocks. Remove odd buffers. Defragment everything.
+        // Expected result: at least 1 block freed.
+        {
+            for (size_t i = 0; i < BLOCK_SIZE / BUF_SIZE * 2; ++i)
+            {
+                ComPtr<D3D12MA::Allocation> alloc;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr, &alloc, IID_NULL, nullptr));
+                if (persistentlyMapped)
+                {
+                    CHECK_HR(alloc->GetResource()->Map(0, &mapRange, &mapPtr));
+                }
+
+                allocations.emplace_back(std::move(alloc));
+            }
+
+            for (size_t i = 1; i < allocations.size(); ++i)
+                allocations.erase(allocations.begin() + i);
+            FillAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+
+            // Set data for defragmentation retrieval
+            for (auto& alloc : allocations)
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+
+            D3D12MA::DEFRAGMENTATION_STATS defragStats;
+            Defragment(ctx, defragDesc, pool.Get(), & defragStats);
+            CHECK_BOOL(defragStats.AllocationsMoved == 4 && defragStats.BytesMoved == 4 * BUF_SIZE);
+
+            ValidateAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+            allocations.clear();
+        }
+
+        // # Test 2
+        // Buffers of fixed size.
+        // Fill 2 blocks. Remove odd buffers. Defragment one buffer at time.
+        // Expected result: Each of 4 interations makes some progress.
+        {
+            for (size_t i = 0; i < BLOCK_SIZE / BUF_SIZE * 2; ++i)
+            {
+                ComPtr<D3D12MA::Allocation> alloc;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr, &alloc, IID_NULL, nullptr));
+                if (persistentlyMapped)
+                {
+                    CHECK_HR(alloc->GetResource()->Map(0, &mapRange, &mapPtr));
+                }
+
+                allocations.emplace_back(std::move(alloc));
+            }
+
+            for (size_t i = 1; i < allocations.size(); ++i)
+                allocations.erase(allocations.begin() + i);
+            FillAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+
+            // Set data for defragmentation retrieval
+            for (auto& alloc : allocations)
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+
+            defragDesc.MaxAllocationsPerPass = 1;
+            defragDesc.MaxBytesPerPass = BUF_SIZE;
+
+            ComPtr<D3D12MA::DefragmentationContext> defragCtx;
+            CHECK_HR(pool->BeginDefragmentation(&defragDesc, &defragCtx));
+
+            for (size_t i = 0; i < BLOCK_SIZE / BUF_SIZE / 2; ++i)
+            {
+                D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+                CHECK_BOOL(defragCtx->BeginPass(&pass) == S_FALSE);
+
+                ProcessDefragmentationPass(ctx, pass);
+
+                CHECK_BOOL(defragCtx->EndPass(&pass) == S_FALSE);
+            }
+
+            D3D12MA::DEFRAGMENTATION_STATS defragStats = {};
+            defragCtx->GetStats(&defragStats);
+            CHECK_BOOL(defragStats.AllocationsMoved == 4 && defragStats.BytesMoved == 4 * BUF_SIZE);
+
+            ValidateAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+            allocations.clear();
+        }
+
+        // # Test 3
+        // Buffers of variable size.
+        // Create a number of buffers. Remove some percent of them.
+        // Defragment while having some percent of them unmovable.
+        // Expected result: Just simple validation.
+        {
+            for (size_t i = 0; i < 100; ++i)
+            {
+                D3D12_RESOURCE_DESC localResDesc = resDesc;
+                localResDesc.Width = RandomBufSize();
+
+                ComPtr<D3D12MA::Allocation> alloc;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &localResDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr, &alloc, IID_NULL, nullptr));
+                if (persistentlyMapped)
+                {
+                    CHECK_HR(alloc->GetResource()->Map(0, &mapRange, &mapPtr));
+                }
+
+                allocations.emplace_back(std::move(alloc));
+            }
+
+            const UINT32 percentToDelete = 60;
+            const size_t numberToDelete = allocations.size() * percentToDelete / 100;
+            for (size_t i = 0; i < numberToDelete; ++i)
+            {
+                size_t indexToDelete = rand.Generate() % (UINT32)allocations.size();
+                allocations.erase(allocations.begin() + indexToDelete);
+            }
+            FillAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+
+            // Non-movable allocations will be at the beginning of allocations array.
+            const UINT32 percentNonMovable = 20;
+            const size_t numberNonMovable = allocations.size() * percentNonMovable / 100;
+            for (size_t i = 0; i < numberNonMovable; ++i)
+            {
+                size_t indexNonMovable = i + rand.Generate() % (UINT32)(allocations.size() - i);
+                if (indexNonMovable != i)
+                    std::swap(allocations[i], allocations[indexNonMovable]);
+            }
+
+            // Set data for defragmentation retrieval
+            for (auto& alloc : allocations)
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+
+            defragDesc.MaxAllocationsPerPass = 0;
+            defragDesc.MaxBytesPerPass = 0;
+
+            ComPtr<D3D12MA::DefragmentationContext> defragCtx;
+            CHECK_HR(pool->BeginDefragmentation(&defragDesc, &defragCtx));
+
+            HRESULT hr = S_OK;
+            D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+            while ((hr = defragCtx->BeginPass(&pass)) == S_FALSE)
+            {
+                D3D12MA::DEFRAGMENTATION_MOVE* end = pass.pMoves + pass.MoveCount;
+                for (UINT32 i = 0; i < numberNonMovable; ++i)
+                {
+                    D3D12MA::DEFRAGMENTATION_MOVE* move = std::find_if(pass.pMoves, end, [&](D3D12MA::DEFRAGMENTATION_MOVE& move) { return move.pSrcAllocation == allocations[i].Get(); });
+                    if (move != end)
+                        move->Operation = D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE;
+                }
+
+                ProcessDefragmentationPass(ctx, pass);
+
+                if ((hr = defragCtx->EndPass(&pass)) == S_OK)
+                    break;
+                CHECK_BOOL(hr == S_FALSE);
+            }
+            CHECK_BOOL(hr == S_OK);
+
+            ValidateAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+            allocations.clear();
+        }
+    }
+}
+
+static void TestDefragmentationAlgorithms(const TestContext& ctx)
+{
+    wprintf(L"Test defragmentation algorithms\n");
+
+    RandomNumberGenerator rand(669);
+
+    const UINT ALLOC_SEED = 20091225;
+    const UINT64 BUF_SIZE = 0x10000;
+    const UINT64 BLOCK_SIZE = BUF_SIZE * 400;
+
+    const UINT64 MIN_BUF_SIZE = 32;
+    const UINT64 MAX_BUF_SIZE = BUF_SIZE * 4;
+    auto RandomBufSize = [&]() -> UINT64
+    {
+        return AlignUp<UINT64>(rand.Generate() % (MAX_BUF_SIZE - MIN_BUF_SIZE + 1) + MIN_BUF_SIZE, 64);
+    };
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.BlockSize = BLOCK_SIZE;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForBuffer(resDesc, BUF_SIZE);
+
+    D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+
+    std::vector<ComPtr<D3D12MA::Allocation>> allocations;
+
+    for (UINT8 i = 0; i < 3; ++i)
+    {
+        switch (i)
+        {
+        case 0:
+            defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FAST;
+            break;
+        case 1:
+            defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_BALANCED;
+            break;
+        case 2:
+            defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FULL;
+            break;
+        }
+        wprintf(L"  Algorithm = %s\n", DefragmentationAlgorithmToStr(defragDesc.Flags));
+
+        // 0 - Without immovable allocations
+        // 1 - With immovable allocations
+        for (uint8_t j = 0; j < 2; ++j)
+        {
+            for (size_t i = 0; i < 800; ++i)
+            {
+                resDesc.Width = RandomBufSize();
+
+                ComPtr<D3D12MA::Allocation> alloc;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr, &alloc, IID_NULL, nullptr));
+                allocations.emplace_back(std::move(alloc));
+            }
+
+            const UINT32 percentToDelete = 55;
+            const size_t numberToDelete = allocations.size() * percentToDelete / 100;
+            for (size_t i = 0; i < numberToDelete; ++i)
+            {
+                size_t indexToDelete = rand.Generate() % (uint32_t)allocations.size();
+                allocations.erase(allocations.begin() + indexToDelete);
+            }
+            FillAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+
+            // Non-movable allocations will be at the beginning of allocations array.
+            const UINT32 percentNonMovable = 20;
+            const size_t numberNonMovable = j == 0 ? 0 : (allocations.size() * percentNonMovable / 100);
+            for (size_t i = 0; i < numberNonMovable; ++i)
+            {
+                size_t indexNonMovable = i + rand.Generate() % (UINT32)(allocations.size() - i);
+                if (indexNonMovable != i)
+                    std::swap(allocations[i], allocations[indexNonMovable]);
+            }
+
+            // Set data for defragmentation retrieval
+            for (auto& alloc : allocations)
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+
+            std::wstring output = DefragmentationAlgorithmToStr(defragDesc.Flags);
+            if (j == 0)
+                output += L"_NoMove";
+            else
+                output += L"_Move";
+            SaveStatsStringToFile(ctx, (output + L"_Before.json").c_str());
+
+            ComPtr<D3D12MA::DefragmentationContext> defragCtx;
+            CHECK_HR(pool->BeginDefragmentation(&defragDesc, &defragCtx));
+
+            HRESULT hr = S_OK;
+            D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+            while ((hr = defragCtx->BeginPass(&pass)) == S_FALSE)
+            {
+                D3D12MA::DEFRAGMENTATION_MOVE* end = pass.pMoves + pass.MoveCount;
+                for (UINT32 i = 0; i < numberNonMovable; ++i)
+                {
+                    D3D12MA::DEFRAGMENTATION_MOVE* move = std::find_if(pass.pMoves, end, [&](D3D12MA::DEFRAGMENTATION_MOVE& move) { return move.pSrcAllocation == allocations[i].Get(); });
+                    if (move != end)
+                        move->Operation = D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE;
+                }
+                for (UINT32 i = 0; i < pass.MoveCount; ++i)
+                {
+                    auto it = std::find_if(allocations.begin(), allocations.end(), [&](const ComPtr<D3D12MA::Allocation>& alloc) { return pass.pMoves[i].pSrcAllocation == alloc.Get(); });
+                    assert(it != allocations.end());
+                }
+
+                ProcessDefragmentationPass(ctx, pass);
+
+                if ((hr = defragCtx->EndPass(&pass)) == S_OK)
+                    break;
+                CHECK_BOOL(hr == S_FALSE);
+            }
+            CHECK_BOOL(hr == S_OK);
+
+            SaveStatsStringToFile(ctx, (output + L"_After.json").c_str());
+            ValidateAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+            allocations.clear();
+        }
+    }
+}
+
+static void TestDefragmentationFull(const TestContext& ctx)
+{
+    const UINT ALLOC_SEED = 20101220;
+    std::vector<ComPtr<D3D12MA::Allocation>> allocations;
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForBuffer(resDesc, 0x10000);
+
+    // Create initial allocations.
+    for (size_t i = 0; i < 400; ++i)
+    {
+        ComPtr<D3D12MA::Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr, &alloc, IID_NULL, nullptr));
+        allocations.emplace_back(std::move(alloc));
+    }
+    FillAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+
+    // Delete random allocations
+    const size_t allocationsToDeletePercent = 80;
+    size_t allocationsToDelete = allocations.size() * allocationsToDeletePercent / 100;
+    for (size_t i = 0; i < allocationsToDelete; ++i)
+    {
+        size_t index = (size_t)rand() % allocations.size();
+        allocations.erase(allocations.begin() + index);
+    }
+    SaveStatsStringToFile(ctx, L"FullBefore.json");
+
+    {
+        // Set data for defragmentation retrieval
+        for (auto& alloc : allocations)
+            alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+
+        const UINT32 defragCount = 1;
+        for (UINT32 defragIndex = 0; defragIndex < defragCount; ++defragIndex)
+        {
+            D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+            defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FULL;
+
+            wprintf(L"Test defragmentation full #%u\n", defragIndex);
+
+            time_point begTime = std::chrono::high_resolution_clock::now();
+
+            D3D12MA::DEFRAGMENTATION_STATS stats;
+            Defragment(ctx, defragDesc, nullptr, &stats);
+
+            float defragmentDuration = ToFloatSeconds(std::chrono::high_resolution_clock::now() - begTime);
+
+            wprintf(L"Moved allocations %u, bytes %llu\n", stats.AllocationsMoved, stats.BytesMoved);
+            wprintf(L"Freed blocks %u, bytes %llu\n", stats.HeapsFreed, stats.BytesFreed);
+            wprintf(L"Time: %.2f s\n", defragmentDuration);
+
+            SaveStatsStringToFile(ctx, (L"FullAfter_" + std::to_wstring(defragIndex) + L".json").c_str());
+        }
+    }
+
+    ValidateAllocationsData(allocations.data(), allocations.size(), ALLOC_SEED);
+}
+
+static void TestDefragmentationGpu(const TestContext& ctx)
+{
+    wprintf(L"Test defragmentation GPU\n");
+
+    const UINT ALLOC_SEED = 20180314;
+    std::vector<ComPtr<D3D12MA::Allocation>> allocations;
+
+    // Create that many allocations to surely fill 3 new blocks of 256 MB.
+    const UINT64 bufSizeMin = 5ull * 1024 * 1024;
+    const UINT64 bufSizeMax = 10ull * 1024 * 1024;
+    const UINT64 totalSize = 3ull * 256 * 1024 * 1024;
+    const size_t bufCount = (size_t)(totalSize / bufSizeMin);
+    const size_t percentToLeave = 30;
+    const size_t percentNonMovable = 3;
+    RandomNumberGenerator rand = { 234522 };
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForBuffer(resDesc, 0x10000);
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+
+    // Create all intended buffers.
+    for (size_t i = 0; i < bufCount; ++i)
+    {
+        resDesc.Width = AlignUp(rand.Generate() % (bufSizeMax - bufSizeMin) + bufSizeMin, 32ull);
+
+        ComPtr<D3D12MA::Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, &alloc, IID_NULL, nullptr));
+        allocations.emplace_back(std::move(alloc));
+    }
+
+    // Destroy some percentage of them.
+    {
+        const size_t buffersToDestroy = RoundDiv<size_t>(bufCount * (100 - percentToLeave), 100);
+        for (size_t i = 0; i < buffersToDestroy; ++i)
+        {
+            const size_t index = rand.Generate() % allocations.size();
+            allocations.erase(allocations.begin() + index);
+        }
+    }
+
+    // Set data for defragmentation retrieval
+    for (auto& alloc : allocations)
+        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+
+    // Fill them with meaningful data.
+    FillAllocationsDataGPU(ctx, allocations.data(), allocations.size(), ALLOC_SEED);
+
+    SaveStatsStringToFile(ctx, L"GPU_defragmentation_A_before.json");
+    // Defragment using GPU only.
+    {
+        const size_t numberNonMovable = allocations.size() * percentNonMovable / 100;
+        for (size_t i = 0; i < numberNonMovable; ++i)
+        {
+            size_t indexNonMovable = i + rand.Generate() % (UINT32)(allocations.size() - i);
+            if (indexNonMovable != i)
+                std::swap(allocations[i], allocations[indexNonMovable]);
+        }
+
+        D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+        D3D12MA::DEFRAGMENTATION_STATS stats;
+        Defragment(ctx, defragDesc, nullptr, &stats);
+
+        CHECK_BOOL(stats.AllocationsMoved > 0 && stats.BytesMoved > 0);
+        CHECK_BOOL(stats.HeapsFreed > 0 && stats.BytesFreed > 0);
+    }
+
+    SaveStatsStringToFile(ctx, L"GPU_defragmentation_B_after.json");
+    ValidateAllocationsDataGPU(ctx, allocations.data(), allocations.size(), ALLOC_SEED);
+}
+
+static void TestDefragmentationIncrementalBasic(const TestContext& ctx)
+{
+    wprintf(L"Test defragmentation incremental basic\n");
+
+    const UINT ALLOC_SEED = 20210918;
+    std::vector<ComPtr<D3D12MA::Allocation>> allocations;
+
+    // Create that many allocations to surely fill 3 new blocks of 256 MB.
+    const std::array<UINT32, 3> imageSizes = { 256, 512, 1024 };
+    const UINT64 bufSizeMin = 5ull * 1024 * 1024;
+    const UINT64 bufSizeMax = 10ull * 1024 * 1024;
+    const UINT64 totalSize = 3ull * 256 * 1024 * 1024;
+    const size_t imageCount = totalSize / ((size_t)imageSizes[0] * imageSizes[0] * 4) / 2;
+    const size_t bufCount = (size_t)(totalSize / bufSizeMin) / 2;
+    const size_t percentToLeave = 30;
+    RandomNumberGenerator rand = { 234522 };
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resDesc.Alignment = 0;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    // Create all intended images.
+    for (size_t i = 0; i < imageCount; ++i)
+    {
+        const UINT32 size = imageSizes[rand.Generate() % 3];
+        resDesc.Width = size;
+        resDesc.Height = size;
+
+        ComPtr<D3D12MA::Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, &alloc, IID_NULL, nullptr));
+
+        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        allocations.emplace_back(std::move(alloc));
+    }
+
+    // And all buffers
+    FillResourceDescForBuffer(resDesc, 0x10000);
+    for (size_t i = 0; i < bufCount; ++i)
+    {
+        resDesc.Width = AlignUp(rand.Generate() % (bufSizeMax - bufSizeMin) + bufSizeMin, 32ull);
+
+        ComPtr<D3D12MA::Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, &alloc, IID_NULL, nullptr));
+
+        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        allocations.emplace_back(std::move(alloc));
+    }
+
+    // Destroy some percentage of them.
+    {
+        const size_t allocationsToDestroy = RoundDiv<size_t>((imageCount + bufCount) * (100 - percentToLeave), 100);
+        for (size_t i = 0; i < allocationsToDestroy; ++i)
+        {
+            const size_t index = rand.Generate() % allocations.size();
+            allocations.erase(allocations.begin() + index);
+        }
+    }
+
+    // Fill them with meaningful data.
+    FillAllocationsDataGPU(ctx, allocations.data(), allocations.size(), ALLOC_SEED);
+
+    SaveStatsStringToFile(ctx, L"GPU_defragmentation_incremental_basic_A_before.json");
+    // Defragment using GPU only.
+    {
+        D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+        ComPtr<D3D12MA::DefragmentationContext> defragCtx;
+        ctx.allocator->BeginDefragmentation(&defragDesc, &defragCtx);
+
+        HRESULT hr = S_OK;
+        D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+        while ((hr = defragCtx->BeginPass(&pass)) == S_FALSE)
+        {
+            // Ignore data outside of test
+            for (UINT32 i = 0; i < pass.MoveCount; ++i)
+            {
+                auto it = std::find_if(allocations.begin(), allocations.end(), [&](const ComPtr<D3D12MA::Allocation>& alloc) { return pass.pMoves[i].pSrcAllocation == alloc.Get(); });
+                if (it == allocations.end())
+                    pass.pMoves[i].Operation = D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE;
+            }
+
+            ProcessDefragmentationPass(ctx, pass);
+
+            if ((hr = defragCtx->EndPass(&pass)) == S_OK)
+                break;
+            CHECK_BOOL(hr == S_FALSE);
+        }
+        CHECK_BOOL(hr == S_OK);
+
+        D3D12MA::DEFRAGMENTATION_STATS stats = {};
+        defragCtx->GetStats(&stats);
+        CHECK_BOOL(stats.AllocationsMoved > 0 && stats.BytesMoved > 0);
+        CHECK_BOOL(stats.HeapsFreed > 0 && stats.BytesFreed > 0);
+    }
+
+    SaveStatsStringToFile(ctx, L"GPU_defragmentation_incremental_basic_B_after.json");
+    ValidateAllocationsDataGPU(ctx, allocations.data(), allocations.size(), ALLOC_SEED);
+}
+
+void TestDefragmentationIncrementalComplex(const TestContext& ctx)
+{
+    wprintf(L"Test defragmentation incremental complex\n");
+
+    const UINT ALLOC_SEED = 20180112;
+    std::vector<ComPtr<D3D12MA::Allocation>> allocations;
+
+    // Create that many allocations to surely fill 3 new blocks of 256 MB.
+    const std::array<UINT32, 3> imageSizes = { 256, 512, 1024 };
+    const UINT64 bufSizeMin = 5ull * 1024 * 1024;
+    const UINT64 bufSizeMax = 10ull * 1024 * 1024;
+    const UINT64 totalSize = 3ull * 256 * 1024 * 1024;
+    const size_t imageCount = (size_t)(totalSize / (imageSizes[0] * imageSizes[0] * 4)) / 2;
+    const size_t bufCount = (size_t)(totalSize / bufSizeMin) / 2;
+    const size_t percentToLeave = 30;
+    RandomNumberGenerator rand = { 234522 };
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resDesc.Alignment = 0;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    // Create all intended images.
+    for (size_t i = 0; i < imageCount; ++i)
+    {
+        const UINT32 size = imageSizes[rand.Generate() % 3];
+        resDesc.Width = size;
+        resDesc.Height = size;
+
+        ComPtr<D3D12MA::Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, &alloc, IID_NULL, nullptr));
+
+        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        allocations.emplace_back(std::move(alloc));
+    }
+
+    // And all buffers
+    FillResourceDescForBuffer(resDesc, 0x10000);
+    for (size_t i = 0; i < bufCount; ++i)
+    {
+        resDesc.Width = AlignUp(rand.Generate() % (bufSizeMax - bufSizeMin) + bufSizeMin, 32ull);
+
+        ComPtr<D3D12MA::Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, &alloc, IID_NULL, nullptr));
+
+        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        allocations.emplace_back(std::move(alloc));
+    }
+
+    // Destroy some percentage of them.
+    {
+        const size_t allocationsToDestroy = RoundDiv<size_t>((imageCount + bufCount) * (100 - percentToLeave), 100);
+        for (size_t i = 0; i < allocationsToDestroy; ++i)
+        {
+            const size_t index = rand.Generate() % allocations.size();
+            allocations.erase(allocations.begin() + index);
+        }
+    }
+
+    // Fill them with meaningful data.
+    FillAllocationsDataGPU(ctx, allocations.data(), allocations.size(), ALLOC_SEED);
+
+    SaveStatsStringToFile(ctx, L"GPU_defragmentation_incremental_complex_A_before.json");
+
+    const size_t maxAdditionalAllocations = 100;
+    std::vector<ComPtr<D3D12MA::Allocation>> additionalAllocations;
+    additionalAllocations.reserve(maxAdditionalAllocations);
+
+#define MakeAdditionalAllocation() \
+    if (additionalAllocations.size() < maxAdditionalAllocations) \
+    { \
+        resDesc.Width = AlignUp(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16ull); \
+        ComPtr<D3D12MA::Allocation> alloc; \
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, \
+            nullptr, &alloc, IID_NULL, nullptr)); \
+        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER); \
+        additionalAllocations.emplace_back(std::move(alloc)); \
+    }
+
+    // Defragment using GPU only.
+    {
+        D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+        defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FULL;
+
+        ComPtr<D3D12MA::DefragmentationContext> defragCtx;
+        ctx.allocator->BeginDefragmentation(&defragDesc, &defragCtx);
+
+        MakeAdditionalAllocation();
+
+        HRESULT hr = S_OK;
+        D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
+        while ((hr = defragCtx->BeginPass(&pass)) == S_FALSE)
+        {
+            MakeAdditionalAllocation();
+
+            // Ignore data outside of test
+            for (UINT32 i = 0; i < pass.MoveCount; ++i)
+            {
+                auto it = std::find_if(allocations.begin(), allocations.end(), [&](const ComPtr<D3D12MA::Allocation>& alloc) { return pass.pMoves[i].pSrcAllocation == alloc.Get(); });
+                if (it == allocations.end())
+                {
+                    auto it = std::find_if(additionalAllocations.begin(), additionalAllocations.end(), [&](const ComPtr<D3D12MA::Allocation>& alloc) { return pass.pMoves[i].pSrcAllocation == alloc.Get(); });
+                    if (it == additionalAllocations.end())
+                        pass.pMoves[i].Operation = D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE;
+                }
+            }
+
+            ProcessDefragmentationPass(ctx, pass);
+
+            MakeAdditionalAllocation();
+
+            if ((hr = defragCtx->EndPass(&pass)) == S_OK)
+                break;
+            CHECK_BOOL(hr == S_FALSE);
+        }
+        CHECK_BOOL(hr == S_OK);
+
+        D3D12MA::DEFRAGMENTATION_STATS stats = {};
+        defragCtx->GetStats(&stats);
+
+        CHECK_BOOL(stats.AllocationsMoved > 0 && stats.BytesMoved > 0);
+        CHECK_BOOL(stats.HeapsFreed > 0 && stats.BytesFreed > 0);
+    }
+
+    SaveStatsStringToFile(ctx, L"GPU_defragmentation_incremental_complex_B_after.json");
+    ValidateAllocationsDataGPU(ctx, allocations.data(), allocations.size(), ALLOC_SEED);
+}
+
 static void TestGroupVirtual(const TestContext& ctx)
 {
     TestVirtualBlocks(ctx);
@@ -2854,6 +3872,16 @@ static void TestGroupBasics(const TestContext& ctx)
 #endif // #if D3D12_DEBUG_MARGIN
 }
 
+static void TestGroupDefragmentation(const TestContext& ctx)
+{
+    TestDefragmentationSimple(ctx);
+    TestDefragmentationAlgorithms(ctx);
+    TestDefragmentationFull(ctx);
+    TestDefragmentationGpu(ctx);
+    TestDefragmentationIncrementalBasic(ctx);
+    TestDefragmentationIncrementalComplex(ctx);
+}
+
 void Test(const TestContext& ctx)
 {
     wprintf(L"TESTS BEGIN\n");
@@ -2867,6 +3895,7 @@ void Test(const TestContext& ctx)
 
     TestGroupVirtual(ctx);
     TestGroupBasics(ctx);
+    TestGroupDefragmentation(ctx);
 
     wprintf(L"TESTS END\n");
 }
