@@ -237,22 +237,31 @@ enum ALLOCATION_FLAGS
     */
     ALLOCATION_FLAG_UPPER_ADDRESS = 0x8,
 
+
+    /** Set this flag if the allocated memory will have aliasing resources.
+    
+    Use this when calling D3D12MA::Allocator::CreateResource() and similar to
+    guarantee creation of explicit heap for desired allocation and prevent it from using `CreateCommittedResource`,
+    so that new allocation object will always have `allocation->GetHeap() != NULL`.
+    */
+    ALLOCATION_FLAG_CAN_ALIAS = 0x10,
+
     /** Allocation strategy that chooses smallest possible free range for the allocation
     to minimize memory usage and fragmentation, possibly at the expense of allocation time.
     */
-    ALLOCATION_FLAG_STRATEGY_MIN_MEMORY = 0x10,
+    ALLOCATION_FLAG_STRATEGY_MIN_MEMORY = 0x00010000,
 
     /** Allocation strategy that chooses first suitable free range for the allocation -
     not necessarily in terms of the smallest offset but the one that is easiest and fastest to find
     to minimize allocation time, possibly at the expense of allocation quality.
     */
-    ALLOCATION_FLAG_STRATEGY_MIN_TIME = 0x20,
+    ALLOCATION_FLAG_STRATEGY_MIN_TIME = 0x00020000,
 
     /** Allocation strategy that chooses always the lowest offset in available space.
     This is not the most efficient strategy but achieves highly packed data.
     Used internally by defragmentation, not recomended in typical usage.
     */
-    ALLOCATION_FLAG_STRATEGY_MIN_OFFSET = 0x40,
+    ALLOCATION_FLAG_STRATEGY_MIN_OFFSET = 0x0004000,
 
     /// Alias to #ALLOCATION_FLAG_STRATEGY_MIN_MEMORY.
     ALLOCATION_FLAG_STRATEGY_BEST_FIT = ALLOCATION_FLAG_STRATEGY_MIN_MEMORY,

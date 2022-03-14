@@ -7516,7 +7516,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     {
         outBlockVector = NULL;
     }
-    if ((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) != 0)
+    if ((allocDesc.Flags & (ALLOCATION_FLAG_NEVER_ALLOCATE | ALLOCATION_FLAG_CAN_ALIAS)) != 0)
     {
         outCommittedAllocationParams.m_List = NULL;
     }
@@ -8518,7 +8518,6 @@ HRESULT BlockVector::CreateBlock(
     return hr;
 }
 #endif // _D3D12MA_BLOCK_VECTOR_FUNCTIONS
-
 
 #ifndef _D3D12MA_DEFRAGMENTATION_CONTEXT_PIMPL_FUNCTIONS
 DefragmentationContextPimpl::DefragmentationContextPimpl(

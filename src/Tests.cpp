@@ -3764,16 +3764,18 @@ void TestDefragmentationIncrementalComplex(const TestContext& ctx)
     std::vector<ComPtr<D3D12MA::Allocation>> additionalAllocations;
     additionalAllocations.reserve(maxAdditionalAllocations);
 
-#define MakeAdditionalAllocation() \
-    if (additionalAllocations.size() < maxAdditionalAllocations) \
-    { \
-        resDesc.Width = AlignUp(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16ull); \
-        ComPtr<D3D12MA::Allocation> alloc; \
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, \
-            nullptr, &alloc, IID_NULL, nullptr)); \
-        alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER); \
-        additionalAllocations.emplace_back(std::move(alloc)); \
-    }
+    const auto makeAdditionalAllocation = [&]()
+    {
+        if (additionalAllocations.size() < maxAdditionalAllocations)
+        {
+            resDesc.Width = AlignUp(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16ull);
+            ComPtr<D3D12MA::Allocation> alloc;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                nullptr, &alloc, IID_NULL, nullptr));
+            alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            additionalAllocations.emplace_back(std::move(alloc));
+        }
+    };
 
     // Defragment using GPU only.
     {
@@ -3783,13 +3785,13 @@ void TestDefragmentationIncrementalComplex(const TestContext& ctx)
         ComPtr<D3D12MA::DefragmentationContext> defragCtx;
         ctx.allocator->BeginDefragmentation(&defragDesc, &defragCtx);
 
-        MakeAdditionalAllocation();
+        makeAdditionalAllocation();
 
         HRESULT hr = S_OK;
         D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass = {};
         while ((hr = defragCtx->BeginPass(&pass)) == S_FALSE)
         {
-            MakeAdditionalAllocation();
+            makeAdditionalAllocation();
 
             // Ignore data outside of test
             for (UINT32 i = 0; i < pass.MoveCount; ++i)
@@ -3805,7 +3807,7 @@ void TestDefragmentationIncrementalComplex(const TestContext& ctx)
 
             ProcessDefragmentationPass(ctx, pass);
 
-            MakeAdditionalAllocation();
+            makeAdditionalAllocation();
 
             if ((hr = defragCtx->EndPass(&pass)) == S_OK)
                 break;
