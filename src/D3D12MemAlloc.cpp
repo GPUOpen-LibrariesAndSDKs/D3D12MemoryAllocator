@@ -6583,6 +6583,11 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         D3D12_HEAP_FLAGS heapFlags;
         CalcDefaultPoolParams(heapProps.Type, heapFlags, i);
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+        if (desc.Flags & ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED)
+            heapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+#endif
+
         m_BlockVectors[i] = D3D12MA_NEW(GetAllocs(), BlockVector)(
             this, // hAllocator
             heapProps, // heapType

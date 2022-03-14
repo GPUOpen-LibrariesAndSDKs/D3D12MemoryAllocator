@@ -993,6 +993,22 @@ enum ALLOCATOR_FLAGS
     To be used for debugging purposes.
     */
     ALLOCATOR_FLAG_ALWAYS_COMMITTED = 0x2,
+
+    /**
+    Heaps created for the default pools will be created with flag `D3D12_HEAP_FLAG_CREATE_NOT_ZEROED`,
+    allowing for their memory to be not zeroed by the system if possible,
+    which can speed up allocation.
+
+    Only affects default pools.
+    To use the flag with @ref custom_pools, you need to add it manually:
+
+    \code
+    poolDesc.heapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+    \endcode
+
+    Only avaiable if `ID3D12Device8` is present. Otherwise, the flag is ignored.
+    */
+    ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED = 0x4,
 };
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().

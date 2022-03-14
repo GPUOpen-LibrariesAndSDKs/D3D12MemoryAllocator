@@ -28,10 +28,11 @@ var searchData=
   ['allocator_25',['Allocator',['../class_d3_d12_m_a_1_1_allocator.html',1,'D3D12MA']]],
   ['allocator_5fdesc_26',['ALLOCATOR_DESC',['../struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html',1,'D3D12MA']]],
   ['allocator_5fflag_5falways_5fcommitted_27',['ALLOCATOR_FLAG_ALWAYS_COMMITTED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb',1,'D3D12MA']]],
-  ['allocator_5fflag_5fnone_28',['ALLOCATOR_FLAG_NONE',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f',1,'D3D12MA']]],
-  ['allocator_5fflag_5fsinglethreaded_29',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]],
-  ['allocator_5fflags_30',['ALLOCATOR_FLAGS',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916',1,'D3D12MA']]],
-  ['allochandle_31',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation']]],
-  ['allochandle_32',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]],
-  ['allochandle_33',['AllocHandle',['../namespace_d3_d12_m_a.html#a15e349adce86a40e0417d405aef1af80',1,'D3D12MA']]]
+  ['allocator_5fflag_5fdefault_5fpools_5fnot_5fzeroed_28',['ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335',1,'D3D12MA']]],
+  ['allocator_5fflag_5fnone_29',['ALLOCATOR_FLAG_NONE',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f',1,'D3D12MA']]],
+  ['allocator_5fflag_5fsinglethreaded_30',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]],
+  ['allocator_5fflags_31',['ALLOCATOR_FLAGS',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916',1,'D3D12MA']]],
+  ['allochandle_32',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation']]],
+  ['allochandle_33',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]],
+  ['allochandle_34',['AllocHandle',['../namespace_d3_d12_m_a.html#a15e349adce86a40e0417d405aef1af80',1,'D3D12MA']]]
 ];
