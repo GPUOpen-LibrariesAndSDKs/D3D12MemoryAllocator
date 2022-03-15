@@ -742,10 +742,10 @@ struct DEFRAGMENTATION_PASS_MOVE_INFO
     After this call, the allocation will point to the new place in memory.
 
     Alternatively, if you cannot move specific allocation,
-    you can set DEFRAGMENTATION_MOVE::Operation to #DEFRAGMENTATION_MOVE_OPERATION_IGNORE.
+    you can set DEFRAGMENTATION_MOVE::Operation to D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE.
 
     Alternatively, if you decide you want to completely remove the allocation,
-    set DEFRAGMENTATION_MOVE::Operation to #DEFRAGMENTATION_MOVE_OPERATION_DESTROY.
+    set DEFRAGMENTATION_MOVE::Operation to D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_DESTROY.
     Then, after DefragmentationContext::EndPass() the allocation will be released.
     */
     DEFRAGMENTATION_MOVE* pMoves;
@@ -1762,7 +1762,144 @@ extended allocation parameters, like custom `D3D12_HEAP_PROPERTIES`, which are a
 
 \page defragmentation Defragmentation
 
-TBD...
+Interleaved allocations and deallocations of many objects of varying size can
+cause fragmentation over time, which can lead to a situation where the library is unable
+to find a continuous range of free memory for a new allocation despite there is
+enough free space, just scattered across many small free ranges between existing
+allocations.
+
+To mitigate this problem, you can use defragmentation feature.
+It doesn't happen automatically though and needs your cooperation,
+because %D3D12MA is a low level library that only allocates memory.
+It cannot recreate buffers and textures in a new place as it doesn't remember the contents of `D3D12_RESOURCE_DESC` structure.
+It cannot copy their contents as it doesn't record any commands to a command list.
+
+Example:
+
+\code
+D3D12MA::DEFRAGMENTATION_DESC defragDesc = {};
+defragDesc.Flags = D3D12MA::DEFRAGMENTATION_FLAG_ALGORITHM_FAST;
+
+D3D12MA::DefragmentationContext* defragCtx;
+allocator->BeginDefragmentation(&defragDesc, &defragCtx);
+
+for(;;)
+{
+    D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO pass;
+    HRESULT hr = defragCtx->BeginPass(&pass);
+    if(hr == S_OK)
+        break;
+    else if(hr != S_FALSE)
+        // Handle error...
+
+    for(UINT i = 0; i < pass.MoveCount; ++i)
+    {
+        // Inspect pass.pMoves[i].pSrcAllocation, identify what buffer/texture it represents.
+        MyEngineResourceData* resData = (MyEngineResourceData*)pMoves[i].pSrcAllocation->GetPrivateData();
+            
+        // Recreate this buffer/texture as placed at pass.pMoves[i].pDstTmpAllocation.
+        D3D12_RESOURCE_DESC resDesc = ...
+        ID3D12Resource* newRes;
+        hr = device->CreatePlacedResource(
+            pass.pMoves[i].pDstTmpAllocation->GetHeap(),
+            pass.pMoves[i].pDstTmpAllocation->GetOffset(), &resDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST, NULL, IID_PPV_ARGS(&newRes));
+        // Check hr...
+
+        // Store new resource in the pDstTmpAllocation.
+        pass.pMoves[i].pDstTmpAllocation->SetResource(newRes);
+
+        // Copy its content to the new place.
+        cmdList->CopyResource(
+            pass.pMoves[i].pDstTmpAllocation->GetResource(),
+            pass.pMoves[i].pSrcAllocation->GetResource());
+    }
+        
+    // Make sure the copy commands finished executing.
+    cmdQueue->ExecuteCommandLists(...);
+    // ...
+    WaitForSingleObject(fenceEvent, INFINITE);
+
+    // Update appropriate descriptors to point to the new places...
+        
+    hr = defragCtx->EndPass(&pass);
+    if(hr == S_OK)
+        break;
+    else if(hr != S_FALSE)
+        // Handle error...
+}
+
+defragCtx->Release();
+\endcode
+
+Although functions like D3D12MA::Allocator::CreateResource()
+create an allocation and a buffer/texture at once, these are just a shortcut for
+allocating memory and creating a placed resource.
+Defragmentation works on memory allocations only. You must handle the rest manually.
+Defragmentation is an iterative process that should repreat "passes" as long as related functions
+return `S_FALSE` not `S_OK`.
+In each pass:
+
+1. D3D12MA::DefragmentationContext::BeginPass() function call:
+   - Calculates and returns the list of allocations to be moved in this pass.
+     Note this can be a time-consuming process.
+   - Reserves destination memory for them by creating temporary destination allocations
+     that you can query for their `ID3D12Heap` + offset using methods like D3D12MA::Allocation::GetHeap().
+2. Inside the pass, **you should**:
+   - Inspect the returned list of allocations to be moved.
+   - Create new buffers/textures as placed at the returned destination temporary allocations.
+   - Copy data from source to destination resources if necessary.
+   - Store the pointer to the new resource in the temporary destination allocation.
+3. D3D12MA::DefragmentationContext::EndPass() function call:
+   - Frees the source memory reserved for the allocations that are moved.
+   - Modifies source D3D12MA::Allocation objects that are moved to point to the destination reserved memory
+     and destination resource, while source resource is released.
+   - Frees `ID3D12Heap` blocks that became empty.
+
+Defragmentation algorithm tries to move all suitable allocations.
+You can, however, refuse to move some of them inside a defragmentation pass, by setting
+`pass.pMoves[i].Operation` to D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE.
+This is not recommended and may result in suboptimal packing of the allocations after defragmentation.
+If you cannot ensure any allocation can be moved, it is better to keep movable allocations separate in a custom pool.
+
+Inside a pass, for each allocation that should be moved:
+
+- You should copy its data from the source to the destination place by calling e.g. `CopyResource()`.
+  - You need to make sure these commands finished executing before the source buffers/textures are released by D3D12MA::DefragmentationContext::EndPass().
+- If a resource doesn't contain any meaningful data, e.g. it is a transient render-target texture to be cleared,
+  filled, and used temporarily in each rendering frame, you can just recreate this texture
+  without copying its data.
+- If the resource is in `D3D12_HEAP_TYPE_READBACK` memory, you can copy its data on the CPU
+  using `memcpy()`.
+- If you cannot move the allocation, you can set `pass.pMoves[i].Operation` to D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_IGNORE.
+  This will cancel the move.
+  - D3D12MA::DefragmentationContext::EndPass() will then free the destination memory
+    not the source memory of the allocation, leaving it unchanged.
+- If you decide the allocation is unimportant and can be destroyed instead of moved (e.g. it wasn't used for long time),
+  you can set `pass.pMoves[i].Operation` to D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_DESTROY.
+  - D3D12MA::DefragmentationContext::EndPass() will then free both source and destination memory, and will destroy the source D3D12MA::Allocation object.
+
+You can defragment a specific custom pool by calling D3D12MA::Pool::BeginDefragmentation
+or all the default pools by calling D3D12MA::Allocator::BeginDefragmentation (like in the example above).
+
+Defragmentation is always performed in each pool separately.
+Allocations are never moved between different heap types.
+The size of the destination memory reserved for a moved allocation is the same as the original one.
+Alignment of an allocation as it was determined using `GetResourceAllocationInfo()` is also respected after defragmentation.
+Buffers/textures should be recreated with the same `D3D12_RESOURCE_DESC` parameters as the original ones.
+
+You can perform the defragmentation incrementally to limit the number of allocations and bytes to be moved
+in each pass, e.g. to call it in sync with render frames and not to experience too big hitches.
+See members: D3D12MA::DEFRAGMENTATION_DESC::MaxBytesPerPass, D3D12MA::DEFRAGMENTATION_DESC::MaxAllocationsPerPass.
+
+It is also safe to perform the defragmentation asynchronously to render frames and other Direct3D 12 and %D3D12MA
+usage, possibly from multiple threads, with the exception that allocations
+returned in D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO::pMoves shouldn't be released until the defragmentation pass is ended.
+
+<b>Mapping</b> is out of scope of this library and so it is not preserved after an allocation is moved during defragmentation.
+You need to map the new resource yourself if needed.
+
+\note Defragmentation is not supported in custom pools created with D3D12MA::POOL_FLAG_ALGORITHM_LINEAR.
 
 
 \page statistics Statistics
