@@ -7023,30 +7023,30 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
     AddDetailedStatistics(outStats.Total, outStats.MemorySegmentGroup[0]);
     AddDetailedStatistics(outStats.Total, outStats.MemorySegmentGroup[1]);
 
-    D3D12MA_ASSERT(outStats.Total.Stats.BlockCount =
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockCount ==
         outStats.MemorySegmentGroup[0].Stats.BlockCount + outStats.MemorySegmentGroup[1].Stats.BlockCount);
-    D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount =
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount ==
         outStats.MemorySegmentGroup[0].Stats.AllocationCount + outStats.MemorySegmentGroup[1].Stats.AllocationCount);
-    D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes =
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes ==
         outStats.MemorySegmentGroup[0].Stats.BlockBytes + outStats.MemorySegmentGroup[1].Stats.BlockBytes);
-    D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes =
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes ==
         outStats.MemorySegmentGroup[0].Stats.AllocationBytes + outStats.MemorySegmentGroup[1].Stats.AllocationBytes);
-    D3D12MA_ASSERT(outStats.Total.UnusedRangeCount =
+    D3D12MA_ASSERT(outStats.Total.UnusedRangeCount ==
         outStats.MemorySegmentGroup[0].UnusedRangeCount + outStats.MemorySegmentGroup[1].UnusedRangeCount);
 
-    D3D12MA_ASSERT(outStats.Total.Stats.BlockCount =
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockCount ==
         outStats.HeapType[0].Stats.BlockCount + outStats.HeapType[1].Stats.BlockCount +
         outStats.HeapType[2].Stats.BlockCount + outStats.HeapType[3].Stats.BlockCount);
-    D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount =
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount ==
         outStats.HeapType[0].Stats.AllocationCount + outStats.HeapType[1].Stats.AllocationCount +
         outStats.HeapType[2].Stats.AllocationCount + outStats.HeapType[3].Stats.AllocationCount);
-    D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes =
+    D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes ==
         outStats.HeapType[0].Stats.BlockBytes + outStats.HeapType[1].Stats.BlockBytes +
         outStats.HeapType[2].Stats.BlockBytes + outStats.HeapType[3].Stats.BlockBytes);
-    D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes =
+    D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes ==
         outStats.HeapType[0].Stats.AllocationBytes + outStats.HeapType[1].Stats.AllocationBytes +
         outStats.HeapType[2].Stats.AllocationBytes + outStats.HeapType[3].Stats.AllocationBytes);
-    D3D12MA_ASSERT(outStats.Total.UnusedRangeCount =
+    D3D12MA_ASSERT(outStats.Total.UnusedRangeCount ==
         outStats.HeapType[0].UnusedRangeCount + outStats.HeapType[1].UnusedRangeCount +
         outStats.HeapType[2].UnusedRangeCount + outStats.HeapType[3].UnusedRangeCount);
 }
