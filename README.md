@@ -30,15 +30,19 @@ This library can help developers to manage memory allocations and resource creat
 
 Additional features:
 
-- Support for resource aliasing (overlap).
-- Virtual allocator - possibility to use core allocation algorithm without using real GPU memory, to allocate your own stuff, e.g. sub-allocate pieces of one large buffer.
 - Well-documented - description of all classes and functions provided, along with chapters that contain general description and example code.
 - Thread-safety: Library is designed to be used in multithreaded code.
 - Configuration: Fill optional members of `ALLOCATOR_DESC` structure to provide custom CPU memory allocator and other parameters.
-- Customization: Predefine appropriate macros to provide your own implementation of external facilities used by the library, like assert, mutex, and atomic.
-- Statistics: Obtain detailed statistics about the amount of memory used, unused, number of allocated blocks, number of allocations etc. - globally and per memory heap type.
-- Debug annotations: Associate string name with every allocation.
-- JSON dump: Obtain a string in JSON format with detailed map of internal state, including list of allocations and gaps between them.
+- Customization and integration with custom engines: Predefine appropriate macros to provide your own implementation of external facilities used by the library, like assert, mutex, and atomic.
+- Support for resource aliasing (overlap).
+- Custom memory pools: Create a pool with desired parameters (e.g. fixed or limited maximum size, custom `D3D12_HEAP_PROPERTIES` and `D3D12_HEAP_FLAGS`) and allocate memory out of it.
+- Linear allocator: Create a pool with linear algorithm and use it for much faster allocations and deallocations in free-at-once, stack, double stack, or ring buffer fashion.
+- Defragmentation: Let the library move data around to free some memory blocks and make your allocations better compacted.
+- Statistics: Obtain brief or detailed statistics about the amount of memory used, unused, number of allocated heaps, number of allocations etc. - globally and per memory heap type. Current memory usage and budget as reported by the system can also be queried.
+- Debug annotations: Associate custom `void* pPrivateData` and debug `LPCWSTR pName` with each allocation.
+- JSON dump: Obtain a string in JSON format with detailed map of internal state, including list of allocations, their string names, and gaps between them.
+- Convert this JSON dump into a picture to visualize your memory using attached Python script.
+- Virtual allocator - an API that exposes the core allocation algorithm to be used without allocating real GPU memory, to allocate your own stuff, e.g. sub-allocate pieces of one large buffer.
 
 # Prerequisites
 
@@ -65,24 +69,21 @@ resourceDesc.SampleDesc.Quality = 0;
 resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-D3D12MA::ALLOCATION_DESC allocationDesc = {};
+D3D12MA::ALLOCATION_DESC allocDesc = {};
 allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
 D3D12Resource* resource;
 D3D12MA::Allocation* allocation;
 HRESULT hr = allocator->CreateResource(
-    &allocationDesc,
-    &resourceDesc,
-    D3D12_RESOURCE_STATE_COPY_DEST,
-    NULL,
-    &allocation,
-    IID_PPV_ARGS(&resource));
+    &allocDesc, &resourceDesc,
+    D3D12_RESOURCE_STATE_COPY_DEST, NULL,
+    &allocation, IID_PPV_ARGS(&resource));
 ```
 
 With this one function call:
 
 1. `ID3D12Heap` memory block is allocated if needed.
-2. An unused region of the memory block assigned.
+2. An unused region of the memory block is reserved for the allocation.
 3. `ID3D12Resource` is created as placed resource, bound to this region.
 
 `Allocation` is an object that represents memory assigned to this texture. It can be queried for parameters like offset and size.
