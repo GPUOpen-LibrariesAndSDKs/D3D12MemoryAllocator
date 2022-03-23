@@ -5603,7 +5603,7 @@ void BlockMetadata_TLSF::WriteAllocationInfoToJson(JsonWriter& json) const
         if (block->IsFree())
             PrintDetailedMap_UnusedRange(json, block->offset, block->size);
         else
-            PrintDetailedMap_Allocation(json, block->size, block->offset, block->PrivateData());
+            PrintDetailedMap_Allocation(json, block->offset, block->size, block->PrivateData());
     }
     PrintDetailedMap_End(json);
 }
