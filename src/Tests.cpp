@@ -1486,6 +1486,39 @@ static void TestAliasingImplicitCommitted(const TestContext& ctx)
     CHECK_BOOL(aliasingRes != NULL);
 }
 
+static void TestPoolMsaaTextureAsCommitted(const TestContext& ctx)
+{
+    wprintf(L"Test MSAA texture always as committed in pool\n");
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.Flags = D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resDesc.Width = 1024;
+    resDesc.Height = 512;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc.SampleDesc.Count = 2;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+    ComPtr<D3D12MA::Allocation> alloc;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, &alloc, IID_NULL, nullptr));
+    // Committed allocation should not have explicit heap
+    CHECK_BOOL(alloc->GetHeap() == nullptr);
+}
+
 static void TestMapping(const TestContext& ctx)
 {
     wprintf(L"Test mapping\n");
@@ -4024,6 +4057,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
     TestAliasingImplicitCommitted(ctx);
+    TestPoolMsaaTextureAsCommitted(ctx);
     TestMapping(ctx);
     TestStats(ctx);
     TestTransfer(ctx);
