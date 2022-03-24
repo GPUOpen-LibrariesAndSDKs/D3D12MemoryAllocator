@@ -48,7 +48,7 @@ enum class FREE_ORDER { FORWARD, BACKWARD, RANDOM, COUNT };
 static const char* CODE_DESCRIPTION = "D3D12MA Tests";
 static constexpr UINT64 KILOBYTE = 1024;
 static constexpr UINT64 MEGABYTE = 1024 * KILOBYTE;
-static constexpr CONFIG_TYPE ConfigType = CONFIG_TYPE_SMALL;
+static constexpr CONFIG_TYPE ConfigType = CONFIG_TYPE_AVERAGE;
 static const char* FREE_ORDER_NAMES[] = { "FORWARD", "BACKWARD", "RANDOM", };
 
 static void CurrentTimeToStr(std::string& out)
@@ -1596,17 +1596,35 @@ static void TestStats(const TestContext& ctx)
     CheckStatistics(endStats.HeapType[1]);
     CheckStatistics(endStats.HeapType[2]);
 
-    D3D12MA::Budget gpuBudget = {}, cpuBudget = {};
-    ctx.allocator->GetBudget(&gpuBudget, &cpuBudget);
+    D3D12MA::Budget localBudget = {}, nonLocalBudget = {};
+    ctx.allocator->GetBudget(&localBudget, &nonLocalBudget);
+
+    CHECK_BOOL(localBudget.Stats.AllocationBytes <= localBudget.Stats.BlockBytes);
+    CHECK_BOOL(endStats.HeapType[3].Stats.BlockCount == 0); // No allocation from D3D12_HEAP_TYPE_CUSTOM in this test.
+    if(!ctx.allocator->IsUMA())
+    {
+        // Discrete GPU
+        CHECK_BOOL(localBudget.Stats.AllocationBytes == endStats.HeapType[0].Stats.AllocationBytes);
+        CHECK_BOOL(localBudget.Stats.BlockBytes == endStats.HeapType[0].Stats.BlockBytes);
     
-    CHECK_BOOL(gpuBudget.Stats.AllocationBytes <= gpuBudget.Stats.BlockBytes);
-    CHECK_BOOL(gpuBudget.Stats.AllocationBytes == endStats.HeapType[0].Stats.AllocationBytes);
-    CHECK_BOOL(gpuBudget.Stats.BlockBytes == endStats.HeapType[0].Stats.BlockBytes);
-    
-    CHECK_BOOL(cpuBudget.Stats.AllocationBytes <= cpuBudget.Stats.BlockBytes);
-    CHECK_BOOL(cpuBudget.Stats.AllocationBytes == endStats.HeapType[1].Stats.AllocationBytes + endStats.HeapType[2].Stats.AllocationBytes);
-    CHECK_BOOL(cpuBudget.Stats.BlockBytes ==
-        endStats.HeapType[1].Stats.BlockBytes + endStats.HeapType[2].Stats.BlockBytes);
+        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes <= nonLocalBudget.Stats.BlockBytes);
+        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes == endStats.HeapType[1].Stats.AllocationBytes + endStats.HeapType[2].Stats.AllocationBytes);
+        CHECK_BOOL(nonLocalBudget.Stats.BlockBytes ==
+            endStats.HeapType[1].Stats.BlockBytes + endStats.HeapType[2].Stats.BlockBytes);
+    }
+    else
+    {
+        // Integrated GPU - all memory is local
+        CHECK_BOOL(localBudget.Stats.AllocationBytes == endStats.HeapType[0].Stats.AllocationBytes +
+            endStats.HeapType[1].Stats.AllocationBytes +
+            endStats.HeapType[2].Stats.AllocationBytes);
+        CHECK_BOOL(localBudget.Stats.BlockBytes == endStats.HeapType[0].Stats.BlockBytes +
+            endStats.HeapType[1].Stats.BlockBytes +
+            endStats.HeapType[2].Stats.BlockBytes);
+
+        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes == 0);
+        CHECK_BOOL(nonLocalBudget.Stats.BlockBytes == 0);
+    }
 }
 
 static void TestTransfer(const TestContext& ctx)
