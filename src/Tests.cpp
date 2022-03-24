@@ -1457,6 +1457,35 @@ static void TestAliasingMemory(const TestContext& ctx)
     // You can use res1 and res2, but not at the same time!
 }
 
+static void TestAliasingImplicitCommitted(const TestContext& ctx)
+{
+    wprintf(L"Test aliasing implicit dedicated\n");
+
+    // The buffer will be large enough to be allocated as committed.
+    // We still need it to have an explicit heap to be able to alias.
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForBuffer(resDesc, 300 * MEGABYTE);
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_CAN_ALIAS;
+
+    ComPtr<D3D12MA::Allocation> alloc;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, NULL,
+        &alloc, IID_NULL, NULL));
+    CHECK_BOOL(alloc != NULL && alloc->GetHeap() != NULL);
+
+    resDesc.Width = 200 * MEGABYTE;
+    ComPtr<ID3D12Resource> aliasingRes;
+    CHECK_HR(ctx.allocator->CreateAliasingResource(alloc.Get(),
+        0, // AllocationLocalOffset
+        &resDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, NULL, IID_PPV_ARGS(&aliasingRes)));
+    CHECK_BOOL(aliasingRes != NULL);
+}
+
 static void TestMapping(const TestContext& ctx)
 {
     wprintf(L"Test mapping\n");
@@ -3994,6 +4023,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCustomHeaps(ctx);
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
+    TestAliasingImplicitCommitted(ctx);
     TestMapping(ctx);
     TestStats(ctx);
     TestTransfer(ctx);

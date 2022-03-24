@@ -5906,6 +5906,7 @@ struct CommittedAllocationParameters
     D3D12_HEAP_PROPERTIES m_HeapProperties = {};
     D3D12_HEAP_FLAGS m_HeapFlags = D3D12_HEAP_FLAG_NONE;
     ID3D12ProtectedResourceSession* m_ProtectedSession = NULL;
+    bool m_CanAlias = false;
 
     bool IsValid() const { return m_List != NULL; }
 };
@@ -7485,13 +7486,42 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
 {
     D3D12MA_ASSERT(committedAllocParams.IsValid());
 
+    HRESULT hr;
+    ID3D12Resource* res = NULL;
+    // Allocate aliasing memory with explicit heap
+    if (committedAllocParams.m_CanAlias)
+    {
+        D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {};
+        heapAllocInfo.SizeInBytes = resourceSize;
+        heapAllocInfo.Alignment = HeapFlagsToAlignment(committedAllocParams.m_HeapFlags);
+        hr = AllocateHeap(committedAllocParams, heapAllocInfo, withinBudget, pPrivateData, ppAllocation);
+        if (SUCCEEDED(hr))
+        {
+            hr = m_Device->CreatePlacedResource((*ppAllocation)->GetHeap(), 0,
+                pResourceDesc, InitialResourceState,
+                pOptimizedClearValue, D3D12MA_IID_PPV_ARGS(&res));
+            if (SUCCEEDED(hr))
+            {
+                if (ppvResource != NULL)
+                    hr = res->QueryInterface(riidResource, ppvResource);
+                if (SUCCEEDED(hr))
+                {
+                    (*ppAllocation)->SetResourcePointer(res, pResourceDesc);
+                    return hr;
+                }
+                res->Release();
+            }
+            FreeHeapMemory(*ppAllocation);
+        }
+        return hr;
+    }
+
     if (withinBudget &&
         !NewAllocationWithinBudget(committedAllocParams.m_HeapProperties.Type, resourceSize))
     {
         return E_OUTOFMEMORY;
     }
 
-    ID3D12Resource* res = NULL;
     /* D3D12 ERROR:
      * ID3D12Device::CreateCommittedResource:
      * When creating a committed resource, D3D12_HEAP_FLAGS must not have either
@@ -7502,15 +7532,14 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
      *
      * [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
     */
-    HRESULT hr;
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     if (m_Device4)
     {
-        hr = m_Device4->CreateCommittedResource1(
-            &committedAllocParams.m_HeapProperties,
-            committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
-            pResourceDesc, InitialResourceState,
-            pOptimizedClearValue, committedAllocParams.m_ProtectedSession, D3D12MA_IID_PPV_ARGS(&res));
+            hr = m_Device4->CreateCommittedResource1(
+                &committedAllocParams.m_HeapProperties,
+                committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
+                pResourceDesc, InitialResourceState,
+                pOptimizedClearValue, committedAllocParams.m_ProtectedSession, D3D12MA_IID_PPV_ARGS(&res));
     }
     else
 #endif
@@ -7538,7 +7567,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
             const BOOL wasZeroInitialized = TRUE;
             Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resourceSize, pResourceDesc->Alignment, wasZeroInitialized);
             alloc->InitCommitted(committedAllocParams.m_List);
-            alloc->SetResource(res, pResourceDesc);
+            alloc->SetResourcePointer(res, pResourceDesc);
             alloc->SetPrivateData(pPrivateData);
 
             *ppAllocation = alloc;
@@ -7572,14 +7601,43 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
         return E_NOINTERFACE;
     }
 
+    HRESULT hr;
+    ID3D12Resource* res = NULL;
+    // Allocate aliasing memory with explicit heap
+    if (committedAllocParams.m_CanAlias)
+    {
+        D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {};
+        heapAllocInfo.SizeInBytes = resourceSize;
+        heapAllocInfo.Alignment = HeapFlagsToAlignment(committedAllocParams.m_HeapFlags);
+        hr = AllocateHeap(committedAllocParams, heapAllocInfo, withinBudget, pPrivateData, ppAllocation);
+        if (SUCCEEDED(hr))
+        {
+            hr = m_Device8->CreatePlacedResource1((*ppAllocation)->GetHeap(), 0,
+                pResourceDesc, InitialResourceState,
+                pOptimizedClearValue, D3D12MA_IID_PPV_ARGS(&res));
+            if (SUCCEEDED(hr))
+            {
+                if (ppvResource != NULL)
+                    hr = res->QueryInterface(riidResource, ppvResource);
+                if (SUCCEEDED(hr))
+                {
+                    (*ppAllocation)->SetResourcePointer(res, pResourceDesc);
+                    return hr;
+                }
+                res->Release();
+            }
+            FreeHeapMemory(*ppAllocation);
+        }
+        return hr;
+    }
+
     if (withinBudget &&
         !NewAllocationWithinBudget(committedAllocParams.m_HeapProperties.Type, resourceSize))
     {
         return E_OUTOFMEMORY;
     }
 
-    ID3D12Resource* res = NULL;
-    HRESULT hr = m_Device8->CreateCommittedResource2(
+    hr = m_Device8->CreateCommittedResource2(
         &committedAllocParams.m_HeapProperties,
         committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS, // D3D12 ERROR: ID3D12Device::CreateCommittedResource: When creating a committed resource, D3D12_HEAP_FLAGS must not have either D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES, D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES, nor D3D12_HEAP_FLAG_DENY_BUFFERS set. These flags will be set automatically to correspond with the committed resource type. [ STATE_CREATION ERROR #640: CREATERESOURCEANDHEAP_INVALIDHEAPMISCFLAGS]
         pResourceDesc, InitialResourceState,
@@ -7595,7 +7653,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
             const BOOL wasZeroInitialized = TRUE;
             Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resourceSize, pResourceDesc->Alignment, wasZeroInitialized);
             alloc->InitCommitted(committedAllocParams.m_List);
-            alloc->SetResource(res, pResourceDesc);
+            alloc->SetResourcePointer(res, pResourceDesc);
             alloc->SetPrivateData(pPrivateData);
 
             *ppAllocation = alloc;
@@ -7726,10 +7784,11 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     {
         outBlockVector = NULL;
     }
-    if ((allocDesc.Flags & (ALLOCATION_FLAG_NEVER_ALLOCATE | ALLOCATION_FLAG_CAN_ALIAS)) != 0)
+    if ((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) != 0)
     {
         outCommittedAllocationParams.m_List = NULL;
     }
+    outCommittedAllocationParams.m_CanAlias = allocDesc.Flags & ALLOCATION_FLAG_CAN_ALIAS;
 
     if (resDesc != NULL && !outPreferCommitted && PrefersCommittedAllocation(*resDesc))
     {
@@ -8340,7 +8399,7 @@ HRESULT BlockVector::CreateResource(
             }
             if (SUCCEEDED(hr))
             {
-                (*ppAllocation)->SetResource(res, &resourceDesc);
+                (*ppAllocation)->SetResourcePointer(res, &resourceDesc);
             }
             else
             {
@@ -8393,7 +8452,7 @@ HRESULT BlockVector::CreateResource2(
             }
             if (SUCCEEDED(hr))
             {
-                (*ppAllocation)->SetResource(res, &resourceDesc);
+                (*ppAllocation)->SetResourcePointer(res, &resourceDesc);
             }
             else
             {
@@ -9701,7 +9760,7 @@ NormalBlock* Allocation::GetBlock()
 }
 
 template<typename D3D12_RESOURCE_DESC_T>
-void Allocation::SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc)
+void Allocation::SetResourcePointer(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc)
 {
     D3D12MA_ASSERT(m_Resource == NULL && pResourceDesc);
     m_Resource = resource;

@@ -635,7 +635,7 @@ private:
     AllocHandle GetAllocHandle() const;
     NormalBlock* GetBlock();
     template<typename D3D12_RESOURCE_DESC_T>
-    void SetResource(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc);
+    void SetResourcePointer(ID3D12Resource* resource, const D3D12_RESOURCE_DESC_T* pResourceDesc);
     void FreeName();
 
     D3D12MA_CLASS_NO_COPY(Allocation)
