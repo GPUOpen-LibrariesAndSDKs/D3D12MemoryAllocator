@@ -1511,61 +1511,61 @@ void JsonWriter::AddAllocationToObject(const Allocation& alloc)
         break;
     default: D3D12MA_ASSERT(0); break;
     }
+
     WriteString(L"Size");
     WriteNumber(alloc.GetSize());
+    WriteString(L"Usage");
+    WriteNumber((UINT)alloc.m_PackedData.GetResourceFlags());
+
+    void* privateData = alloc.GetPrivateData();
+    if (privateData)
+    {
+        WriteString(L"CustomData");
+        WriteNumber((uintptr_t)privateData);
+    }
+
     LPCWSTR name = alloc.GetName();
     if (name != NULL)
     {
         WriteString(L"Name");
         WriteString(name);
     }
-    if (alloc.m_PackedData.GetResourceFlags())
-    {
-        WriteString(L"Flags");
-        WriteNumber((UINT)alloc.m_PackedData.GetResourceFlags());
-    }
     if (alloc.m_PackedData.GetTextureLayout())
     {
         WriteString(L"Layout");
         WriteNumber((UINT)alloc.m_PackedData.GetTextureLayout());
-    }
-    if (alloc.m_CreationFrameIndex)
-    {
-        WriteString(L"CreationFrameIndex");
-        WriteNumber(alloc.m_CreationFrameIndex);
     }
 }
 
 void JsonWriter::AddDetailedStatisticsInfoObject(const DetailedStatistics& stats)
 {
     BeginObject();
+
     WriteString(L"BlockCount");
     WriteNumber(stats.Stats.BlockCount);
-    WriteString(L"AllocationCount");
-    WriteNumber(stats.Stats.AllocationCount);
-    WriteString(L"UnusedRangeCount");
-    WriteNumber(stats.UnusedRangeCount);
     WriteString(L"BlockBytes");
     WriteNumber(stats.Stats.BlockBytes);
+    WriteString(L"AllocationCount");
+    WriteNumber(stats.Stats.AllocationCount);
     WriteString(L"AllocationBytes");
     WriteNumber(stats.Stats.AllocationBytes);
+    WriteString(L"UnusedRangeCount");
+    WriteNumber(stats.UnusedRangeCount);
 
-    WriteString(L"AllocationSize");
-    BeginObject(true);
-    WriteString(L"Min");
-    WriteNumber(stats.AllocationSizeMin);
-    WriteString(L"Max");
-    WriteNumber(stats.AllocationSizeMax);
-    EndObject();
-
-    WriteString(L"UnusedRangeSize");
-    BeginObject(true);
-    WriteString(L"Min");
-    WriteNumber(stats.UnusedRangeSizeMin);
-    WriteString(L"Max");
-    WriteNumber(stats.UnusedRangeSizeMax);
-    EndObject();
-
+    if (stats.Stats.AllocationCount > 1)
+    {
+        WriteString(L"AllocationSizeMin");
+        WriteNumber(stats.AllocationSizeMin);
+        WriteString(L"AllocationSizeMax");
+        WriteNumber(stats.AllocationSizeMax);
+    }
+    if (stats.UnusedRangeCount > 1)
+    {
+        WriteString(L"UnusedRangeSizeMin");
+        WriteNumber(stats.UnusedRangeSizeMin);
+        WriteString(L"UnusedRangeSizeMax");
+        WriteNumber(stats.UnusedRangeSizeMax);
+    }
     EndObject();
 }
 
@@ -2965,8 +2965,6 @@ BlockMetadata::BlockMetadata(const ALLOCATION_CALLBACKS* allocationCallbacks, bo
 void BlockMetadata::PrintDetailedMap_Begin(JsonWriter& json,
     UINT64 unusedBytes, size_t allocationCount, size_t unusedRangeCount) const
 {
-    json.BeginObject();
-
     json.WriteString(L"TotalBytes");
     json.WriteNumber(GetSize());
 
@@ -2993,13 +2991,11 @@ void BlockMetadata::PrintDetailedMap_Allocation(JsonWriter& json,
 
     if (IsVirtual())
     {
-        json.WriteString(L"Type");
-        json.WriteString(L"ALLOCATION");
         json.WriteString(L"Size");
         json.WriteNumber(size);
         if (privateData)
         {
-            json.WriteString(L"PrivateData");
+            json.WriteString(L"CustomData");
             json.WriteNumber((uintptr_t)privateData);
         }
     }
@@ -3032,7 +3028,6 @@ void BlockMetadata::PrintDetailedMap_UnusedRange(JsonWriter& json,
 void BlockMetadata::PrintDetailedMap_End(JsonWriter& json) const
 {
     json.EndArray();
-    json.EndObject();
 }
 #endif // _D3D12MA_BLOCK_METADATA_FUNCTIONS
 #endif // _D3D12MA_BLOCK_METADATA
@@ -5942,6 +5937,7 @@ public:
     ~BlockVector();
 
     const D3D12_HEAP_PROPERTIES& GetHeapProperties() const { return m_HeapProps; }
+    D3D12_HEAP_FLAGS GetHeapFlags() const { return m_HeapFlags; }
     UINT64 GetPreferredBlockSize() const { return m_PreferredBlockSize; }
     UINT32 GetAlgorithm() const { return m_Algorithm; }
     // To be used only while the m_Mutex is locked. Used during defragmentation.
@@ -6409,13 +6405,13 @@ public:
     void FreeHeapMemory(Allocation* allocation);
 
     void SetCurrentFrameIndex(UINT frameIndex);
-
-    void CalculateStatistics(TotalStatistics& outStats);
+    // For more deailed stats use outCutomHeaps to access statistics divided into L0 and L1 group
+    void CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCutomHeaps[2] = NULL);
 
     void GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget);
     void GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE heapType);
 
-    void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap);
+    void BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap);
     void FreeStatsString(WCHAR* pStatsString);
 
 private:
@@ -6945,7 +6941,7 @@ void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
 #endif
 }
 
-void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
+void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCutomHeaps[2])
 {
     // Init stats
     for (size_t i = 0; i < HEAP_TYPE_COUNT; i++)
@@ -6953,6 +6949,11 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
     for (size_t i = 0; i < DXGI_MEMORY_SEGMENT_GROUP_COUNT; i++)
         ClearDetailedStatistics(outStats.MemorySegmentGroup[i]);
     ClearDetailedStatistics(outStats.Total);
+    if (outCutomHeaps)
+    {
+        ClearDetailedStatistics(outCutomHeaps[0]);
+        ClearDetailedStatistics(outCutomHeaps[1]);
+    }
 
     // Process default pools. 3 standard heap types only. Add them to outStats.HeapType[i].
     if (SupportsResourceHeapTier2())
@@ -7003,8 +7004,13 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats)
             pool->AddDetailedStatistics(tmpStats);
             AddDetailedStatistics(
                 outStats.HeapType[heapTypeIndex], tmpStats);
+
+            UINT memorySegment = HeapPropertiesToMemorySegmentGroup(poolHeapProps);
             AddDetailedStatistics(
-                outStats.MemorySegmentGroup[HeapPropertiesToMemorySegmentGroup(poolHeapProps)], tmpStats);
+                outStats.MemorySegmentGroup[memorySegment], tmpStats);
+
+            if (outCutomHeaps)
+                AddDetailedStatistics(outCutomHeaps[memorySegment], tmpStats);
         }
     }
 
@@ -7106,155 +7112,354 @@ void AllocatorPimpl::GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE hea
     }
 }
 
-void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap)
+void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
 {
     StringBuilder sb(GetAllocs());
     {
-        JsonWriter json(GetAllocs(), sb);
-
         Budget localBudget = {}, nonLocalBudget = {};
         GetBudget(&localBudget, &nonLocalBudget);
 
         TotalStatistics stats;
-        CalculateStatistics(stats);
+        DetailedStatistics customHeaps[2];
+        CalculateStatistics(stats, customHeaps);
 
-        json.BeginObject();
-
-        json.WriteString(L"Total");
-        json.AddDetailedStatisticsInfoObject(stats.Total);
-        for (size_t heapType = 0; heapType < HEAP_TYPE_COUNT; ++heapType)
-        {
-            json.WriteString(HeapTypeNames[heapType]);
-            json.AddDetailedStatisticsInfoObject(stats.HeapType[heapType]);
-        }
-
-        json.WriteString(L"Budget");
+        JsonWriter json(GetAllocs(), sb);
         json.BeginObject();
         {
-            json.WriteString(L"Local");
-            WriteBudgetToJson(json, localBudget);
-            json.WriteString(L"NonLocal");
-            WriteBudgetToJson(json, nonLocalBudget);
-        }
-        json.EndObject();
-
-        if (DetailedMap)
-        {
-            json.WriteString(L"DetailedMap");
+            json.WriteString(L"General");
             json.BeginObject();
+            {
+                json.WriteString(L"API");
+                json.WriteString(L"Direct3D 12");
+
+                json.WriteString(L"GPU");
+                json.WriteString(m_AdapterDesc.Description);
+
+                json.WriteString(L"DedicatedVideoMemory");
+                json.WriteNumber(m_AdapterDesc.DedicatedVideoMemory);
+                json.WriteString(L"DedicatedSystemMemory");
+                json.WriteNumber(m_AdapterDesc.DedicatedSystemMemory);
+                json.WriteString(L"SharedSystemMemory");
+                json.WriteNumber(m_AdapterDesc.SharedSystemMemory);
+                
+                json.WriteString(L"ResourceHeapTier");
+                json.WriteNumber(static_cast<UINT>(m_D3D12Options.ResourceHeapTier));
+
+                json.WriteString(L"ResourceBindingTier");
+                json.WriteNumber(static_cast<UINT>(m_D3D12Options.ResourceBindingTier));
+
+                json.WriteString(L"TiledResourcesTier");
+                json.WriteNumber(static_cast<UINT>(m_D3D12Options.TiledResourcesTier));
+
+                json.WriteString(L"TileBasedRenderer");
+                json.WriteBool(m_D3D12Architecture.TileBasedRenderer);
+
+                json.WriteString(L"UMA");
+                json.WriteBool(m_D3D12Architecture.UMA);
+                json.WriteString(L"CacheCoherentUMA");
+                json.WriteBool(m_D3D12Architecture.CacheCoherentUMA);
+            }
+            json.EndObject();
+        }
+        {
+            json.WriteString(L"Total");
+            json.AddDetailedStatisticsInfoObject(stats.Total);
+        }
+        {
+            json.WriteString(L"MemoryInfo");
+            json.BeginObject();
+            {
+                json.WriteString(L"L0");
+                json.BeginObject();
+                {
+                    json.WriteString(L"Budget");
+                    WriteBudgetToJson(json, IsUMA() ? localBudget : nonLocalBudget); // When UMA device only L0 present as local
+
+                    json.WriteString(L"Stats");
+                    json.AddDetailedStatisticsInfoObject(stats.MemorySegmentGroup[!IsUMA()]);
+
+                    json.WriteString(L"MemoryPools");
+                    json.BeginObject();
+                    {
+                        if (IsUMA())
+                        {
+                            json.WriteString(L"DEFAULT");
+                            json.BeginObject();
+                            {
+                                json.WriteString(L"Flags");
+                                json.BeginArray(true);
+                                json.EndArray();
+                                json.WriteString(L"Stats");
+                                json.AddDetailedStatisticsInfoObject(stats.HeapType[0]);
+                            }
+                            json.EndObject();
+                        }
+                        json.WriteString(L"UPLOAD");
+                        json.BeginObject();
+                        {
+                            json.WriteString(L"Flags");
+                            json.BeginArray(true);
+                            json.EndArray();
+                            json.WriteString(L"Stats");
+                            json.AddDetailedStatisticsInfoObject(stats.HeapType[1]);
+                        }
+                        json.EndObject();
+
+                        json.WriteString(L"READBACK");
+                        json.BeginObject();
+                        {
+                            json.WriteString(L"Flags");
+                            json.BeginArray(true);
+                            json.EndArray();
+                            json.WriteString(L"Stats");
+                            json.AddDetailedStatisticsInfoObject(stats.HeapType[2]);
+                        }
+                        json.EndObject();
+
+                        json.WriteString(L"CUSTOM");
+                        json.BeginObject();
+                        {
+                            json.WriteString(L"Flags");
+                            json.BeginArray(true);
+                            json.EndArray();
+                            json.WriteString(L"Stats");
+                            json.AddDetailedStatisticsInfoObject(customHeaps[!IsUMA()]);
+                        }
+                        json.EndObject();
+                    }
+                    json.EndObject();
+                }
+                json.EndObject();
+                if (!IsUMA())
+                {
+                    json.WriteString(L"L1");
+                    json.BeginObject();
+                    {
+                        json.WriteString(L"Flags");
+                        json.BeginArray(true);
+                        json.EndArray();
+
+                        json.WriteString(L"Size");
+                        json.WriteNumber(0U);
+
+                        json.WriteString(L"Budget");
+                        WriteBudgetToJson(json, localBudget);
+
+                        json.WriteString(L"Stats");
+                        json.AddDetailedStatisticsInfoObject(stats.MemorySegmentGroup[0]);
+
+                        json.WriteString(L"MemoryPools");
+                        json.BeginObject();
+                        {
+                            json.WriteString(L"DEFAULT");
+                            json.BeginObject();
+                            {
+                                json.WriteString(L"Flags");
+                                json.BeginArray(true);
+                                json.EndArray();
+                                json.WriteString(L"Stats");
+                                json.AddDetailedStatisticsInfoObject(stats.HeapType[0]);
+                            }
+                            json.EndObject();
+
+                            json.WriteString(L"CUSTOM");
+                            json.BeginObject();
+                            {
+                                json.WriteString(L"Flags");
+                                json.BeginArray(true);
+                                json.EndArray();
+                                json.WriteString(L"Stats");
+                                json.AddDetailedStatisticsInfoObject(customHeaps[0]);
+                            }
+                            json.EndObject();
+                        }
+                        json.EndObject();
+                    }
+                    json.EndObject();
+                }
+            }
+            json.EndObject();
+        }
+
+        if (detailedMap)
+        {
+            const auto writeHeapInfo = [&](BlockVector* blockVector, CommittedAllocationList* committedAllocs, bool customHeap)
+            {
+                D3D12MA_ASSERT(blockVector);
+
+                D3D12_HEAP_FLAGS flags = blockVector->GetHeapFlags();
+                json.WriteString(L"Flags");
+                json.BeginArray(true);
+                {
+                    if (flags & D3D12_HEAP_FLAG_SHARED)
+                        json.WriteString(L"HEAP_FLAG_SHARED");
+                    if (flags & D3D12_HEAP_FLAG_ALLOW_DISPLAY)
+                        json.WriteString(L"HEAP_FLAG_ALLOW_DISPLAY");
+                    if (flags & D3D12_HEAP_FLAG_SHARED_CROSS_ADAPTER)
+                        json.WriteString(L"HEAP_FLAG_CROSS_ADAPTER");
+                    if (flags & D3D12_HEAP_FLAG_HARDWARE_PROTECTED)
+                        json.WriteString(L"HEAP_FLAG_HARDWARE_PROTECTED");
+                    if (flags & D3D12_HEAP_FLAG_ALLOW_WRITE_WATCH)
+                        json.WriteString(L"HEAP_FLAG_ALLOW_WRITE_WATCH");
+                    if (flags & D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS)
+                        json.WriteString(L"HEAP_FLAG_ALLOW_SHADER_ATOMICS");
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+                    if (flags & D3D12_HEAP_FLAG_CREATE_NOT_RESIDENT)
+                        json.WriteString(L"HEAP_FLAG_CREATE_NOT_RESIDENT");
+                    if (flags & D3D12_HEAP_FLAG_CREATE_NOT_ZEROED)
+                        json.WriteString(L"HEAP_FLAG_CREATE_NOT_ZEROED");
+#endif
+
+                    if (flags & D3D12_HEAP_FLAG_DENY_BUFFERS)
+                        json.WriteString(L"HEAP_FLAG_DENY_BUFFERS");
+                    if (flags & D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES)
+                        json.WriteString(L"HEAP_FLAG_DENY_RT_DS_TEXTURES");
+                    if (flags & D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES)
+                        json.WriteString(L"HEAP_FLAG_DENY_NON_RT_DS_TEXTURES");
+
+                    flags &= ~(D3D12_HEAP_FLAG_SHARED
+                        | D3D12_HEAP_FLAG_DENY_BUFFERS
+                        | D3D12_HEAP_FLAG_ALLOW_DISPLAY
+                        | D3D12_HEAP_FLAG_SHARED_CROSS_ADAPTER
+                        | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES
+                        | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES
+                        | D3D12_HEAP_FLAG_HARDWARE_PROTECTED
+                        | D3D12_HEAP_FLAG_ALLOW_WRITE_WATCH
+                        | D3D12_HEAP_FLAG_ALLOW_SHADER_ATOMICS);
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+                    flags &= ~(D3D12_HEAP_FLAG_CREATE_NOT_RESIDENT
+                        | D3D12_HEAP_FLAG_CREATE_NOT_ZEROED);
+#endif
+                    if (flags != 0)
+                        json.WriteNumber((UINT)flags);
+
+                    if (customHeap)
+                    {
+                        const D3D12_HEAP_PROPERTIES& properties = blockVector->GetHeapProperties();
+                        switch (properties.MemoryPoolPreference)
+                        {
+                        default:
+                            D3D12MA_ASSERT(0);
+                        case D3D12_MEMORY_POOL_UNKNOWN:
+                            json.WriteString(L"MEMORY_POOL_UNKNOWN");
+                            break;
+                        case D3D12_MEMORY_POOL_L0:
+                            json.WriteString(L"MEMORY_POOL_L0");
+                            break;
+                        case D3D12_MEMORY_POOL_L1:
+                            json.WriteString(L"MEMORY_POOL_L1");
+                            break;
+                        }
+                        switch (properties.CPUPageProperty)
+                        {
+                        default:
+                            D3D12MA_ASSERT(0);
+                        case D3D12_CPU_PAGE_PROPERTY_UNKNOWN:
+                            json.WriteString(L"CPU_PAGE_PROPERTY_UNKNOWN");
+                            break;
+                        case D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE:
+                            json.WriteString(L"CPU_PAGE_PROPERTY_NOT_AVAILABLE");
+                            break;
+                        case D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE:
+                            json.WriteString(L"CPU_PAGE_PROPERTY_WRITE_COMBINE");
+                            break;
+                        case D3D12_CPU_PAGE_PROPERTY_WRITE_BACK:
+                            json.WriteString(L"CPU_PAGE_PROPERTY_WRITE_BACK");
+                            break;
+                        }
+                    }
+                }
+                json.EndArray();
+
+                json.WriteString(L"PreferredBlockSize");
+                json.WriteNumber(blockVector->GetPreferredBlockSize());
+
+                json.WriteString(L"Blocks");
+                blockVector->WriteBlockInfoToJson(json);
+
+                json.WriteString(L"DedicatedAllocations");
+                json.BeginArray();
+                if (committedAllocs)
+                    committedAllocs->BuildStatsString(json);
+                json.EndArray();
+            };
 
             json.WriteString(L"DefaultPools");
             json.BeginObject();
-
-            if (SupportsResourceHeapTier2())
             {
-                for (size_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
+                if (SupportsResourceHeapTier2())
                 {
-                    json.WriteString(HeapTypeNames[heapType]);
-                    json.BeginObject();
-
-                    json.WriteString(L"Blocks");
-
-                    BlockVector* blockVector = m_BlockVectors[heapType];
-                    D3D12MA_ASSERT(blockVector);
-                    blockVector->WriteBlockInfoToJson(json);
-
-                    json.EndObject(); // heap name
-                }
-            }
-            else
-            {
-                for (size_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
-                {
-                    for (size_t heapSubType = 0; heapSubType < 3; ++heapSubType)
+                    for (uint8_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
                     {
-                        static const WCHAR* const heapSubTypeName[] = {
-                            L" + buffer",
-                            L" + texture",
-                            L" + texture RT or DS",
-                        };
-                        json.BeginString();
-                        json.ContinueString(HeapTypeNames[heapType]);
-                        json.ContinueString(heapSubTypeName[heapSubType]);
-                        json.EndString();
+                        json.WriteString(HeapTypeNames[heapType]);
                         json.BeginObject();
-
-                        json.WriteString(L"Blocks");
-
-                        BlockVector* blockVector = m_BlockVectors[heapType * 3 + heapSubType];
-                        D3D12MA_ASSERT(blockVector);
-                        blockVector->WriteBlockInfoToJson(json);
-
-                        json.EndObject(); // heap name
+                        writeHeapInfo(m_BlockVectors[heapType], m_CommittedAllocations + heapType, false);
+                        json.EndObject();
                     }
                 }
-            }
-
-            json.EndObject(); // DefaultPools
-
-            json.WriteString(L"CommittedAllocations");
-            json.BeginObject();
-
-            for (size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
-            {
-                json.WriteString(HeapTypeNames[heapTypeIndex]);
-                json.BeginArray();
-                m_CommittedAllocations[heapTypeIndex].BuildStatsString(json);
-                json.EndArray();
-            }
-
-            json.EndObject(); // CommittedAllocations
-
-            json.WriteString(L"Pools");
-            json.BeginObject();
-
-            for (size_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
-            {
-                json.WriteString(HeapTypeNames[heapTypeIndex]);
-                json.BeginArray();
-                MutexLockRead mutex(m_PoolsMutex[heapTypeIndex], m_UseMutex);
-                size_t index = 0;
-                for (auto* item = m_Pools[heapTypeIndex].Front(); item != nullptr; item = PoolList::GetNext(item))
+                else
                 {
-                    json.BeginObject();
-                    json.WriteString(L"Name");
-                    if (item->GetName() != nullptr)
+                    for (uint8_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
                     {
-                        json.WriteString(item->GetName());
+                        for (uint8_t heapSubType = 0; heapSubType < 3; ++heapSubType)
+                        {
+                            static const WCHAR* const heapSubTypeName[] = {
+                                L" - Buffers",
+                                L" - Textures",
+                                L" - Textures RT/DS",
+                            };
+                            json.BeginString(HeapTypeNames[heapType]);
+                            json.EndString(heapSubTypeName[heapSubType]);
+
+                            json.BeginObject();
+                            writeHeapInfo(m_BlockVectors[heapType + heapSubType], m_CommittedAllocations + heapType, false);
+                            json.EndObject();
+                        }
                     }
-                    else
-                    {
-                        json.BeginString();
-                        json.ContinueString(index);
-                        json.EndString();
-                    }
-                    ++index;
-
-                    json.WriteString(L"Blocks");
-                    item->GetBlockVector()->WriteBlockInfoToJson(json);
-
-                    json.WriteString(L"CommittedAllocations");
-                    json.BeginArray();
-                    if (item->SupportsCommittedAllocations())
-                        item->GetCommittedAllocationList()->BuildStatsString(json);
-                    json.EndArray();
-
-                    json.EndObject();
                 }
-                json.EndArray();
             }
+            json.EndObject();
 
-            json.EndObject(); // Pools
+            json.WriteString(L"CustomPools");
+            json.BeginObject();
+            for (uint8_t heapTypeIndex = 0; heapTypeIndex < HEAP_TYPE_COUNT; ++heapTypeIndex)
+            {
+                MutexLockRead mutex(m_PoolsMutex[heapTypeIndex], m_UseMutex);
+                auto* item = m_Pools[heapTypeIndex].Front();
+                if (item != NULL)
+                {
+                    size_t index = 0;
+                    json.WriteString(HeapTypeNames[heapTypeIndex]);
+                    json.BeginArray();
+                    do
+                    {
+                        json.BeginObject();
+                        json.WriteString(L"Name");
+                        json.BeginString();
+                        json.ContinueString(index++);
+                        if (item->GetName())
+                        {
+                            json.WriteString(L" - ");
+                            json.WriteString(item->GetName());
+                        }
+                        json.EndString();
 
-            json.EndObject(); // DetailedMap
+                        writeHeapInfo(item->GetBlockVector(), item->GetCommittedAllocationList(), heapTypeIndex == 3);
+                        json.EndObject();
+                    } while ((item = PoolList::GetNext(item)) != NULL);
+                    json.EndArray();
+                }
+            }
+            json.EndObject();
         }
         json.EndObject();
     }
 
     const size_t length = sb.GetLength();
-    WCHAR* result = AllocateArray<WCHAR>(GetAllocs(), length + 1);
-    memcpy(result, sb.GetData(), length * sizeof(WCHAR));
-    result[length] = L'\0';
+    WCHAR* result = AllocateArray<WCHAR>(GetAllocs(), length + 2);
+    result[0] = 0xFEFF;
+    memcpy(result + 1, sb.GetData(), length * sizeof(WCHAR));
+    result[length + 1] = L'\0';
     *ppStatsString = result;
 }
 
@@ -7710,18 +7915,10 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
 {
     json.BeginObject();
     {
-        json.WriteString(L"BlockCount");
-        json.WriteNumber(budget.Stats.BlockCount);
-        json.WriteString(L"AllocationCount");
-        json.WriteNumber(budget.Stats.AllocationCount);
-        json.WriteString(L"BlockBytes");
-        json.WriteNumber(budget.Stats.BlockBytes);
-        json.WriteString(L"AllocationBytes");
-        json.WriteNumber(budget.Stats.AllocationBytes);
-        json.WriteString(L"UsageBytes");
-        json.WriteNumber(budget.UsageBytes);
         json.WriteString(L"BudgetBytes");
         json.WriteNumber(budget.BudgetBytes);
+        json.WriteString(L"UsageBytes");
+        json.WriteNumber(budget.UsageBytes);
     }
     json.EndObject();
 }
@@ -8254,7 +8451,9 @@ void BlockVector::WriteBlockInfoToJson(JsonWriter& json)
         json.ContinueString(pBlock->GetId());
         json.EndString();
 
+        json.BeginObject();
         pBlock->m_pMetadata->WriteAllocationInfoToJson(json);
+        json.EndObject();
     }
 
     json.EndObject();
@@ -9423,7 +9622,6 @@ Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size, UINT64 alignment,
     m_Size{ size },
     m_Alignment{ alignment },
     m_Resource{ NULL },
-    m_CreationFrameIndex{ allocator->GetCurrentFrameIndex() },
     m_Name{ NULL }
 {
     D3D12MA_ASSERT(allocator);

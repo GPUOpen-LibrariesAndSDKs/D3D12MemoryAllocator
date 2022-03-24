@@ -41,7 +41,7 @@ Additional features:
 - Statistics: Obtain brief or detailed statistics about the amount of memory used, unused, number of allocated heaps, number of allocations etc. - globally and per memory heap type. Current memory usage and budget as reported by the system can also be queried.
 - Debug annotations: Associate custom `void* pPrivateData` and debug `LPCWSTR pName` with each allocation.
 - JSON dump: Obtain a string in JSON format with detailed map of internal state, including list of allocations, their string names, and gaps between them.
-- Convert this JSON dump into a picture to visualize your memory using attached Python script.
+- Convert this JSON dump into a picture to visualize your memory. See [tools/GpuMemDumpVis](tools/GpuMemDumpVis/README.md).
 - Virtual allocator - an API that exposes the core allocation algorithm to be used without allocating real GPU memory, to allocate your own stuff, e.g. sub-allocate pieces of one large buffer.
 
 # Prerequisites

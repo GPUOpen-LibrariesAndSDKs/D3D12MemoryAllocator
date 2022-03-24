@@ -237,7 +237,6 @@ enum ALLOCATION_FLAGS
     */
     ALLOCATION_FLAG_UPPER_ADDRESS = 0x8,
 
-
     /** Set this flag if the allocated memory will have aliasing resources.
     
     Use this when calling D3D12MA::Allocator::CreateResource() and similar to
@@ -570,7 +569,6 @@ private:
     UINT64 m_Size;
     UINT64 m_Alignment;
     ID3D12Resource* m_Resource;
-    UINT m_CreationFrameIndex;
     void* m_pPrivateData;
     wchar_t* m_Name;
 
@@ -1246,8 +1244,9 @@ public:
     */
     void CalculateStatistics(TotalStatistics* pStats);
 
-    /// Builds and returns statistics as a string in JSON format.
-    /** @param[out] ppStatsString Must be freed using Allocator::FreeStatsString.
+    /** \brief Builds and returns statistics as a string in JSON format.
+    * 
+    @param[out] ppStatsString Must be freed using Allocator::FreeStatsString.
     @param DetailedMap `TRUE` to include full list of allocations (can make the string quite long), `FALSE` to only return statistics.
     */
     void BuildStatsString(WCHAR** ppStatsString, BOOL DetailedMap) const;

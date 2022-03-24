@@ -439,51 +439,194 @@ static void TestDebugMarginNotInVirtualAllocator(const TestContext& ctx)
     }
 }
 
-static void TestFrameIndexAndJson(const TestContext& ctx)
+static void TestJson(const TestContext& ctx)
 {
-    const UINT64 bufSize = 32ull * 1024;
+    wprintf(L"Test JSON\n");
+
+    std::vector<ComPtr<D3D12MA::Pool>> pools;
+    std::vector<ComPtr<D3D12MA::Allocation>> allocs;
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Alignment = 0;
+    resDesc.MipLevels = 1;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
 
-    D3D12_RESOURCE_DESC resourceDesc;
-    FillResourceDescForBuffer(resourceDesc, bufSize);
+    D3D12_RESOURCE_ALLOCATION_INFO allocInfo = {};
+    allocInfo.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    allocInfo.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 
-    const UINT BEGIN_INDEX = 10;
-    const UINT END_INDEX = 20;
-    for (UINT frameIndex = BEGIN_INDEX; frameIndex < END_INDEX; ++frameIndex)
+    // Select if using custom pool or default
+    for (UINT8 poolType = 0; poolType < 2; ++poolType)
     {
-        ctx.allocator->SetCurrentFrameIndex(frameIndex);
-        D3D12MA::Allocation* alloc = nullptr;
-        CHECK_HR(ctx.allocator->CreateResource(
-            &allocDesc,
-            &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            NULL,
-            &alloc,
-            IID_NULL,
-            NULL));
-
-        WCHAR* statsString;
-        ctx.allocator->BuildStatsString(&statsString, TRUE);
-        const UINT BUFFER_SIZE = 1024;
-        WCHAR buffer[BUFFER_SIZE];
-        for (UINT testIndex = BEGIN_INDEX; testIndex < END_INDEX; ++testIndex)
+        // Select different heaps
+        for (UINT8 heapType = 0; heapType < 5; ++heapType)
         {
-            swprintf(buffer, BUFFER_SIZE, L"\"CreationFrameIndex\": %u", testIndex);
-            if (testIndex == frameIndex)
+            D3D12_RESOURCE_STATES state;
+            D3D12_CPU_PAGE_PROPERTY cpuPageType = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+            D3D12_MEMORY_POOL memoryPool = D3D12_MEMORY_POOL_UNKNOWN;
+            switch (heapType)
             {
-                CHECK_BOOL(wcsstr(statsString, buffer) != NULL);
+            case 0:
+                allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+                state = D3D12_RESOURCE_STATE_COMMON;
+                break;
+            case 1:
+                allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+                state = D3D12_RESOURCE_STATE_GENERIC_READ;
+                break;
+            case 2:
+                allocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;
+                state = D3D12_RESOURCE_STATE_COPY_DEST;
+                break;
+            case 3:
+                allocDesc.HeapType = D3D12_HEAP_TYPE_CUSTOM;
+                state = D3D12_RESOURCE_STATE_COMMON;
+                cpuPageType = D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE;
+                memoryPool = ctx.allocator->IsUMA() ? D3D12_MEMORY_POOL_L0 : D3D12_MEMORY_POOL_L1;
+                break;
+            case 4:
+                allocDesc.HeapType = D3D12_HEAP_TYPE_CUSTOM;
+                state = D3D12_RESOURCE_STATE_GENERIC_READ;
+                cpuPageType = D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE;
+                memoryPool = D3D12_MEMORY_POOL_L0;
+                break;
             }
-            else
+            // Skip custom heaps for default pools
+            if (poolType == 0 && heapType > 2)
+                continue;
+            const bool texturesPossible = heapType == 0 || heapType == 3;
+
+            // Select different resource region types
+            for (UINT8 resType = 0; resType < 3; ++resType)
             {
-                CHECK_BOOL(wcsstr(statsString, buffer) == NULL);
+                allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+                D3D12_RESOURCE_FLAGS resFlags = D3D12_RESOURCE_FLAG_NONE;
+                if (texturesPossible)
+                {
+                    switch (resType)
+                    {
+                    case 1:
+                        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+                        break;
+                    case 2:
+                        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+                        resFlags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                        break;
+                    }
+                }
+
+                switch (poolType)
+                {
+                case 0:
+                    allocDesc.CustomPool = nullptr;
+                    break;
+                case 1:
+                {
+                    ComPtr<D3D12MA::Pool> pool;
+                    D3D12MA::POOL_DESC poolDesc = {};
+                    poolDesc.HeapFlags = allocDesc.ExtraHeapFlags;
+                    poolDesc.HeapProperties.Type = allocDesc.HeapType;
+                    poolDesc.HeapProperties.CPUPageProperty = cpuPageType;
+                    poolDesc.HeapProperties.MemoryPoolPreference = memoryPool;
+                    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+                    allocDesc.CustomPool = pool.Get();
+                    pools.emplace_back(std::move(pool));
+                    break;
+                }
+                }
+
+                // Select different allocation flags
+                for (UINT8 allocFlag = 0; allocFlag < 2; ++allocFlag)
+                {
+                    switch (allocFlag)
+                    {
+                    case 0:
+                        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+                        break;
+                    case 1:
+                        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+                        break;
+                    }
+
+                    // Select different alloc types (block, buffer, texture, etc.)
+                    for (UINT8 allocType = 0; allocType < 5; ++allocType)
+                    {
+                        // Select different data stored in the allocation
+                        for (UINT8 data = 0; data < 4; ++data)
+                        {
+                            ComPtr<D3D12MA::Allocation> alloc;
+
+                            if (texturesPossible && resType != 0)
+                            {
+                                resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                                resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                                switch (allocType % 3)
+                                {
+                                case 0:
+                                    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+                                    resDesc.Width = 512;
+                                    resDesc.Height = 1;
+                                    resDesc.DepthOrArraySize = 1;
+                                    resDesc.Flags = resFlags;
+                                    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, state, nullptr, &alloc, IID_NULL, nullptr));
+                                    break;
+                                case 1:
+                                    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                                    resDesc.Width = 1024;
+                                    resDesc.Height = 512;
+                                    resDesc.DepthOrArraySize = 1;
+                                    resDesc.Flags = resFlags;
+                                    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, state, nullptr, &alloc, IID_NULL, nullptr));
+                                    break;
+                                case 2:
+                                    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+                                    resDesc.Width = 512;
+                                    resDesc.Height = 256;
+                                    resDesc.DepthOrArraySize = 128;
+                                    resDesc.Flags = resFlags;
+                                    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, state, nullptr, &alloc, IID_NULL, nullptr));
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                switch (allocType % 2)
+                                {
+                                case 0:
+                                    CHECK_HR(ctx.allocator->AllocateMemory(&allocDesc, &allocInfo, &alloc));
+                                    break;
+                                case 1:
+                                    FillResourceDescForBuffer(resDesc, 1024);
+                                    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, state, nullptr, &alloc, IID_NULL, nullptr));
+                                    break;
+                                }
+                            }
+
+                            switch (data)
+                            {
+                            case 1:
+                                alloc->SetPrivateData((void*)16112007);
+                                break;
+                            case 2:
+                                alloc->SetName(L"SHEPURD");
+                                break;
+                            case 3:
+                                alloc->SetPrivateData((void*)26012010);
+                                alloc->SetName(L"JOKER");
+                                break;
+                            }
+                            allocs.emplace_back(std::move(alloc));
+                        }
+                    }
+
+                }
             }
         }
-        ctx.allocator->FreeStatsString(statsString);
-        alloc->Release();
     }
+    SaveStatsStringToFile(ctx, L"JSON_D3D12.json");
 }
 
 static void TestCommittedResourcesAndJson(const TestContext& ctx)
@@ -2689,8 +2832,8 @@ static void TestVirtualBlocks(const TestContext& ctx)
     block->BuildStatsString(&json);
     {
         std::wstring str(json);
-        CHECK_BOOL(str.find(L"\"PrivateData\": 1") != std::wstring::npos);
-        CHECK_BOOL(str.find(L"\"PrivateData\": 2") != std::wstring::npos);
+        CHECK_BOOL(str.find(L"\"CustomData\": 1") != std::wstring::npos);
+        CHECK_BOOL(str.find(L"\"CustomData\": 2") != std::wstring::npos);
     }
     block->FreeStatsString(json);
 
@@ -3839,7 +3982,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestDebugMargin(ctx);
     TestDebugMarginNotInVirtualAllocator(ctx);
 #else
-    TestFrameIndexAndJson(ctx);
+    TestJson(ctx);
     TestCommittedResourcesAndJson(ctx);
     TestCustomHeapFlags(ctx);
     TestPlacedResources(ctx);
