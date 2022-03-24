@@ -3815,7 +3815,7 @@ bool BlockMetadata_Linear::Validate() const
             {
                 if (!IsVirtual())
                 {
-                    D3D12MA_VALIDATE((UINT64)alloc->GetAllocHandle() == suballoc.offset);
+                    D3D12MA_VALIDATE(GetAllocationOffset(alloc->GetAllocHandle()) == suballoc.offset);
                     D3D12MA_VALIDATE(alloc->GetSize() == suballoc.size);
                 }
                 sumUsedSize += suballoc.size;
@@ -3857,7 +3857,7 @@ bool BlockMetadata_Linear::Validate() const
         {
             if (!IsVirtual())
             {
-                D3D12MA_VALIDATE((UINT64)alloc->GetAllocHandle() == suballoc.offset);
+                D3D12MA_VALIDATE(GetAllocationOffset(alloc->GetAllocHandle()) == suballoc.offset);
                 D3D12MA_VALIDATE(alloc->GetSize() == suballoc.size);
             }
             sumUsedSize += suballoc.size;
@@ -3891,7 +3891,7 @@ bool BlockMetadata_Linear::Validate() const
             {
                 if (!IsVirtual())
                 {
-                    D3D12MA_VALIDATE((UINT64)alloc->GetAllocHandle() == suballoc.offset);
+                    D3D12MA_VALIDATE(GetAllocationOffset(alloc->GetAllocHandle()) == suballoc.offset);
                     D3D12MA_VALIDATE(alloc->GetSize() == suballoc.size);
                 }
                 sumUsedSize += suballoc.size;
