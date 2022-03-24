@@ -446,7 +446,7 @@ static D3D12_HEAP_TYPE IndexToHeapType(UINT heapTypeIndex)
     return (D3D12_HEAP_TYPE)(heapTypeIndex + 1);
 }
 
-static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags)
+static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags, bool denyMsaaTextures)
 {
     /*
     Documentation of D3D12_HEAP_DESC structure says:
@@ -458,6 +458,9 @@ static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags)
 
     https://docs.microsoft.com/en-us/windows/desktop/api/d3d12/ns-d3d12-d3d12_heap_desc
     */
+
+    if (denyMsaaTextures)
+        return D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
 
     const D3D12_HEAP_FLAGS denyAllTexturesFlags =
         D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES;
@@ -3815,7 +3818,7 @@ bool BlockMetadata_Linear::Validate() const
             {
                 if (!IsVirtual())
                 {
-                    D3D12MA_VALIDATE((UINT64)alloc->GetAllocHandle() == suballoc.offset);
+                    D3D12MA_VALIDATE(GetAllocationOffset(alloc->GetAllocHandle()) == suballoc.offset);
                     D3D12MA_VALIDATE(alloc->GetSize() == suballoc.size);
                 }
                 sumUsedSize += suballoc.size;
@@ -3857,7 +3860,7 @@ bool BlockMetadata_Linear::Validate() const
         {
             if (!IsVirtual())
             {
-                D3D12MA_VALIDATE((UINT64)alloc->GetAllocHandle() == suballoc.offset);
+                D3D12MA_VALIDATE(GetAllocationOffset(alloc->GetAllocHandle()) == suballoc.offset);
                 D3D12MA_VALIDATE(alloc->GetSize() == suballoc.size);
             }
             sumUsedSize += suballoc.size;
@@ -3891,7 +3894,7 @@ bool BlockMetadata_Linear::Validate() const
             {
                 if (!IsVirtual())
                 {
-                    D3D12MA_VALIDATE((UINT64)alloc->GetAllocHandle() == suballoc.offset);
+                    D3D12MA_VALIDATE(GetAllocationOffset(alloc->GetAllocHandle()) == suballoc.offset);
                     D3D12MA_VALIDATE(alloc->GetSize() == suballoc.size);
                 }
                 sumUsedSize += suballoc.size;
@@ -5791,7 +5794,7 @@ protected:
     const UINT64 m_Size;
     const UINT m_Id;
 
-    HRESULT Init(ID3D12ProtectedResourceSession* pProtectedSession);
+    HRESULT Init(ID3D12ProtectedResourceSession* pProtectedSession, bool denyMsaaTextures);
 
 private:
     ID3D12Heap* m_Heap = NULL;
@@ -5823,7 +5826,7 @@ public:
     BlockVector* GetBlockVector() const { return m_BlockVector; }
 
     // 'algorithm' should be one of the *_ALGORITHM_* flags in enums POOL_FLAGS or VIRTUAL_BLOCK_FLAGS
-    HRESULT Init(UINT32 algorithm, ID3D12ProtectedResourceSession* pProtectedSession);
+    HRESULT Init(UINT32 algorithm, ID3D12ProtectedResourceSession* pProtectedSession, bool denyMsaaTextures);
 
     // Validates all data structures inside this object. If not valid, returns false.
     bool Validate() const;
@@ -5934,6 +5937,7 @@ public:
         bool explicitBlockSize,
         UINT64 minAllocationAlignment,
         UINT32 algorithm,
+        bool denyMsaaTextures,
         ID3D12ProtectedResourceSession* pProtectedSession);
     ~BlockVector();
 
@@ -5941,6 +5945,7 @@ public:
     D3D12_HEAP_FLAGS GetHeapFlags() const { return m_HeapFlags; }
     UINT64 GetPreferredBlockSize() const { return m_PreferredBlockSize; }
     UINT32 GetAlgorithm() const { return m_Algorithm; }
+    bool DeniesMsaaTextures() const { return m_DenyMsaaTextures; }
     // To be used only while the m_Mutex is locked. Used during defragmentation.
     size_t GetBlockCount() const { return m_Blocks.size(); }
     // To be used only while the m_Mutex is locked. Used during defragmentation.
@@ -5998,6 +6003,7 @@ private:
     const bool m_ExplicitBlockSize;
     const UINT64 m_MinAllocationAlignment;
     const UINT32 m_Algorithm;
+    const bool m_DenyMsaaTextures;
     ID3D12ProtectedResourceSession* const m_ProtectedSession;
     /* There can be at most one allocation that is completely empty - a
     hysteresis to avoid pessimistic case of alternating creation and destruction
@@ -6420,6 +6426,7 @@ private:
 
     const bool m_UseMutex;
     const bool m_AlwaysCommitted;
+    const bool m_MsaaAlwaysCommitted;
     ID3D12Device* m_Device; // AddRef
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     ID3D12Device4* m_Device4 = NULL; // AddRef, optional
@@ -6511,6 +6518,7 @@ private:
 AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, const ALLOCATOR_DESC& desc)
     : m_UseMutex((desc.Flags & ALLOCATOR_FLAG_SINGLETHREADED) == 0),
     m_AlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_ALWAYS_COMMITTED) != 0),
+    m_MsaaAlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0),
     m_Device(desc.pDevice),
     m_Adapter(desc.pAdapter),
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
@@ -6594,7 +6602,8 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             SIZE_MAX, // maxBlockCount
             false, // explicitBlockSize
             D3D12MA_DEBUG_ALIGNMENT, // minAllocationAlignment
-            0, // Default algorithm
+            0, // Default algorithm,
+            m_MsaaAlwaysCommitted,
             NULL); // pProtectedSession
         // No need to call m_pBlockVectors[i]->CreateMinBlocks here, becase minBlockCount is 0.
     }
@@ -7493,7 +7502,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     {
         D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {};
         heapAllocInfo.SizeInBytes = resourceSize;
-        heapAllocInfo.Alignment = HeapFlagsToAlignment(committedAllocParams.m_HeapFlags);
+        heapAllocInfo.Alignment = HeapFlagsToAlignment(committedAllocParams.m_HeapFlags, m_MsaaAlwaysCommitted);
         hr = AllocateHeap(committedAllocParams, heapAllocInfo, withinBudget, pPrivateData, ppAllocation);
         if (SUCCEEDED(hr))
         {
@@ -7608,7 +7617,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource2(
     {
         D3D12_RESOURCE_ALLOCATION_INFO heapAllocInfo = {};
         heapAllocInfo.SizeInBytes = resourceSize;
-        heapAllocInfo.Alignment = HeapFlagsToAlignment(committedAllocParams.m_HeapFlags);
+        heapAllocInfo.Alignment = HeapFlagsToAlignment(committedAllocParams.m_HeapFlags, m_MsaaAlwaysCommitted);
         hr = AllocateHeap(committedAllocParams, heapAllocInfo, withinBudget, pPrivateData, ppAllocation);
         if (SUCCEEDED(hr))
         {
@@ -7732,10 +7741,12 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     outCommittedAllocationParams = CommittedAllocationParameters();
     outPreferCommitted = false;
 
+    bool msaaAlwaysCommitted;
     if (allocDesc.CustomPool != NULL)
     {
         PoolPimpl* const pool = allocDesc.CustomPool->m_Pimpl;
 
+        msaaAlwaysCommitted = pool->GetBlockVector()->DeniesMsaaTextures();
         outBlockVector = pool->GetBlockVector();
 
         outCommittedAllocationParams.m_ProtectedSession = pool->GetDesc().pProtectedSession;
@@ -7749,6 +7760,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         {
             return E_INVALIDARG;
         }
+        msaaAlwaysCommitted = m_MsaaAlwaysCommitted;
 
         outCommittedAllocationParams.m_HeapProperties = StandardHeapTypeToHeapProperties(allocDesc.HeapType);
         outCommittedAllocationParams.m_HeapFlags = allocDesc.ExtraHeapFlags;
@@ -7790,9 +7802,12 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     }
     outCommittedAllocationParams.m_CanAlias = allocDesc.Flags & ALLOCATION_FLAG_CAN_ALIAS;
 
-    if (resDesc != NULL && !outPreferCommitted && PrefersCommittedAllocation(*resDesc))
+    if (resDesc != NULL)
     {
-        outPreferCommitted = true;
+        if (resDesc->SampleDesc.Count > 1 && msaaAlwaysCommitted)
+            outBlockVector = NULL;
+        if (!outPreferCommitted && PrefersCommittedAllocation(*resDesc))
+            outPreferCommitted = true;
     }
 
     return (outBlockVector != NULL || outCommittedAllocationParams.m_List != NULL) ? S_OK : E_INVALIDARG;
@@ -8045,14 +8060,14 @@ MemoryBlock::~MemoryBlock()
     }
 }
 
-HRESULT MemoryBlock::Init(ID3D12ProtectedResourceSession* pProtectedSession)
+HRESULT MemoryBlock::Init(ID3D12ProtectedResourceSession* pProtectedSession, bool denyMsaaTextures)
 {
     D3D12MA_ASSERT(m_Heap == NULL && m_Size > 0);
 
     D3D12_HEAP_DESC heapDesc = {};
     heapDesc.SizeInBytes = m_Size;
     heapDesc.Properties = m_HeapProps;
-    heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags);
+    heapDesc.Alignment = HeapFlagsToAlignment(m_HeapFlags, denyMsaaTextures);
     heapDesc.Flags = m_HeapFlags;
 
     HRESULT hr;
@@ -8102,9 +8117,9 @@ NormalBlock::~NormalBlock()
     }
 }
 
-HRESULT NormalBlock::Init(UINT32 algorithm, ID3D12ProtectedResourceSession* pProtectedSession)
+HRESULT NormalBlock::Init(UINT32 algorithm, ID3D12ProtectedResourceSession* pProtectedSession, bool denyMsaaTextures)
 {
-    HRESULT hr = MemoryBlock::Init(pProtectedSession);
+    HRESULT hr = MemoryBlock::Init(pProtectedSession, denyMsaaTextures);
     if (FAILED(hr))
     {
         return hr;
@@ -8226,6 +8241,7 @@ BlockVector::BlockVector(
     bool explicitBlockSize,
     UINT64 minAllocationAlignment,
     UINT32 algorithm,
+    bool denyMsaaTextures,
     ID3D12ProtectedResourceSession* pProtectedSession)
     : m_hAllocator(hAllocator),
     m_HeapProps(heapProps),
@@ -8236,6 +8252,7 @@ BlockVector::BlockVector(
     m_ExplicitBlockSize(explicitBlockSize),
     m_MinAllocationAlignment(minAllocationAlignment),
     m_Algorithm(algorithm),
+    m_DenyMsaaTextures(denyMsaaTextures),
     m_ProtectedSession(pProtectedSession),
     m_HasEmptyBlock(false),
     m_Blocks(hAllocator->GetAllocs()),
@@ -8765,7 +8782,7 @@ HRESULT BlockVector::CreateBlock(
         m_HeapFlags,
         blockSize,
         m_NextBlockId++);
-    HRESULT hr = pBlock->Init(m_Algorithm, m_ProtectedSession);
+    HRESULT hr = pBlock->Init(m_Algorithm, m_ProtectedSession, m_DenyMsaaTextures);
     if (FAILED(hr))
     {
         D3D12MA_DELETE(m_hAllocator->GetAllocs(), pBlock);
@@ -9433,6 +9450,7 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc)
         explicitBlockSize,
         D3D12MA_MAX(desc.MinAllocationAlignment, (UINT64)D3D12MA_DEBUG_ALIGNMENT),
         desc.Flags & POOL_FLAG_ALGORITHM_MASK,
+        desc.Flags & POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED,
         desc.pProtectedSession);
 }
 

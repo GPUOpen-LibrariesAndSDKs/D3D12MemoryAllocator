@@ -836,6 +836,14 @@ enum POOL_FLAGS
     */
     POOL_FLAG_ALGORITHM_LINEAR = 0x1,
 
+    /** \brief Optimization, allocate MSAA textures as committed resources always.
+    
+    Specify this flag to create MSAA textures with implicit heaps, as if they were created
+    with flag ALLOCATION_FLAG_COMMITTED. Usage of this flags enables pool to create its heaps
+    on smaller alignment not suitable for MSAA textures.
+    */
+    POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED = 0x2,
+
     // Bit mask to extract only `ALGORITHM` bits from entire set of flags.
     POOL_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_LINEAR
 };
@@ -1007,6 +1015,14 @@ enum ALLOCATOR_FLAGS
     Only avaiable if `ID3D12Device8` is present. Otherwise, the flag is ignored.
     */
     ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED = 0x4,
+
+    /** \brief Optimization, allocate MSAA textures as committed resources always.
+
+    Specify this flag to create MSAA textures with implicit heaps, as if they were created
+    with flag ALLOCATION_FLAG_COMMITTED. Usage of this flags enables all default pools
+    to create its heaps on smaller alignment not suitable for MSAA textures.
+    */
+    ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED = 0x8,
 };
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().
