@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.0.0-development</b> (2021-07-26)
+<b>Version 2.0.0</b> (2022-03-25)
 
 Copyright (c) 2019-2022 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -226,8 +226,6 @@ enum ALLOCATION_FLAGS
 
     /** Create allocation only if additional memory required for it, if any, won't exceed
     memory budget. Otherwise return `E_OUTOFMEMORY`.
-
-    \warning Currently this feature is not fully implemented yet.
     */
     ALLOCATION_FLAG_WITHIN_BUDGET = 0x4,
 

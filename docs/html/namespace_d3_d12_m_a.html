@@ -185,14 +185,19 @@ Enumerations</h2></td></tr>
 <tr class="separator:a82bb787a69699a877b4166789a30e602"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a919d8545365d6b7209a964f2b99936d1"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">POOL_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02">POOL_FLAG_NONE</a> = 0
 , <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a">POOL_FLAG_ALGORITHM_LINEAR</a> = 0x1
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a> = 0x2
 , <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7">POOL_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_LINEAR
  }</td></tr>
 <tr class="memdesc:a919d8545365d6b7209a964f2b99936d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with POOL_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">More...</a><br /></td></tr>
 <tr class="separator:a919d8545365d6b7209a964f2b99936d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916">ALLOCATOR_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f">ALLOCATOR_FLAG_NONE</a> = 0
+<tr class="memitem:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916">ALLOCATOR_FLAGS</a> { <br />
+&#160;&#160;<a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f">ALLOCATOR_FLAG_NONE</a> = 0
 , <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52">ALLOCATOR_FLAG_SINGLETHREADED</a> = 0x1
 , <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb">ALLOCATOR_FLAG_ALWAYS_COMMITTED</a> = 0x2
 , <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335">ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED</a> = 0x4
+, <br />
+&#160;&#160;<a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e">ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a> = 0x8
+<br />
  }</td></tr>
 <tr class="memdesc:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with ALLOCATOR_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916">More...</a><br /></td></tr>
 <tr class="separator:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -302,8 +307,7 @@ Functions</h2></td></tr>
 <p >If new allocation cannot be placed in any of the existing heaps, allocation fails with <code>E_OUTOFMEMORY</code> error.</p>
 <p >You should not use <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a> and <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea9a52c6ae694eadcd20896091e77c0628">D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE</a> at the same time. It makes no sense. </p>
 </td></tr>
-<tr><td class="fieldname"><a id="abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6" name="abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6"></a>ALLOCATION_FLAG_WITHIN_BUDGET&#160;</td><td class="fielddoc"><p >Create allocation only if additional memory required for it, if any, won't exceed memory budget. Otherwise return <code>E_OUTOFMEMORY</code>.</p>
-<dl class="section warning"><dt>Warning</dt><dd>Currently this feature is not fully implemented yet. </dd></dl>
+<tr><td class="fieldname"><a id="abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6" name="abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6"></a>ALLOCATION_FLAG_WITHIN_BUDGET&#160;</td><td class="fielddoc"><p >Create allocation only if additional memory required for it, if any, won't exceed memory budget. Otherwise return <code>E_OUTOFMEMORY</code>. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="abbad31a7e0b3d09d77f3fb704b77645eafb0e2dacce691336e717550a1df72474" name="abbad31a7e0b3d09d77f3fb704b77645eafb0e2dacce691336e717550a1df72474"></a>ALLOCATION_FLAG_UPPER_ADDRESS&#160;</td><td class="fielddoc"><p ><a class="el" href="class_d3_d12_m_a_1_1_allocation.html" title="Represents single memory allocation.">Allocation</a> will be created from upper stack in a double stack pool.</p>
 <p >This flag is only allowed for custom pools created with <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a" title="Enables alternative, linear allocation algorithm in this pool.">POOL_FLAG_ALGORITHM_LINEAR</a> flag. </p>
@@ -352,6 +356,9 @@ Functions</h2></td></tr>
 <p >Only affects default pools. To use the flag with <a class="el" href="custom_pools.html">Custom memory pools</a>, you need to add it manually:</p>
 <div class="fragment"><div class="line">poolDesc.heapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;</div>
 </div><!-- fragment --><p >Only avaiable if <code>ID3D12Device8</code> is present. Otherwise, the flag is ignored. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e" name="ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e"></a>ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED&#160;</td><td class="fielddoc"><p >Optimization, allocate MSAA textures as committed resources always. </p>
+<p >Specify this flag to create MSAA textures with implicit heaps, as if they were created with flag ALLOCATION_FLAG_COMMITTED. Usage of this flags enables all default pools to create its heaps on smaller alignment not suitable for MSAA textures. </p>
 </td></tr>
 </table>
 
@@ -426,6 +433,9 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a" name="a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a"></a>POOL_FLAG_ALGORITHM_LINEAR&#160;</td><td class="fielddoc"><p >Enables alternative, linear allocation algorithm in this pool. </p>
 <p >Specify this flag to enable linear allocation algorithm, which always creates new allocations after last one and doesn't reuse space from allocations freed in between. It trades memory consumption for simplified algorithm and data structure, which has better performance and uses less memory for metadata.</p>
 <p >By using this flag, you can achieve behavior of free-at-once, stack, ring buffer, and double stack. For details, see documentation chapter <a class="el" href="linear_algorithm.html">Linear allocation algorithm</a>. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa" name="a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa"></a>POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED&#160;</td><td class="fielddoc"><p >Optimization, allocate MSAA textures as committed resources always. </p>
+<p >Specify this flag to create MSAA textures with implicit heaps, as if they were created with flag ALLOCATION_FLAG_COMMITTED. Usage of this flags enables pool to create its heaps on smaller alignment not suitable for MSAA textures. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7" name="a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7"></a>POOL_FLAG_ALGORITHM_MASK&#160;</td><td class="fielddoc"></td></tr>
 </table>
