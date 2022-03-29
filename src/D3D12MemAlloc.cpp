@@ -7449,8 +7449,8 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                         json.ContinueString(index++);
                         if (item->GetName())
                         {
-                            json.WriteString(L" - ");
-                            json.WriteString(item->GetName());
+                            json.ContinueString(L" - ");
+                            json.ContinueString(item->GetName());
                         }
                         json.EndString();
 
