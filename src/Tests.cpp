@@ -1033,6 +1033,11 @@ static void TestCustomPools(const TestContext& ctx)
         D3D12_RESOURCE_STATE_GENERIC_READ,
         NULL, // pOptimizedClearValue
         IID_PPV_ARGS(&res)) );
+
+    // JSON dump
+    wchar_t* json = nullptr;
+    ctx.allocator->BuildStatsString(&json, TRUE);
+    ctx.allocator->FreeStatsString(json);
 }
 
 static void TestPoolsAndAllocationParameters(const TestContext& ctx)
