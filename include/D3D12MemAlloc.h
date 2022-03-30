@@ -36,6 +36,7 @@ Documentation of all members: D3D12MemAlloc.h
 - \subpage quick_start
     - [Project setup](@ref quick_start_project_setup)
     - [Creating resources](@ref quick_start_creating_resources)
+    - [Resource reference counting](@ref quick_start_resource_reference_counting)
     - [Mapping memory](@ref quick_start_mapping_memory)
 - \subpage custom_pools
 - \subpage defragmentation
@@ -1572,9 +1573,9 @@ to be passed along with `D3D12_RESOURCE_DESC` and other parameters for created
 resource. This structure describes parameters of the desired memory allocation,
 including choice of `D3D12_HEAP_TYPE`.
 
-The function also returns a new object of type D3D12MA::Allocation, created along
-with usual `ID3D12Resource`. It represents allocated memory and can be queried
-for size, offset, `ID3D12Resource`, and `ID3D12Heap` if needed.
+The function returns a new object of type D3D12MA::Allocation.
+It represents allocated memory and can be queried for size, offset, `ID3D12Heap`.
+It also holds a reference to the `ID3D12Resource`, which can be accessed by calling D3D12MA::Allocation::GetResource().
 
 \code
 D3D12_RESOURCE_DESC resourceDesc = {};
@@ -1593,7 +1594,6 @@ resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 D3D12MA::ALLOCATION_DESC allocationDesc = {};
 allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
-D3D12Resource* resource;
 D3D12MA::Allocation* allocation;
 HRESULT hr = allocator->CreateResource(
     &allocationDesc,
@@ -1601,15 +1601,16 @@ HRESULT hr = allocator->CreateResource(
     D3D12_RESOURCE_STATE_COPY_DEST,
     NULL,
     &allocation,
-    IID_PPV_ARGS(&resource));
+    IID_NULL, NULL);
+
+// Use allocation->GetResource()...
 \endcode
 
-You need to remember both resource and allocation objects and destroy them
-separately when no longer needed.
+You need to release the allocation object when no longer needed.
+This will also release the D3D12 resource.
 
 \code
 allocation->Release();
-resource->Release();
 \endcode
 
 The advantage of using the allocator instead of creating committed resource, and
@@ -1630,6 +1631,65 @@ resources of 3 types: buffers, textures that are render targets or depth-stencil
 and other textures must be kept in separate heaps. When `D3D12_RESOURCE_HEAP_TIER_2`,
 they can be kept together. By using this library, you don't need to handle this
 manually.
+
+
+\section quick_start_resource_reference_counting Resource reference counting
+
+`ID3D12Resource` and other interfaces of Direct3D 12 use COM, so they are reference-counted.
+Objects of this library are reference-counted as well.
+An object of type D3D12MA::Allocation remembers the resource (buffer or texture)
+that was created together with this memory allocation
+and holds a reference to the `ID3D12Resource` object.
+(Note this is a difference to Vulkan Memory Allocator, where a `VmaAllocation` object has no connection
+with the buffer or image that was created with it.)
+Thus, it is important to manage the resource reference counter properly.
+
+The simplest use case is shown in the code snippet above.
+When only D3D12MA::Allocation object is obtained from a function call like D3D12MA::Allocator::CreateResource,
+it remembers the `ID3D12Resource` that was created with it and holds a reference to it.
+The resource can be obtained by calling `allocation->GetResource()`, which doesn't increment the resource
+reference counter.
+Calling `allocation->Release()` will decrease the resource reference counter, which is = 1 in this case,
+so the resource will be released.
+
+Second option is to retrieve a pointer to the resource along with D3D12MA::Allocation.
+Last parameters of the resource creation function can be used for this purpose.
+
+\code
+D3D12MA::Allocation* allocation;
+ID3D12Resource* resource;
+HRESULT hr = allocator->CreateResource(
+    &allocationDesc,
+    &resourceDesc,
+    D3D12_RESOURCE_STATE_COPY_DEST,
+    NULL,
+    &allocation,
+    IID_PPV_ARGS(&resource));
+
+// Use resource...
+\endcode
+
+In this case, returned pointer `resource` is equal to `allocation->GetResource()`,
+but the creation function additionally increases resource reference counter for the purpose of returning it from this call
+(it actually calls `QueryInterface` internally), so the resource will have the counter = 2.
+The resource then need to be released along with the allocation, in this particular order,
+to make sure the resource is destroyed before its memory heap can potentially be freed.
+
+\code
+resource->Release();
+allocation->Release();
+\endcode
+
+More advanced use cases are possible when we consider that an D3D12MA::Allocation object can just hold
+a reference to any resource.
+It can be changed by calling D3D12MA::Allocation::SetResource. This function
+releases the old resource and calls `AddRef` on the new one.
+
+Special care must be taken when performing defragmentation.
+The new resource created at the destination place should be set as `pass.pMoves[i].pDstTmpAllocation->SetResource(newRes)`,
+but it is moved to the source allocation at end of the defragmentation pass,
+while the old resource accessible through `pass.pMoves[i].pSrcAllocation->GetResource()` is then released.
+For more information, see documentation chapter \ref defragmentation.
 
 
 \section quick_start_mapping_memory Mapping memory
