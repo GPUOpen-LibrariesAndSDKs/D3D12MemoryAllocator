@@ -1644,7 +1644,7 @@ and holds a reference to the `ID3D12Resource` object.
 with the buffer or image that was created with it.)
 Thus, it is important to manage the resource reference counter properly.
 
-The simplest use case is shown in the code snippet above.
+<b>The simplest use case</b> is shown in the code snippet above.
 When only D3D12MA::Allocation object is obtained from a function call like D3D12MA::Allocator::CreateResource,
 it remembers the `ID3D12Resource` that was created with it and holds a reference to it.
 The resource can be obtained by calling `allocation->GetResource()`, which doesn't increment the resource
@@ -1652,7 +1652,7 @@ reference counter.
 Calling `allocation->Release()` will decrease the resource reference counter, which is = 1 in this case,
 so the resource will be released.
 
-Second option is to retrieve a pointer to the resource along with D3D12MA::Allocation.
+<b>Second option</b> is to retrieve a pointer to the resource along with D3D12MA::Allocation.
 Last parameters of the resource creation function can be used for this purpose.
 
 \code
@@ -1680,12 +1680,12 @@ resource->Release();
 allocation->Release();
 \endcode
 
-More advanced use cases are possible when we consider that an D3D12MA::Allocation object can just hold
+<b>More advanced use cases</b> are possible when we consider that an D3D12MA::Allocation object can just hold
 a reference to any resource.
 It can be changed by calling D3D12MA::Allocation::SetResource. This function
 releases the old resource and calls `AddRef` on the new one.
 
-Special care must be taken when performing defragmentation.
+Special care must be taken when performing <b>defragmentation</b>.
 The new resource created at the destination place should be set as `pass.pMoves[i].pDstTmpAllocation->SetResource(newRes)`,
 but it is moved to the source allocation at end of the defragmentation pass,
 while the old resource accessible through `pass.pMoves[i].pSrcAllocation->GetResource()` is then released.
