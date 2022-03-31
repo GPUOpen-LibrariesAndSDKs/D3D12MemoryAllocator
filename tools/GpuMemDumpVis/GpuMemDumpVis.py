@@ -306,7 +306,7 @@ if __name__ == '__main__':
                 draw.text((IMG_MARGIN, y), "Custom pool %s block %s" % (poolName, block['ID']), fill=COLOR_TEXT_H2, font=font)
                 y += FONT_SIZE + IMG_MARGIN
                 DrawBlock(draw, y, block, pixelsPerByte)
-                y += 2 * (FONT_SIZE + IMG_MARGIN)
+                y += MAP_SIZE + IMG_MARGIN 
             index = 0
             for dedicatedAlloc in pool['DedicatedAllocations']:
                 draw.text((IMG_MARGIN, y), "Custom pool %s dedicated allocation %d" % (poolName, index), fill=COLOR_TEXT_H2, font=font)
