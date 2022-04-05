@@ -1,3 +1,12 @@
+# 2.0.1 (2022-04-05)
+
+A maintenance release with some bug fixes and improvements. There are no changes in the library API.
+
+- Fixed an assert failing when detailed JSON dump was made while a custom pool was present with specified string name (#36, thanks @rbertin-aso).
+- Fixed image height calculation in JSON dump visualization tool "GpuMemDumpVis.py" (#37, thanks @rbertin-aso).
+- Added JSON Schema for JSON dump format - see file "tools\GpuMemDumpVis\GpuMemDump.schema.json".
+- Added documentation section "Resource reference counting".
+
 # 2.0.0 (2022-03-25)
 
 So much has changed since the first release that it doesn’t make much sense to compare the differences. Here are the most important features that the library now provides:
