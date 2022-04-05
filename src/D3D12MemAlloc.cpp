@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <utility>
 #include <cstdlib>
+#include <cstdint>
 #include <malloc.h> // for _aligned_malloc, _aligned_free
 #ifndef _WIN32
     #include <shared_mutex>
@@ -377,7 +378,15 @@ template <typename T>
 static T RoundDiv(T x, T y) { return (x + (y / (T)2)) / y; }
 template <typename T>
 static T DivideRoundingUp(T x, T y) { return (x + y - 1) / y; }
-    
+
+static WCHAR HexDigitToChar(UINT8 digit)
+{
+    if(digit < 10)
+        return L'0' + digit;
+    else
+        return L'A' + (digit - 10);
+}
+
 /*
 Performs binary search and returns iterator to first element that is greater or
 equal to `key`, according to comparison `cmp`.
@@ -1180,6 +1189,7 @@ public:
     void AddNewLine() { Add(L'\n'); }
     void AddNumber(UINT num);
     void AddNumber(UINT64 num);
+    void AddPointer(const void* ptr);
 
 private:
     Vector<WCHAR> m_Data;
@@ -1224,6 +1234,22 @@ void StringBuilder::AddNumber(UINT64 num)
     while (num);
     Add(p);
 }
+
+void StringBuilder::AddPointer(const void* ptr)
+{
+    WCHAR buf[21];
+    uintptr_t num = (uintptr_t)ptr;
+    buf[20] = L'\0';
+    WCHAR *p = &buf[20];
+    do
+    {
+        *--p = HexDigitToChar((UINT8)(num & 0xF));
+        num >>= 4;
+    }
+    while (num);
+    Add(p);
+}
+
 #endif // _D3D12MA_STRING_BUILDER_FUNCTIONS
 #endif // _D3D12MA_STRING_BUILDER
 
@@ -1267,6 +1293,7 @@ public:
     // Posts next part of an open string. The number is converted to decimal characters.
     void ContinueString(UINT num);
     void ContinueString(UINT64 num);
+    void ContinueString_Pointer(const void* ptr);
     // Posts next part of an open string. Pointer value is converted to characters
     // using "%p" formatting - shown as hexadecimal number, e.g.: 000000081276Ad00
     // void ContinueString_Pointer(const void* ptr);
@@ -1452,6 +1479,12 @@ void JsonWriter::ContinueString(UINT64 num)
     m_SB.AddNumber(num);
 }
 
+void JsonWriter::ContinueString_Pointer(const void* ptr)
+{
+    D3D12MA_ASSERT(m_InsideString);
+    m_SB.AddPointer(ptr);
+}
+
 void JsonWriter::EndString(LPCWSTR pStr)
 {
     D3D12MA_ASSERT(m_InsideString);
@@ -1524,7 +1557,9 @@ void JsonWriter::AddAllocationToObject(const Allocation& alloc)
     if (privateData)
     {
         WriteString(L"CustomData");
-        WriteNumber((uintptr_t)privateData);
+        BeginString();
+        ContinueString_Pointer(privateData);
+        EndString();
     }
 
     LPCWSTR name = alloc.GetName();
@@ -7196,9 +7231,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                             json.WriteString(L"DEFAULT");
                             json.BeginObject();
                             {
-                                json.WriteString(L"Flags");
-                                json.BeginArray(true);
-                                json.EndArray();
                                 json.WriteString(L"Stats");
                                 json.AddDetailedStatisticsInfoObject(stats.HeapType[0]);
                             }
@@ -7207,9 +7239,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                         json.WriteString(L"UPLOAD");
                         json.BeginObject();
                         {
-                            json.WriteString(L"Flags");
-                            json.BeginArray(true);
-                            json.EndArray();
                             json.WriteString(L"Stats");
                             json.AddDetailedStatisticsInfoObject(stats.HeapType[1]);
                         }
@@ -7218,9 +7247,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                         json.WriteString(L"READBACK");
                         json.BeginObject();
                         {
-                            json.WriteString(L"Flags");
-                            json.BeginArray(true);
-                            json.EndArray();
                             json.WriteString(L"Stats");
                             json.AddDetailedStatisticsInfoObject(stats.HeapType[2]);
                         }
@@ -7229,9 +7255,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                         json.WriteString(L"CUSTOM");
                         json.BeginObject();
                         {
-                            json.WriteString(L"Flags");
-                            json.BeginArray(true);
-                            json.EndArray();
                             json.WriteString(L"Stats");
                             json.AddDetailedStatisticsInfoObject(customHeaps[!IsUMA()]);
                         }
@@ -7245,13 +7268,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                     json.WriteString(L"L1");
                     json.BeginObject();
                     {
-                        json.WriteString(L"Flags");
-                        json.BeginArray(true);
-                        json.EndArray();
-
-                        json.WriteString(L"Size");
-                        json.WriteNumber(0U);
-
                         json.WriteString(L"Budget");
                         WriteBudgetToJson(json, localBudget);
 
@@ -7264,9 +7280,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                             json.WriteString(L"DEFAULT");
                             json.BeginObject();
                             {
-                                json.WriteString(L"Flags");
-                                json.BeginArray(true);
-                                json.EndArray();
                                 json.WriteString(L"Stats");
                                 json.AddDetailedStatisticsInfoObject(stats.HeapType[0]);
                             }
@@ -7275,9 +7288,6 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                             json.WriteString(L"CUSTOM");
                             json.BeginObject();
                             {
-                                json.WriteString(L"Flags");
-                                json.BeginArray(true);
-                                json.EndArray();
                                 json.WriteString(L"Stats");
                                 json.AddDetailedStatisticsInfoObject(customHeaps[0]);
                             }

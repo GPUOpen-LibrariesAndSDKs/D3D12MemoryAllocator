@@ -322,10 +322,10 @@ static void ValidateAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D1
     }
 }
 
-static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFilePath)
+static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFilePath, BOOL detailed = TRUE)
 {
     WCHAR* s = nullptr;
-    ctx.allocator->BuildStatsString(&s, TRUE);
+    ctx.allocator->BuildStatsString(&s, detailed);
     SaveFile(dstFilePath, s, wcslen(s) * sizeof(WCHAR));
     ctx.allocator->FreeStatsString(s);
 }
