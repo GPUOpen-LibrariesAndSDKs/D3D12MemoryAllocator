@@ -1965,9 +1965,20 @@ You can perform the defragmentation incrementally to limit the number of allocat
 in each pass, e.g. to call it in sync with render frames and not to experience too big hitches.
 See members: D3D12MA::DEFRAGMENTATION_DESC::MaxBytesPerPass, D3D12MA::DEFRAGMENTATION_DESC::MaxAllocationsPerPass.
 
-It is also safe to perform the defragmentation asynchronously to render frames and other Direct3D 12 and %D3D12MA
+<b>Thread safety:</b>
+It is safe to perform the defragmentation asynchronously to render frames and other Direct3D 12 and %D3D12MA
 usage, possibly from multiple threads, with the exception that allocations
 returned in D3D12MA::DEFRAGMENTATION_PASS_MOVE_INFO::pMoves shouldn't be released until the defragmentation pass is ended.
+During the call to D3D12MA::DefragmentationContext::BeginPass(), any operations on the memory pool
+affected by the defragmentation are blocked by a mutex.
+
+What it means in practice is that you shouldn't free any allocations from the defragmented pool
+since the moment a call to `BeginPass` begins. Otherwise, a thread performing the `allocation->Release()`
+would block for the time `BeginPass` executes and then free the allocation when it finishes, while the allocation
+could have ended up on the list of allocations to move.
+A solution to freeing allocations during defragmentation is to find such allocation on the list
+`pass.pMoves[i]` and set its operation to D3D12MA::DEFRAGMENTATION_MOVE_OPERATION_DESTROY instead of
+calling `allocation->Release()`, or simply deferring the release to the time after defragmentation finished.
 
 <b>Mapping</b> is out of scope of this library and so it is not preserved after an allocation is moved during defragmentation.
 You need to map the new resource yourself if needed.
