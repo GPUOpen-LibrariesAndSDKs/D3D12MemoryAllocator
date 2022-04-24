@@ -6616,6 +6616,14 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         m_D3D12Architecture.CacheCoherentUMA = FALSE;
     }
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+		D3D12_FEATURE_DATA_D3D12_OPTIONS7 o = {};
+		hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &o, sizeof(o));
+		D3D12_HEAP_FLAGS additionalFlags = (hr == S_OK) ? D3D12_HEAP_FLAG_CREATE_NOT_ZEROED : D3D12_HEAP_FLAG_NONE;
+#else
+        constexpr D3D12_HEAP_FLAGS additionalFlags = D3D12_HEAP_FLAG_NONE;
+#endif
+
     D3D12_HEAP_PROPERTIES heapProps = {};
     const UINT defaultPoolCount = GetDefaultPoolCount();
     for (UINT i = 0; i < defaultPoolCount; ++i)
@@ -6625,7 +6633,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
         if (desc.Flags & ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED)
-            heapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+                heapFlags |= additionalFlags;
 #endif
 
         m_BlockVectors[i] = D3D12MA_NEW(GetAllocs(), BlockVector)(
