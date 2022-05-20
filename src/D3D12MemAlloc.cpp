@@ -5228,7 +5228,7 @@ bool BlockMetadata_TLSF::CreateAllocationRequest(
 
     // Round up to the next block
     UINT64 sizeForNextList = allocSize;
-    UINT64 smallSizeStep = SMALL_BUFFER_SIZE / (IsVirtual() ? 1 << SECOND_LEVEL_INDEX : 4);
+    UINT16 smallSizeStep = SMALL_BUFFER_SIZE / (IsVirtual() ? 1 << SECOND_LEVEL_INDEX : 4);
     if (allocSize > SMALL_BUFFER_SIZE)
     {
         sizeForNextList += (1ULL << (BitScanMSB(allocSize) - SECOND_LEVEL_INDEX));
@@ -7769,9 +7769,10 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         msaaAlwaysCommitted = pool->GetBlockVector()->DeniesMsaaTextures();
         outBlockVector = pool->GetBlockVector();
 
-        outCommittedAllocationParams.m_ProtectedSession = pool->GetDesc().pProtectedSession;
-        outCommittedAllocationParams.m_HeapProperties = pool->GetDesc().HeapProperties;
-        outCommittedAllocationParams.m_HeapFlags = pool->GetDesc().HeapFlags;
+        const auto& desc = pool->GetDesc();
+        outCommittedAllocationParams.m_ProtectedSession = desc.pProtectedSession;
+        outCommittedAllocationParams.m_HeapProperties = desc.HeapProperties;
+        outCommittedAllocationParams.m_HeapFlags = desc.HeapFlags;
         outCommittedAllocationParams.m_List = pool->GetCommittedAllocationList();
     }
     else
@@ -9138,8 +9139,8 @@ bool DefragmentationContextPimpl::IncrementCounters(UINT64 bytes)
     // Early return when max found
     if (++m_PassStats.AllocationsMoved >= m_MaxPassAllocations || m_PassStats.BytesMoved >= m_MaxPassBytes)
     {
-        D3D12MA_ASSERT(m_PassStats.AllocationsMoved == m_MaxPassAllocations ||
-            m_PassStats.BytesMoved == m_MaxPassBytes && "Exceeded maximal pass threshold!");
+        D3D12MA_ASSERT((m_PassStats.AllocationsMoved == m_MaxPassAllocations ||
+            m_PassStats.BytesMoved == m_MaxPassBytes) && "Exceeded maximal pass threshold!");
         return true;
     }
     return false;
@@ -9719,6 +9720,7 @@ Allocation::Allocation(AllocatorPimpl* allocator, UINT64 size, UINT64 alignment,
     m_Size{ size },
     m_Alignment{ alignment },
     m_Resource{ NULL },
+    m_pPrivateData{ NULL },
     m_Name{ NULL }
 {
     D3D12MA_ASSERT(allocator);
