@@ -9470,8 +9470,8 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc)
         desc.MinBlockCount, maxBlockCount,
         explicitBlockSize,
         D3D12MA_MAX(desc.MinAllocationAlignment, (UINT64)D3D12MA_DEBUG_ALIGNMENT),
-        desc.Flags & POOL_FLAG_ALGORITHM_MASK,
-        desc.Flags & POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED,
+        (desc.Flags & POOL_FLAG_ALGORITHM_MASK) != 0,
+        (desc.Flags & POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0,
         desc.pProtectedSession);
 }
 
