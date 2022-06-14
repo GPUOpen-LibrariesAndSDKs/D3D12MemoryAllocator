@@ -3010,10 +3010,10 @@ void BlockMetadata::PrintDetailedMap_Begin(JsonWriter& json,
     json.WriteNumber(unusedBytes);
 
     json.WriteString(L"Allocations");
-    json.WriteNumber(allocationCount);
+    json.WriteNumber((UINT64)allocationCount);
 
     json.WriteString(L"UnusedRanges");
-    json.WriteNumber(unusedRangeCount);
+    json.WriteNumber((UINT64)unusedRangeCount);
 
     json.WriteString(L"Suballocations");
     json.BeginArray();
@@ -7191,11 +7191,11 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                 json.WriteString(m_AdapterDesc.Description);
 
                 json.WriteString(L"DedicatedVideoMemory");
-                json.WriteNumber(m_AdapterDesc.DedicatedVideoMemory);
+                json.WriteNumber((UINT64)m_AdapterDesc.DedicatedVideoMemory);
                 json.WriteString(L"DedicatedSystemMemory");
-                json.WriteNumber(m_AdapterDesc.DedicatedSystemMemory);
+                json.WriteNumber((UINT64)m_AdapterDesc.DedicatedSystemMemory);
                 json.WriteString(L"SharedSystemMemory");
-                json.WriteNumber(m_AdapterDesc.SharedSystemMemory);
+                json.WriteNumber((UINT64)m_AdapterDesc.SharedSystemMemory);
                 
                 json.WriteString(L"ResourceHeapTier");
                 json.WriteNumber(static_cast<UINT>(m_D3D12Options.ResourceHeapTier));
