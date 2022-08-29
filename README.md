@@ -109,5 +109,6 @@ For more information see [NOTICES.txt](NOTICES.txt).
 
 # See also
 
+- **[Vcpkg](https://github.com/Microsoft/vcpkg)** dependency manager from Microsoft offers a port of this library that is easy to install.
 - **[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/)** - equivalent library for Vulkan. License: MIT.
 - **[TerraFX.Interop.D3D12MemoryAllocator](https://github.com/terrafx/terrafx.interop.d3d12memoryallocator)** - interop bindings for this library for C#, as used by [TerraFX](https://github.com/terrafx/terrafx). License: MIT.
