@@ -8185,7 +8185,7 @@ NormalBlock::~NormalBlock()
 {
     if (m_pMetadata != NULL)
     {
-        // Define macro VMA_DEBUG_LOG to receive the list of the unfreed allocations
+        // Define macro D3D12MA_DEBUG_LOG to receive the list of the unfreed allocations.
         if (!m_pMetadata->IsEmpty())
             m_pMetadata->DebugLogAllAllocations();
 
