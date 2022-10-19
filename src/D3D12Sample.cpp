@@ -795,6 +795,7 @@ static void InitD3D() // initializes direct3d 12
         IID_PPV_ARGS(&g_DepthStencilBuffer)
     ) );
     CHECK_HR( g_DepthStencilBuffer->SetName(L"Depth/Stencil Resource Heap") );
+    g_DepthStencilAllocation->SetName(L"Depth/Stencil Resource Heap");
 
     D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
     depthStencilDesc.Format = DEPTH_STENCIL_FORMAT;
@@ -917,6 +918,7 @@ static void InitD3D() // initializes direct3d 12
             &g_ConstantBufferUploadAllocation[i],
             IID_PPV_ARGS(&g_ConstantBufferUploadHeap[i])) );
         g_ConstantBufferUploadHeap[i]->SetName(L"Constant Buffer Upload Resource Heap");
+        g_ConstantBufferUploadAllocation[i]->SetName(L"Constant Buffer Upload Resource Heap");
 
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
         cbvDesc.BufferLocation = g_ConstantBufferUploadHeap[i]->GetGPUVirtualAddress();
@@ -1045,6 +1047,7 @@ static void InitD3D() // initializes direct3d 12
 
     // we can give resource heaps a name so when we debug with the graphics debugger we know what resource we are looking at
     g_VertexBuffer->SetName(L"Vertex Buffer Resource Heap");
+    g_VertexBufferAllocation->SetName(L"Vertex Buffer Resource Heap");
 
     // create upload heap
     // upload heaps are used to upload data to the GPU. CPU can write to it, GPU can read from it
@@ -1073,6 +1076,7 @@ static void InitD3D() // initializes direct3d 12
         &vBufferUploadHeapAllocation,
         IID_PPV_ARGS(&vBufferUploadHeap)) );
     vBufferUploadHeap->SetName(L"Vertex Buffer Upload Resource Heap");
+    vBufferUploadHeapAllocation->SetName(L"Vertex Buffer Upload Resource Heap");
 
     // store vertex buffer in upload heap
     D3D12_SUBRESOURCE_DATA vertexData = {};
@@ -1154,6 +1158,7 @@ static void InitD3D() // initializes direct3d 12
 
     // we can give resource heaps a name so when we debug with the graphics debugger we know what resource we are looking at
     g_IndexBuffer->SetName(L"Index Buffer Resource Heap");
+    g_IndexBufferAllocation->SetName(L"Index Buffer Resource Heap");
 
     // create upload heap to upload index buffer
     D3D12MA::ALLOCATION_DESC iBufferUploadAllocDesc = {};
@@ -1180,6 +1185,7 @@ static void InitD3D() // initializes direct3d 12
         &iBufferUploadHeapAllocation,
         IID_PPV_ARGS(&iBufferUploadHeap)) );
     CHECK_HR( iBufferUploadHeap->SetName(L"Index Buffer Upload Resource Heap") );
+    iBufferUploadHeapAllocation->SetName(L"Index Buffer Upload Resource Heap");
 
     // store vertex buffer in upload heap
     D3D12_SUBRESOURCE_DATA indexData = {};
@@ -1236,6 +1242,7 @@ static void InitD3D() // initializes direct3d 12
             &g_CbPerObjectUploadHeapAllocations[i],
             IID_PPV_ARGS(&g_CbPerObjectUploadHeaps[i])) );
         g_CbPerObjectUploadHeaps[i]->SetName(L"Constant Buffer Upload Resource Heap");
+        g_CbPerObjectUploadHeapAllocations[i]->SetName(L"Constant Buffer Upload Resource Heap");
 
         CHECK_HR( g_CbPerObjectUploadHeaps[i]->Map(0, &EMPTY_RANGE, &g_CbPerObjectAddress[i]) );
     }
@@ -1298,6 +1305,7 @@ static void InitD3D() // initializes direct3d 12
         &g_TextureAllocation,
         IID_PPV_ARGS(&g_Texture)) );
     g_Texture->SetName(L"g_Texture");
+    g_TextureAllocation->SetName(L"g_Texture");
 
     UINT64 textureUploadBufferSize;
     device->GetCopyableFootprints(
@@ -1334,6 +1342,7 @@ static void InitD3D() // initializes direct3d 12
         &textureUploadAllocation,
         IID_PPV_ARGS(&textureUpload)) );
     textureUpload->SetName(L"textureUpload");
+    textureUploadAllocation->SetName(L"textureUpload");
 
     D3D12_SUBRESOURCE_DATA textureSubresourceData = {};
     textureSubresourceData.pData = imageData.data();
