@@ -10272,11 +10272,13 @@ void VirtualBlock::BuildStatsString(WCHAR** ppStatsString) const
 
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
 
-        StringBuilder sb(m_Pimpl->m_AllocationCallbacks);
+    StringBuilder sb(m_Pimpl->m_AllocationCallbacks);
     {
         JsonWriter json(m_Pimpl->m_AllocationCallbacks, sb);
         D3D12MA_HEAVY_ASSERT(m_Pimpl->m_Metadata->Validate());
+        json.BeginObject();
         m_Pimpl->m_Metadata->WriteAllocationInfoToJson(json);
+        json.EndObject();
     } // Scope for JsonWriter
 
     const size_t length = sb.GetLength();
