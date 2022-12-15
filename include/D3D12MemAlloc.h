@@ -933,7 +933,7 @@ struct POOL_DESC
     allocate with D3D12MA::ALLOCATION_FLAG_COMMITTED and call
     `ID3D12Device1::SetResidencyPriority`, passing `allocation->GetResource()`.
     */
-    D3D12_RESIDENCY_PRIORITY Priority;
+    D3D12_RESIDENCY_PRIORITY ResidencyPriority;
 };
 
 /** \brief Custom memory pool

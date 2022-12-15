@@ -6032,7 +6032,7 @@ public:
         UINT32 algorithm,
         bool denyMsaaTextures,
         ID3D12ProtectedResourceSession* pProtectedSession,
-        D3D12_RESIDENCY_PRIORITY priority);
+        D3D12_RESIDENCY_PRIORITY residencyPriority);
     ~BlockVector();
     D3D12_RESIDENCY_PRIORITY GetResidencyPriority() const { return m_ResidencyPriority; }
 
@@ -6723,7 +6723,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             0, // Default algorithm,
             m_MsaaAlwaysCommitted,
             NULL, // pProtectedSession
-            D3D12_RESIDENCY_PRIORITY_NONE); // priority
+            D3D12_RESIDENCY_PRIORITY_NONE); // residencyPriority
         // No need to call m_pBlockVectors[i]->CreateMinBlocks here, becase minBlockCount is 0.
     }
 
@@ -7866,7 +7866,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         outCommittedAllocationParams.m_HeapProperties = desc.HeapProperties;
         outCommittedAllocationParams.m_HeapFlags = desc.HeapFlags;
         outCommittedAllocationParams.m_List = pool->GetCommittedAllocationList();
-        outCommittedAllocationParams.m_ResidencyPriority = pool->GetDesc().Priority;
+        outCommittedAllocationParams.m_ResidencyPriority = pool->GetDesc().ResidencyPriority;
     }
     else
     {
@@ -8363,7 +8363,7 @@ BlockVector::BlockVector(
     UINT32 algorithm,
     bool denyMsaaTextures,
     ID3D12ProtectedResourceSession* pProtectedSession,
-    D3D12_RESIDENCY_PRIORITY priority)
+    D3D12_RESIDENCY_PRIORITY residencyPriority)
     : m_hAllocator(hAllocator),
     m_HeapProps(heapProps),
     m_HeapFlags(heapFlags),
@@ -8375,7 +8375,7 @@ BlockVector::BlockVector(
     m_Algorithm(algorithm),
     m_DenyMsaaTextures(denyMsaaTextures),
     m_ProtectedSession(pProtectedSession),
-    m_ResidencyPriority(priority),
+    m_ResidencyPriority(residencyPriority),
     m_HasEmptyBlock(false),
     m_Blocks(hAllocator->GetAllocs()),
     m_NextBlockId(0) {}
@@ -9576,7 +9576,7 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc)
         (desc.Flags & POOL_FLAG_ALGORITHM_MASK) != 0,
         (desc.Flags & POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0,
         desc.pProtectedSession,
-        desc.Priority);
+        desc.ResidencyPriority);
 }
 
 PoolPimpl::~PoolPimpl()

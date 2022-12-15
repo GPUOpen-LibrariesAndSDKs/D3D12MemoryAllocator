@@ -906,7 +906,7 @@ static void TestCustomPools(const TestContext& ctx)
     poolDesc.BlockSize = 11 * MEGABYTE;
     poolDesc.MinBlockCount = 1;
     poolDesc.MaxBlockCount = 2;
-    poolDesc.Priority = D3D12_RESIDENCY_PRIORITY_HIGH; // Test some residency priority, by the way.
+    poolDesc.ResidencyPriority = D3D12_RESIDENCY_PRIORITY_HIGH; // Test some residency priority, by the way.
 
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &pool) );
