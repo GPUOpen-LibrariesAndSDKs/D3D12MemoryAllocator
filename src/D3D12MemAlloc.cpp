@@ -148,6 +148,8 @@ static const WCHAR* const HeapTypeNames[] =
 static const D3D12_HEAP_FLAGS RESOURCE_CLASS_HEAP_FLAGS =
     D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES;
 
+static const D3D12_RESIDENCY_PRIORITY D3D12_RESIDENCY_PRIORITY_NONE = D3D12_RESIDENCY_PRIORITY(0);
+
 #ifndef _D3D12MA_ENUM_DECLARATIONS
 
 // Local copy of this enum, as it is provided only by <dxgi1_4.h>, so it may not be available.
@@ -6000,6 +6002,7 @@ struct CommittedAllocationParameters
     D3D12_HEAP_FLAGS m_HeapFlags = D3D12_HEAP_FLAG_NONE;
     ID3D12ProtectedResourceSession* m_ProtectedSession = NULL;
     bool m_CanAlias = false;
+    D3D12_RESIDENCY_PRIORITY m_ResidencyPriority = D3D12_RESIDENCY_PRIORITY_NONE;
 
     bool IsValid() const { return m_List != NULL; }
 };
@@ -6028,8 +6031,10 @@ public:
         UINT64 minAllocationAlignment,
         UINT32 algorithm,
         bool denyMsaaTextures,
-        ID3D12ProtectedResourceSession* pProtectedSession);
+        ID3D12ProtectedResourceSession* pProtectedSession,
+        D3D12_RESIDENCY_PRIORITY priority);
     ~BlockVector();
+    D3D12_RESIDENCY_PRIORITY GetResidencyPriority() const { return m_ResidencyPriority; }
 
     const D3D12_HEAP_PROPERTIES& GetHeapProperties() const { return m_HeapProps; }
     D3D12_HEAP_FLAGS GetHeapFlags() const { return m_HeapFlags; }
@@ -6095,6 +6100,7 @@ private:
     const UINT32 m_Algorithm;
     const bool m_DenyMsaaTextures;
     ID3D12ProtectedResourceSession* const m_ProtectedSession;
+    const D3D12_RESIDENCY_PRIORITY m_ResidencyPriority;
     /* There can be at most one allocation that is completely empty - a
     hysteresis to avoid pessimistic case of alternating creation and destruction
     of a ID3D12Heap. */
@@ -6417,6 +6423,9 @@ public:
     ~AllocatorPimpl();
 
     ID3D12Device* GetDevice() const { return m_Device; }
+#ifdef __ID3D12Device1_INTERFACE_DEFINED__
+    ID3D12Device1* GetDevice1() const { return m_Device1; }
+#endif
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     ID3D12Device4* GetDevice4() const { return m_Device4; }
 #endif
@@ -6501,6 +6510,8 @@ public:
     // Allocation object must be deleted externally afterwards.
     void FreeHeapMemory(Allocation* allocation);
 
+    void SetResidencyPriority(ID3D12Pageable* obj, D3D12_RESIDENCY_PRIORITY priority) const;
+
     void SetCurrentFrameIndex(UINT frameIndex);
     // For more deailed stats use outCutomHeaps to access statistics divided into L0 and L1 group
     void CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCutomHeaps[2] = NULL);
@@ -6518,6 +6529,9 @@ private:
     const bool m_AlwaysCommitted;
     const bool m_MsaaAlwaysCommitted;
     ID3D12Device* m_Device; // AddRef
+#ifdef __ID3D12Device1_INTERFACE_DEFINED__
+    ID3D12Device1* m_Device1 = NULL; // AddRef, optional
+#endif
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     ID3D12Device4* m_Device4 = NULL; // AddRef, optional
 #endif
@@ -6643,6 +6657,10 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
     desc.pAdapter->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Adapter3));
 #endif
 
+#ifdef __ID3D12Device1_INTERFACE_DEFINED__
+    m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device1));
+#endif
+
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device4));
 #endif
@@ -6704,7 +6722,8 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             D3D12MA_DEBUG_ALIGNMENT, // minAllocationAlignment
             0, // Default algorithm,
             m_MsaaAlwaysCommitted,
-            NULL); // pProtectedSession
+            NULL, // pProtectedSession
+            D3D12_RESIDENCY_PRIORITY_NONE); // priority
         // No need to call m_pBlockVectors[i]->CreateMinBlocks here, becase minBlockCount is 0.
     }
 
@@ -6722,6 +6741,9 @@ AllocatorPimpl::~AllocatorPimpl()
 #endif
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
     SAFE_RELEASE(m_Device4);
+#endif
+#ifdef __ID3D12Device1_INTERFACE_DEFINED__
+    SAFE_RELEASE(m_Device1);
 #endif
 #if D3D12MA_DXGI_1_4
     SAFE_RELEASE(m_Adapter3);
@@ -7040,6 +7062,17 @@ void AllocatorPimpl::FreeHeapMemory(Allocation* allocation)
     const UINT64 allocSize = allocation->GetSize();
     m_Budget.RemoveAllocation(memSegmentGroup, allocSize);
     m_Budget.RemoveBlock(memSegmentGroup, allocSize);
+}
+
+void AllocatorPimpl::SetResidencyPriority(ID3D12Pageable* obj, D3D12_RESIDENCY_PRIORITY priority) const
+{
+#ifdef __ID3D12Device1_INTERFACE_DEFINED__
+    if (priority != D3D12_RESIDENCY_PRIORITY_NONE && m_Device1)
+    {
+        // Intentionally ignoring the result.
+        m_Device1->SetResidencyPriority(1, &obj, &priority);
+    }
+#endif
 }
 
 void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
@@ -7642,6 +7675,8 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
 
     if (SUCCEEDED(hr))
     {
+        SetResidencyPriority(res, committedAllocParams.m_ResidencyPriority);
+
         if (ppvResource != NULL)
         {
             hr = res->QueryInterface(riidResource, ppvResource);
@@ -7794,6 +7829,8 @@ HRESULT AllocatorPimpl::AllocateHeap(
 
     if (SUCCEEDED(hr))
     {
+        SetResidencyPriority(heap, committedAllocParams.m_ResidencyPriority);
+
         const BOOL wasZeroInitialized = TRUE;
         (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes, allocInfo.Alignment, wasZeroInitialized);
         (*ppAllocation)->InitHeap(committedAllocParams.m_List, heap);
@@ -7829,6 +7866,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         outCommittedAllocationParams.m_HeapProperties = desc.HeapProperties;
         outCommittedAllocationParams.m_HeapFlags = desc.HeapFlags;
         outCommittedAllocationParams.m_List = pool->GetCommittedAllocationList();
+        outCommittedAllocationParams.m_ResidencyPriority = pool->GetDesc().Priority;
     }
     else
     {
@@ -7841,6 +7879,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         outCommittedAllocationParams.m_HeapProperties = StandardHeapTypeToHeapProperties(allocDesc.HeapType);
         outCommittedAllocationParams.m_HeapFlags = allocDesc.ExtraHeapFlags;
         outCommittedAllocationParams.m_List = &m_CommittedAllocations[HeapTypeToIndex(allocDesc.HeapType)];
+        // outCommittedAllocationParams.m_ResidencyPriority intentionally left with default value.
 
         const ResourceClass resourceClass = (resDesc != NULL) ?
             ResourceDescToResourceClass(*resDesc) : HeapFlagsToResourceClass(allocDesc.ExtraHeapFlags);
@@ -8072,6 +8111,7 @@ void AllocatorPimpl::WriteBudgetToJson(JsonWriter& json, const Budget& budget)
     }
     json.EndObject();
 }
+
 #endif // _D3D12MA_ALLOCATOR_PIMPL
 #endif // _D3D12MA_ALLOCATOR_PIMPL
 
@@ -8322,7 +8362,8 @@ BlockVector::BlockVector(
     UINT64 minAllocationAlignment,
     UINT32 algorithm,
     bool denyMsaaTextures,
-    ID3D12ProtectedResourceSession* pProtectedSession)
+    ID3D12ProtectedResourceSession* pProtectedSession,
+    D3D12_RESIDENCY_PRIORITY priority)
     : m_hAllocator(hAllocator),
     m_HeapProps(heapProps),
     m_HeapFlags(heapFlags),
@@ -8334,6 +8375,7 @@ BlockVector::BlockVector(
     m_Algorithm(algorithm),
     m_DenyMsaaTextures(denyMsaaTextures),
     m_ProtectedSession(pProtectedSession),
+    m_ResidencyPriority(priority),
     m_HasEmptyBlock(false),
     m_Blocks(hAllocator->GetAllocs()),
     m_NextBlockId(0) {}
@@ -8868,6 +8910,8 @@ HRESULT BlockVector::CreateBlock(
         D3D12MA_DELETE(m_hAllocator->GetAllocs(), pBlock);
         return hr;
     }
+
+    m_hAllocator->SetResidencyPriority(pBlock->GetHeap(), m_ResidencyPriority);
 
     m_Blocks.push_back(pBlock);
     if (pNewBlockIndex != NULL)
@@ -9531,7 +9575,8 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc)
         D3D12MA_MAX(desc.MinAllocationAlignment, (UINT64)D3D12MA_DEBUG_ALIGNMENT),
         (desc.Flags & POOL_FLAG_ALGORITHM_MASK) != 0,
         (desc.Flags & POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0,
-        desc.pProtectedSession);
+        desc.pProtectedSession,
+        desc.Priority);
 }
 
 PoolPimpl::~PoolPimpl()

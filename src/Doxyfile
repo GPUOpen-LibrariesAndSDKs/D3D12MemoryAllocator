@@ -2324,7 +2324,8 @@ INCLUDE_FILE_PATTERNS  =
 # recursively expanded use the := operator instead of the = operator.
 # This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
 
-PREDEFINED             = __ID3D12Device4_INTERFACE_DEFINED__ \
+PREDEFINED             = __ID3D12Device1_INTERFACE_DEFINED__ \
+                         __ID3D12Device4_INTERFACE_DEFINED__ \
                          __ID3D12Device8_INTERFACE_DEFINED__ \
                          protected=private
 

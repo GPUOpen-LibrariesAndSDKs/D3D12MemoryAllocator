@@ -111,6 +111,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a475840ec05c19732c8d5aa8bb27270f4"><td class="memItemLeft" align="right" valign="top">ID3D12ProtectedResourceSession *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a475840ec05c19732c8d5aa8bb27270f4">pProtectedSession</a></td></tr>
 <tr class="memdesc:a475840ec05c19732c8d5aa8bb27270f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Additional parameter allowing pool to create resources with passed protected session.  <a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a475840ec05c19732c8d5aa8bb27270f4">More...</a><br /></td></tr>
 <tr class="separator:a475840ec05c19732c8d5aa8bb27270f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3fd42e9d726c0a9fd846b4c3b73cc488"><td class="memItemLeft" align="right" valign="top">D3D12_RESIDENCY_PRIORITY&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3fd42e9d726c0a9fd846b4c3b73cc488">Priority</a></td></tr>
+<tr class="memdesc:a3fd42e9d726c0a9fd846b4c3b73cc488"><td class="mdescLeft">&#160;</td><td class="mdescRight">Residency priority to be set for all allocations made in this pool. Optional.  <a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3fd42e9d726c0a9fd846b4c3b73cc488">More...</a><br /></td></tr>
+<tr class="separator:a3fd42e9d726c0a9fd846b4c3b73cc488"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p >Parameters of created <a class="el" href="class_d3_d12_m_a_1_1_pool.html" title="Custom memory pool.">D3D12MA::Pool</a> object. To be used with <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aac7b1f6bf53cbf4c4ce2264cb72ca515" title="Creates custom pool.">D3D12MA::Allocator::CreatePool</a>. </p>
@@ -249,6 +252,26 @@ Public Attributes</h2></td></tr>
 
 <p>Additional parameter allowing pool to create resources with passed protected session. </p>
 <p >If not null then all the heaps and committed resources will be created with this parameter. Valid only if ID3D12Device4 interface is present in current Windows SDK! </p>
+
+</div>
+</div>
+<a id="a3fd42e9d726c0a9fd846b4c3b73cc488" name="a3fd42e9d726c0a9fd846b4c3b73cc488"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3fd42e9d726c0a9fd846b4c3b73cc488">&#9670;&#160;</a></span>Priority</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">D3D12_RESIDENCY_PRIORITY D3D12MA::POOL_DESC::Priority</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Residency priority to be set for all allocations made in this pool. Optional. </p>
+<p >Set this parameter to one of the possible enum values e.g. <code>D3D12_RESIDENCY_PRIORITY_HIGH</code> to apply specific residency priority to all allocations made in this pool: <code>ID3D12Heap</code> memory blocks used to sub-allocate for placed resources, as well as committed resources or heaps created when <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a> is used. This can increase/decrease chance that the memory will be pushed out from VRAM to system RAM when the system runs out of memory, which is invisible to the developer using D3D12 API while it can degrade performance.</p>
+<p >Priority is set using function <code>ID3D12Device1::SetResidencyPriority</code>. It is performed only when <code>ID3D12Device1</code> interface is defined and successfully obtained. Otherwise, this parameter is ignored.</p>
+<p >This parameter is optional. If you set it to <code>D3D12_RESIDENCY_PRIORITY(0)</code>, residency priority will not be set for allocations made in this pool.</p>
+<p >There is no equivalent parameter for allocations made in default pools. If you want to set residency priority for such allocation, you need to do it manually: allocate with <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a> and call <code>ID3D12Device1::SetResidencyPriority</code>, passing <code>allocation-&gt;GetResource()</code>. </p>
 
 </div>
 </div>

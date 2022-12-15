@@ -11,5 +11,6 @@ var searchData=
   ['pprotectedsession_8',['pProtectedSession',['../struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a475840ec05c19732c8d5aa8bb27270f4',1,'D3D12MA::POOL_DESC']]],
   ['preferredblocksize_9',['PreferredBlockSize',['../struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#a97149c9559deae943c2cfa49aeeff8a6',1,'D3D12MA::ALLOCATOR_DESC']]],
   ['prev_10',['prev',['../class_d3_d12_m_a_1_1_allocation.html#adc3ac89758a915a409e047f9b89aa160',1,'D3D12MA::Allocation']]],
-  ['psrcallocation_11',['pSrcAllocation',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___m_o_v_e.html#a4946b874c958a71c21fac25b515cf5f7',1,'D3D12MA::DEFRAGMENTATION_MOVE']]]
+  ['priority_11',['Priority',['../struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3fd42e9d726c0a9fd846b4c3b73cc488',1,'D3D12MA::POOL_DESC']]],
+  ['psrcallocation_12',['pSrcAllocation',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___m_o_v_e.html#a4946b874c958a71c21fac25b515cf5f7',1,'D3D12MA::DEFRAGMENTATION_MOVE']]]
 ];

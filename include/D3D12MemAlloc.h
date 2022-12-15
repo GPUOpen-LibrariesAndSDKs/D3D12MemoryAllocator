@@ -133,6 +133,18 @@ If providing your own implementation, you need to implement a subset of std::ato
 // Forward declaration if ID3D12ProtectedResourceSession is not defined inside the headers (older SDK, pre ID3D12Device4)
 struct ID3D12ProtectedResourceSession;
 
+// Define this enum even if SDK doesn't provide it, to simplify the API.
+#ifndef __ID3D12Device1_INTERFACE_DEFINED__
+typedef enum D3D12_RESIDENCY_PRIORITY
+{
+    D3D12_RESIDENCY_PRIORITY_MINIMUM = 0x28000000,
+    D3D12_RESIDENCY_PRIORITY_LOW = 0x50000000,
+    D3D12_RESIDENCY_PRIORITY_NORMAL = 0x78000000,
+    D3D12_RESIDENCY_PRIORITY_HIGH = 0xa0010000,
+    D3D12_RESIDENCY_PRIORITY_MAXIMUM = 0xc8000000
+} D3D12_RESIDENCY_PRIORITY;
+#endif
+
 namespace D3D12MA
 {
 class D3D12MA_API IUnknownImpl : public IUnknown
@@ -899,6 +911,29 @@ struct POOL_DESC
     Valid only if ID3D12Device4 interface is present in current Windows SDK!
     */
     ID3D12ProtectedResourceSession* pProtectedSession;
+    /** \brief Residency priority to be set for all allocations made in this pool. Optional.
+    
+    Set this parameter to one of the possible enum values e.g. `D3D12_RESIDENCY_PRIORITY_HIGH`
+    to apply specific residency priority to all allocations made in this pool:
+    `ID3D12Heap` memory blocks used to sub-allocate for placed resources, as well as
+    committed resources or heaps created when D3D12MA::ALLOCATION_FLAG_COMMITTED is used.
+    This can increase/decrease chance that the memory will be pushed out from VRAM
+    to system RAM when the system runs out of memory, which is invisible to the developer
+    using D3D12 API while it can degrade performance.
+
+    Priority is set using function `ID3D12Device1::SetResidencyPriority`.
+    It is performed only when `ID3D12Device1` interface is defined and successfully obtained.
+    Otherwise, this parameter is ignored.
+
+    This parameter is optional. If you set it to `D3D12_RESIDENCY_PRIORITY(0)`,
+    residency priority will not be set for allocations made in this pool.
+
+    There is no equivalent parameter for allocations made in default pools.
+    If you want to set residency priority for such allocation, you need to do it manually:
+    allocate with D3D12MA::ALLOCATION_FLAG_COMMITTED and call
+    `ID3D12Device1::SetResidencyPriority`, passing `allocation->GetResource()`.
+    */
+    D3D12_RESIDENCY_PRIORITY Priority;
 };
 
 /** \brief Custom memory pool
