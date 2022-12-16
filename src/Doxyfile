@@ -2327,6 +2327,7 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = __ID3D12Device1_INTERFACE_DEFINED__ \
                          __ID3D12Device4_INTERFACE_DEFINED__ \
                          __ID3D12Device8_INTERFACE_DEFINED__ \
+                         __ID3D12Device10_INTERFACE_DEFINED__ \
                          protected=private
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
