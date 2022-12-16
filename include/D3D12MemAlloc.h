@@ -51,7 +51,7 @@ Documentation of all members: D3D12MemAlloc.h
   - [Thread safety](@ref general_considerations_thread_safety)
   - [Versioning and compatibility](@ref general_considerations_versioning_and_compatibility)
   - [Features not supported](@ref general_considerations_features_not_supported)
-		
+        
 \section main_see_also See also
 
 - [Product page on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/)
@@ -1194,22 +1194,22 @@ public:
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
-	/** \brief Similar to Allocator::CreateResource2, but there are initial layout instead of state and 
+    /** \brief Similar to Allocator::CreateResource2, but there are initial layout instead of state and 
     castable formats list
 
-	It internally uses `ID3D12Device10::CreateCommittedResource3` or `ID3D12Device10::CreatePlacedResource2`.
+    It internally uses `ID3D12Device10::CreateCommittedResource3` or `ID3D12Device10::CreatePlacedResource2`.
 
-	To work correctly, `ID3D12Device10` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
-	*/
-	HRESULT CreateResource3(const ALLOCATION_DESC* pAllocDesc,
-		const D3D12_RESOURCE_DESC1* pResourceDesc,
-		D3D12_BARRIER_LAYOUT InitialLayout,
-		const D3D12_CLEAR_VALUE* pOptimizedClearValue,
-		UINT32 NumCastableFormats,
-		DXGI_FORMAT* pCastableFormats,
-		Allocation** ppAllocation,
-		REFIID riidResource,
-		void** ppvResource);
+    To work correctly, `ID3D12Device10` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    */
+    HRESULT CreateResource3(const ALLOCATION_DESC* pAllocDesc,
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
+        D3D12_BARRIER_LAYOUT InitialLayout,
+        const D3D12_CLEAR_VALUE* pOptimizedClearValue,
+        UINT32 NumCastableFormats,
+        DXGI_FORMAT* pCastableFormats,
+        Allocation** ppAllocation,
+        REFIID riidResource,
+        void** ppvResource);
 #endif  // #ifdef __ID3D12Device10_INTERFACE_DEFINED__
 
     /** \brief Allocates memory without creating any resource placed in it.
@@ -1274,32 +1274,32 @@ public:
 
     To work correctly, `ID3D12Device8` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
     */
-	HRESULT CreateAliasingResource1(Allocation* pAllocation,
-		UINT64 AllocationLocalOffset,
-		const D3D12_RESOURCE_DESC1* pResourceDesc,
-		D3D12_RESOURCE_STATES InitialResourceState,
-		const D3D12_CLEAR_VALUE* pOptimizedClearValue,
-		REFIID riidResource,
-		void** ppvResource);
+    HRESULT CreateAliasingResource1(Allocation* pAllocation,
+        UINT64 AllocationLocalOffset,
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
+        const D3D12_CLEAR_VALUE* pOptimizedClearValue,
+        REFIID riidResource,
+        void** ppvResource);
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     /** \brief Similar to Allocator::CreateAliasingResource1, but there are initial layout instead of state and 
     castable formats list
 
-	It internally uses `ID3D12Device10::CreatePlacedResource2`.
+    It internally uses `ID3D12Device10::CreatePlacedResource2`.
 
-	To work correctly, `ID3D12Device10` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
-	*/
+    To work correctly, `ID3D12Device10` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    */
     HRESULT CreateAliasingResource2(Allocation* pAllocation,
-		UINT64 AllocationLocalOffset,
-		const D3D12_RESOURCE_DESC1* pResourceDesc,
-		D3D12_BARRIER_LAYOUT InitialLayout,
-		const D3D12_CLEAR_VALUE* pOptimizedClearValue,
-		UINT32 NumCastableFormats,
-		DXGI_FORMAT* pCastableFormats,
-		REFIID riidResource,
-		void** ppvResource);
+        UINT64 AllocationLocalOffset,
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
+        D3D12_BARRIER_LAYOUT InitialLayout,
+        const D3D12_CLEAR_VALUE* pOptimizedClearValue,
+        UINT32 NumCastableFormats,
+        DXGI_FORMAT* pCastableFormats,
+        REFIID riidResource,
+        void** ppvResource);
 #endif  // #ifdef __ID3D12Device10_INTERFACE_DEFINED__
 
     /** \brief Creates custom pool.
