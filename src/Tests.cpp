@@ -2821,18 +2821,98 @@ static void TestDevice8(const TestContext& ctx)
         &allocPtr0, IID_PPV_ARGS(&res0)));
     CHECK_BOOL(allocPtr0->GetHeap() == NULL);
 
-    // Create a placed buffer
+    // Create a heap and placed buffer in it
 
-    allocDesc.Flags &= ~D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_CAN_ALIAS;
 
     ComPtr<D3D12MA::Allocation> allocPtr1;
     ComPtr<ID3D12Resource> res1;
     CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
         D3D12_RESOURCE_STATE_COMMON, NULL,
         &allocPtr1, IID_PPV_ARGS(&res1)));
-    CHECK_BOOL(allocPtr1->GetHeap()!= NULL);
+    CHECK_BOOL(allocPtr1->GetHeap() != NULL);
+
+    // Create a placed buffer
+
+    allocDesc.Flags &= ~D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+    ComPtr<D3D12MA::Allocation> allocPtr2;
+    ComPtr<ID3D12Resource> res2;
+    CHECK_HR(ctx.allocator->CreateResource2(&allocDesc, &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL,
+        &allocPtr2, IID_PPV_ARGS(&res2)));
+    CHECK_BOOL(allocPtr2->GetHeap()!= NULL);
+
+    // Create an aliasing buffer
+    ComPtr<ID3D12Resource> res3;
+    CHECK_HR(ctx.allocator->CreateAliasingResource1(allocPtr2.Get(), 0, &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL,
+        IID_PPV_ARGS(&res3)));
 }
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
+#ifdef __ID3D12Device10_INTERFACE_DEFINED__
+static void TestDevice10(const TestContext& ctx)
+{
+    wprintf(L"Test ID3D12Device10\n");
+
+    ComPtr<ID3D12Device10> dev10;
+    CHECK_HR(ctx.device->QueryInterface(IID_PPV_ARGS(&dev10)));
+
+    D3D12_RESOURCE_DESC1 resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Width = 1920;
+    resourceDesc.Height = 1080;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    // Create a committed texture
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+    ComPtr<D3D12MA::Allocation> allocPtr0;
+    ComPtr<ID3D12Resource> res0;
+    CHECK_HR(ctx.allocator->CreateResource3(&allocDesc, &resourceDesc,
+        D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, 0, NULL,
+        &allocPtr0, IID_PPV_ARGS(&res0)));
+    CHECK_BOOL(allocPtr0->GetHeap() == NULL);
+
+    // Create a heap and placed texture in it
+
+    allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_CAN_ALIAS;
+
+    ComPtr<D3D12MA::Allocation> allocPtr1;
+    ComPtr<ID3D12Resource> res1;
+    CHECK_HR(ctx.allocator->CreateResource3(&allocDesc, &resourceDesc,
+        D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, 0, NULL,
+        &allocPtr1, IID_PPV_ARGS(&res1)));
+    CHECK_BOOL(allocPtr1->GetHeap() != NULL);
+
+    // Create a placed texture
+
+    allocDesc.Flags &= ~D3D12MA::ALLOCATION_FLAG_COMMITTED;
+
+    ComPtr<D3D12MA::Allocation> allocPtr2;
+    ComPtr<ID3D12Resource> res2;
+    CHECK_HR(ctx.allocator->CreateResource3(&allocDesc, &resourceDesc,
+        D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, 0, NULL,
+        &allocPtr2, IID_PPV_ARGS(&res2)));
+    CHECK_BOOL(allocPtr2->GetHeap() != NULL);
+
+    // Create an aliasing texture
+    ComPtr<ID3D12Resource> res3;
+    CHECK_HR(ctx.allocator->CreateAliasingResource2(allocPtr2.Get(), 0, &resourceDesc,
+        D3D12_BARRIER_LAYOUT_UNDEFINED, NULL, 0, NULL,
+        IID_PPV_ARGS(&res3)));
+}
+#endif // #ifdef __ID3D12Device10_INTERFACE_DEFINED__
 
 static void TestVirtualBlocks(const TestContext& ctx)
 {
@@ -4095,6 +4175,9 @@ static void TestGroupBasics(const TestContext& ctx)
 #endif
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     TestDevice8(ctx);
+#endif
+#ifdef __ID3D12Device10_INTERFACE_DEFINED__
+    TestDevice10(ctx);
 #endif
 
     FILE* file;
