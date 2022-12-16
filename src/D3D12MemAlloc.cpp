@@ -6016,7 +6016,7 @@ struct CREATE_RESOURCE_PARAMS
         const D3D12_RESOURCE_DESC* pResourceDesc, 
         D3D12_RESOURCE_STATES InitialResourceState, 
         const D3D12_CLEAR_VALUE* pOptimizedClearValue)
-        : variant(VARIANT_WITH_STATE)
+        : Variant(VARIANT_WITH_STATE)
         , pResourceDesc(pResourceDesc)
         , InitialResourceState(InitialResourceState)
         , pOptimizedClearValue(pOptimizedClearValue)
@@ -6027,7 +6027,7 @@ struct CREATE_RESOURCE_PARAMS
         const D3D12_RESOURCE_DESC1* pResourceDesc, 
         D3D12_RESOURCE_STATES InitialResourceState, 
         const D3D12_CLEAR_VALUE* pOptimizedClearValue)
-        : variant(VARIANT_WITH_STATE_AND_DESC1)
+        : Variant(VARIANT_WITH_STATE_AND_DESC1)
         , pResourceDesc1(pResourceDesc)
         , InitialResourceState(InitialResourceState)
         , pOptimizedClearValue(pOptimizedClearValue)
@@ -6041,7 +6041,7 @@ struct CREATE_RESOURCE_PARAMS
         const D3D12_CLEAR_VALUE* pOptimizedClearValue,
         UINT32 NumCastableFormats,
         DXGI_FORMAT* pCastableFormats)
-        : variant(VARIANT_WITH_LAYOUT)
+        : Variant(VARIANT_WITH_LAYOUT)
         , pResourceDesc1(pResourceDesc)
         , InitialLayout(InitialLayout)
         , pOptimizedClearValue(pOptimizedClearValue)
@@ -6055,15 +6055,69 @@ struct CREATE_RESOURCE_PARAMS
     {
         VARIANT_INVALID = 0,
         VARIANT_WITH_STATE,
-#ifdef __ID3D12Device8_INTERFACE_DEFINED__
         VARIANT_WITH_STATE_AND_DESC1,
-#endif
-#ifdef __ID3D12Device10_INTERFACE_DEFINED__
         VARIANT_WITH_LAYOUT
-#endif
     };
 
-    VARIANT variant = VARIANT_INVALID;
+    VARIANT Variant = VARIANT_INVALID;
+
+    const D3D12_RESOURCE_DESC* GetResourceDesc() const
+    {
+        D3D12MA_ASSERT(Variant == VARIANT_WITH_STATE);
+        return pResourceDesc;
+    }
+    const D3D12_RESOURCE_DESC*& AccessResourceDesc()
+    {
+        D3D12MA_ASSERT(Variant == VARIANT_WITH_STATE);
+        return pResourceDesc;
+    }
+    const D3D12_RESOURCE_DESC* GetBaseResourceDesc() const
+    {
+        // D3D12_RESOURCE_DESC1 can be cast to D3D12_RESOURCE_DESC by discarding the new members at the end.
+        return pResourceDesc;
+    }
+    D3D12_RESOURCE_STATES GetInitialResourceState() const
+    {
+        D3D12MA_ASSERT(Variant < VARIANT_WITH_LAYOUT);
+        return InitialResourceState;
+    }
+    const D3D12_CLEAR_VALUE* GetOptimizedClearValue() const
+    {
+        return pOptimizedClearValue;
+    }
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    const D3D12_RESOURCE_DESC1* GetResourceDesc1() const
+    {
+        D3D12MA_ASSERT(Variant >= VARIANT_WITH_STATE_AND_DESC1);
+        return pResourceDesc1;
+    }
+    const D3D12_RESOURCE_DESC1*& AccessResourceDesc1()
+    {
+        D3D12MA_ASSERT(Variant >= VARIANT_WITH_STATE_AND_DESC1);
+        return pResourceDesc1;
+    }
+#endif
+
+#ifdef __ID3D12Device10_INTERFACE_DEFINED__
+    D3D12_BARRIER_LAYOUT GetInitialLayout() const
+    {
+        D3D12MA_ASSERT(Variant >= VARIANT_WITH_LAYOUT);
+        return InitialLayout;
+    }
+    UINT32 GetNumCastableFormats() const
+    {
+        D3D12MA_ASSERT(Variant >= VARIANT_WITH_LAYOUT);
+        return NumCastableFormats;
+    }
+    DXGI_FORMAT* GetCastableFormats() const
+    {
+        D3D12MA_ASSERT(Variant >= VARIANT_WITH_LAYOUT);
+        return pCastableFormats;
+    }
+#endif
+
+private:
     union
     {
         const D3D12_RESOURCE_DESC* pResourceDesc;
@@ -6874,35 +6928,35 @@ HRESULT AllocatorPimpl::CreatePlacedResourceWrap(
     void** ppvResource)
 {
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
     {
         if (!m_Device10)
         {
             return E_NOINTERFACE;
         }
         return m_Device10->CreatePlacedResource2(pHeap, HeapOffset,
-            createParams.pResourceDesc1, createParams.InitialLayout,
-            createParams.pOptimizedClearValue, createParams.NumCastableFormats, 
-            createParams.pCastableFormats, riidResource, ppvResource);
+            createParams.GetResourceDesc1(), createParams.GetInitialLayout(),
+            createParams.GetOptimizedClearValue(), createParams.GetNumCastableFormats(),
+            createParams.GetCastableFormats(), riidResource, ppvResource);
     } else
 #endif
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
         if (!m_Device8)
         {
             return E_NOINTERFACE;
         }
         return m_Device8->CreatePlacedResource1(pHeap, HeapOffset,
-            createParams.pResourceDesc1, createParams.InitialResourceState,
-            createParams.pOptimizedClearValue, riidResource, ppvResource);
+            createParams.GetResourceDesc1(), createParams.GetInitialResourceState(),
+            createParams.GetOptimizedClearValue(), riidResource, ppvResource);
     } else 
 #endif
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
     {
         return m_Device->CreatePlacedResource(pHeap, HeapOffset,
-            createParams.pResourceDesc, createParams.InitialResourceState,
-            createParams.pOptimizedClearValue, riidResource, ppvResource);
+            createParams.GetResourceDesc(), createParams.GetInitialResourceState(),
+            createParams.GetOptimizedClearValue(), riidResource, ppvResource);
     }
     else
     {
@@ -6919,7 +6973,7 @@ HRESULT AllocatorPimpl::CreateResource(
     REFIID riidResource,
     void** ppvResource)
 {
-    D3D12MA_ASSERT(pAllocDesc && createParams.pResourceDesc && ppAllocation);
+    D3D12MA_ASSERT(pAllocDesc && createParams.GetBaseResourceDesc() && ppAllocation);
 
     *ppAllocation = NULL;
     if (ppvResource)
@@ -6933,33 +6987,33 @@ HRESULT AllocatorPimpl::CreateResource(
     D3D12_RESOURCE_DESC1 finalResourceDesc1;
 #endif
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo;
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
     {
-        finalResourceDesc = *createParams.pResourceDesc;
-        finalCreateParams.pResourceDesc = &finalResourceDesc;
+        finalResourceDesc = *createParams.GetResourceDesc();
+        finalCreateParams.AccessResourceDesc() = &finalResourceDesc;
         resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    else if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
+    else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
         if (!m_Device8)
         {
             return E_NOINTERFACE;
         }
-        finalResourceDesc1 = *createParams.pResourceDesc1;
-        finalCreateParams.pResourceDesc1 = &finalResourceDesc1;
+        finalResourceDesc1 = *createParams.GetResourceDesc1();
+        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
         resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
-    else if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
+    else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
     {
         if (!m_Device10)
         {
             return E_NOINTERFACE;
         }
-        finalResourceDesc1 = *createParams.pResourceDesc1;
-        finalCreateParams.pResourceDesc1 = &finalResourceDesc1;
+        finalResourceDesc1 = *createParams.GetResourceDesc1();
+        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
         resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
@@ -6974,9 +7028,22 @@ HRESULT AllocatorPimpl::CreateResource(
     BlockVector* blockVector = NULL;
     CommittedAllocationParameters committedAllocationParams = {};
     bool preferCommitted = false;
-    HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
-        createParams.pResourceDesc,
-        blockVector, committedAllocationParams, preferCommitted);
+    
+    HRESULT hr;
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    if (createParams.Variant >= CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
+    {
+        hr = CalcAllocationParams<D3D12_RESOURCE_DESC1>(*pAllocDesc, resAllocInfo.SizeInBytes,
+            createParams.GetResourceDesc1(),
+            blockVector, committedAllocationParams, preferCommitted);
+    }
+    else
+#endif
+    {
+        hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
+            createParams.GetResourceDesc(),
+            blockVector, committedAllocationParams, preferCommitted);
+    }
     if (FAILED(hr))
         return hr;
 
@@ -7064,33 +7131,33 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
     D3D12_RESOURCE_DESC1 finalResourceDesc1;
 #endif
     D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo;
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
     {
-        finalResourceDesc = *createParams.pResourceDesc;
-        finalCreateParams.pResourceDesc = &finalResourceDesc;
+        finalResourceDesc = *createParams.GetResourceDesc();
+        finalCreateParams.AccessResourceDesc() = &finalResourceDesc;
         resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    else if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
+    else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
         if (!m_Device8)
         {
             return E_NOINTERFACE;
         }
-        finalResourceDesc1 = *createParams.pResourceDesc1;
-        finalCreateParams.pResourceDesc1 = &finalResourceDesc1;
+        finalResourceDesc1 = *createParams.GetResourceDesc1();
+        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
         resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
-    else if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
+    else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
     {
         if (!m_Device10)
         {
             return E_NOINTERFACE;
         }
-        finalResourceDesc1 = *createParams.pResourceDesc1;
-        finalCreateParams.pResourceDesc1 = &finalResourceDesc1;
+        finalResourceDesc1 = *createParams.GetResourceDesc1();
+        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
         resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
@@ -7713,7 +7780,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
                     hr = res->QueryInterface(riidResource, ppvResource);
                 if (SUCCEEDED(hr))
                 {
-                    (*ppAllocation)->SetResourcePointer(res, createParams.pResourceDesc);
+                    (*ppAllocation)->SetResourcePointer(res, createParams.GetBaseResourceDesc());
                     return hr;
                 }
                 res->Release();
@@ -7741,7 +7808,7 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
     */
 
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
     {
         if (!m_Device10)
         {
@@ -7750,14 +7817,14 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         hr = m_Device10->CreateCommittedResource3(
                 &committedAllocParams.m_HeapProperties,
                 committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
-                createParams.pResourceDesc1, createParams.InitialLayout,
-                createParams.pOptimizedClearValue, committedAllocParams.m_ProtectedSession, 
-                createParams.NumCastableFormats, createParams.pCastableFormats,
+                createParams.GetResourceDesc1(), createParams.GetInitialLayout(),
+                createParams.GetOptimizedClearValue(), committedAllocParams.m_ProtectedSession,
+                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(),
                 D3D12MA_IID_PPV_ARGS(&res));
     } else
 #endif
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
         if (!m_Device8)
         {
@@ -7766,12 +7833,12 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         hr = m_Device8->CreateCommittedResource2(
                 &committedAllocParams.m_HeapProperties,
                 committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
-                createParams.pResourceDesc1, createParams.InitialResourceState,
-                createParams.pOptimizedClearValue, committedAllocParams.m_ProtectedSession,
+                createParams.GetResourceDesc1(), createParams.GetInitialResourceState(),
+                createParams.GetOptimizedClearValue(), committedAllocParams.m_ProtectedSession,
                 D3D12MA_IID_PPV_ARGS(&res));
     } else
 #endif
-    if (createParams.variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
+    if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
     {
 #ifdef __ID3D12Device4_INTERFACE_DEFINED__
         if (m_Device4)
@@ -7779,8 +7846,8 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
                 hr = m_Device4->CreateCommittedResource1(
                     &committedAllocParams.m_HeapProperties,
                     committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
-                    createParams.pResourceDesc, createParams.InitialResourceState,
-                    createParams.pOptimizedClearValue, committedAllocParams.m_ProtectedSession, 
+                    createParams.GetResourceDesc(), createParams.GetInitialResourceState(),
+                    createParams.GetOptimizedClearValue(), committedAllocParams.m_ProtectedSession,
                     D3D12MA_IID_PPV_ARGS(&res));
         }
         else
@@ -7791,8 +7858,8 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
                 hr = m_Device->CreateCommittedResource(
                     &committedAllocParams.m_HeapProperties,
                     committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
-                    createParams.pResourceDesc, createParams.InitialResourceState,
-                    createParams.pOptimizedClearValue, D3D12MA_IID_PPV_ARGS(&res));
+                    createParams.GetResourceDesc(), createParams.GetInitialResourceState(),
+                    createParams.GetOptimizedClearValue(), D3D12MA_IID_PPV_ARGS(&res));
             }
             else
                 hr = E_NOINTERFACE;
@@ -7815,9 +7882,10 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         if (SUCCEEDED(hr))
         {
             const BOOL wasZeroInitialized = TRUE;
-            Allocation* alloc = m_AllocationObjectAllocator.Allocate(this, resourceSize, createParams.pResourceDesc->Alignment, wasZeroInitialized);
+            Allocation* alloc = m_AllocationObjectAllocator.Allocate(
+                this, resourceSize, createParams.GetBaseResourceDesc()->Alignment, wasZeroInitialized);
             alloc->InitCommitted(committedAllocParams.m_List);
-            alloc->SetResourcePointer(res, createParams.pResourceDesc);
+            alloc->SetResourcePointer(res, createParams.GetBaseResourceDesc());
             alloc->SetPrivateData(pPrivateData);
 
             *ppAllocation = alloc;
@@ -8578,7 +8646,7 @@ HRESULT BlockVector::CreateResource(
             }
             if (SUCCEEDED(hr))
             {
-                (*ppAllocation)->SetResourcePointer(res, createParams.pResourceDesc);
+                (*ppAllocation)->SetResourcePointer(res, createParams.GetBaseResourceDesc());
             }
             else
             {
