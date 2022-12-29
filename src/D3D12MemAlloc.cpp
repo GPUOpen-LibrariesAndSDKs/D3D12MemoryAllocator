@@ -128,6 +128,10 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 
 #define D3D12MA_IID_PPV_ARGS(ppType)   __uuidof(**(ppType)), reinterpret_cast<void**>(ppType)
 
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    #define D3D12MA_CREATE_NOT_ZEROED_AVAILABLE 1
+#endif
+
 namespace D3D12MA
 {
 static constexpr UINT HEAP_TYPE_COUNT = 4;
@@ -2854,7 +2858,7 @@ struct AllocationRequest
     UINT64 sumFreeSize; // Sum size of free items that overlap with proposed allocation.
     UINT64 sumItemSize; // Sum size of items to make lost that overlap with proposed allocation.
     SuballocationList::iterator item;
-    BOOL zeroInitialized;
+    BOOL zeroInitialized = FALSE; // TODO Implement proper handling in TLSF and Linear, using ZeroInitializedRange class.
 };
 #endif // _D3D12MA_ALLOCATION_REQUEST
 
@@ -6812,7 +6816,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         D3D12_HEAP_FLAGS heapFlags;
         CalcDefaultPoolParams(heapProps.Type, heapFlags, i);
 
-#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+#if D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
         if(m_DefaultPoolsNotZeroed)
         {
             heapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
@@ -7884,7 +7888,14 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         }
         if (SUCCEEDED(hr))
         {
-            const BOOL wasZeroInitialized = TRUE;
+            BOOL wasZeroInitialized = TRUE;
+#if D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
+            if((committedAllocParams.m_HeapFlags & D3D12_HEAP_FLAG_CREATE_NOT_ZEROED) != 0)
+            {
+                wasZeroInitialized = FALSE;
+            }
+#endif
+
             Allocation* alloc = m_AllocationObjectAllocator.Allocate(
                 this, resourceSize, createParams.GetBaseResourceDesc()->Alignment, wasZeroInitialized);
             alloc->InitCommitted(committedAllocParams.m_List);
@@ -7946,7 +7957,14 @@ HRESULT AllocatorPimpl::AllocateHeap(
     {
         SetResidencyPriority(heap, committedAllocParams.m_ResidencyPriority);
 
-        const BOOL wasZeroInitialized = TRUE;
+        BOOL wasZeroInitialized = TRUE;
+#if D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
+        if((heapDesc.Flags & D3D12_HEAP_FLAG_CREATE_NOT_ZEROED) != 0)
+        {
+            wasZeroInitialized = FALSE;
+        }
+#endif
+
         (*ppAllocation) = m_AllocationObjectAllocator.Allocate(this, allocInfo.SizeInBytes, allocInfo.Alignment, wasZeroInitialized);
         (*ppAllocation)->InitHeap(committedAllocParams.m_List, heap);
         (*ppAllocation)->SetPrivateData(pPrivateData);
@@ -8047,7 +8065,7 @@ UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, Reso
 {
     D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
 
-#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+#if D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
     // If allocator was created with ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED, also ignore
     // D3D12_HEAP_FLAG_CREATE_NOT_ZEROED.
     if(m_DefaultPoolsNotZeroed)
