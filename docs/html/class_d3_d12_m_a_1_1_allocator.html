@@ -111,12 +111,21 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a7a1c79c79a7a573c438aa45c4a531b96"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a7a1c79c79a7a573c438aa45c4a531b96">CreateResource2</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC1 *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
 <tr class="memdesc:a7a1c79c79a7a573c438aa45c4a531b96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#a7a1c79c79a7a573c438aa45c4a531b96">More...</a><br /></td></tr>
 <tr class="separator:a7a1c79c79a7a573c438aa45c4a531b96"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a323b2af320b01d0fdecfc515c75db747"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a323b2af320b01d0fdecfc515c75db747">CreateResource3</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_DESC1 *pResourceDesc, D3D12_BARRIER_LAYOUT InitialLayout, const D3D12_CLEAR_VALUE *pOptimizedClearValue, UINT32 NumCastableFormats, DXGI_FORMAT *pCastableFormats, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation, REFIID riidResource, void **ppvResource)</td></tr>
+<tr class="memdesc:a323b2af320b01d0fdecfc515c75db747"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a7a1c79c79a7a573c438aa45c4a531b96" title="Similar to Allocator::CreateResource, but supports new structure D3D12_RESOURCE_DESC1.">Allocator::CreateResource2</a>, but there are initial layout instead of state and castable formats list.  <a href="class_d3_d12_m_a_1_1_allocator.html#a323b2af320b01d0fdecfc515c75db747">More...</a><br /></td></tr>
+<tr class="separator:a323b2af320b01d0fdecfc515c75db747"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acb8a10a5ea30171ce60128286aec5ee2"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2">AllocateMemory</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *pAllocDesc, const D3D12_RESOURCE_ALLOCATION_INFO *pAllocInfo, <a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **ppAllocation)</td></tr>
 <tr class="memdesc:acb8a10a5ea30171ce60128286aec5ee2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocates memory without creating any resource placed in it.  <a href="class_d3_d12_m_a_1_1_allocator.html#acb8a10a5ea30171ce60128286aec5ee2">More...</a><br /></td></tr>
 <tr class="separator:acb8a10a5ea30171ce60128286aec5ee2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab45536f92410aedb7be44ea36b1b4717"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717">CreateAliasingResource</a> (<a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> *pAllocation, UINT64 AllocationLocalOffset, const D3D12_RESOURCE_DESC *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, REFIID riidResource, void **ppvResource)</td></tr>
 <tr class="memdesc:ab45536f92410aedb7be44ea36b1b4717"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates a new resource in place of an existing allocation. This is useful for memory aliasing.  <a href="class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717">More...</a><br /></td></tr>
 <tr class="separator:ab45536f92410aedb7be44ea36b1b4717"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad3b83cc5707cb4ed92bc277069c4ddd6"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ad3b83cc5707cb4ed92bc277069c4ddd6">CreateAliasingResource1</a> (<a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> *pAllocation, UINT64 AllocationLocalOffset, const D3D12_RESOURCE_DESC1 *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, REFIID riidResource, void **ppvResource)</td></tr>
+<tr class="memdesc:ad3b83cc5707cb4ed92bc277069c4ddd6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717" title="Creates a new resource in place of an existing allocation. This is useful for memory aliasing.">Allocator::CreateAliasingResource</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>.  <a href="class_d3_d12_m_a_1_1_allocator.html#ad3b83cc5707cb4ed92bc277069c4ddd6">More...</a><br /></td></tr>
+<tr class="separator:ad3b83cc5707cb4ed92bc277069c4ddd6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a562cbaa71cbd333cade09cd67ed82453"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a562cbaa71cbd333cade09cd67ed82453">CreateAliasingResource2</a> (<a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> *pAllocation, UINT64 AllocationLocalOffset, const D3D12_RESOURCE_DESC1 *pResourceDesc, D3D12_BARRIER_LAYOUT InitialLayout, const D3D12_CLEAR_VALUE *pOptimizedClearValue, UINT32 NumCastableFormats, DXGI_FORMAT *pCastableFormats, REFIID riidResource, void **ppvResource)</td></tr>
+<tr class="memdesc:a562cbaa71cbd333cade09cd67ed82453"><td class="mdescLeft">&#160;</td><td class="mdescRight">Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ad3b83cc5707cb4ed92bc277069c4ddd6" title="Similar to Allocator::CreateAliasingResource, but supports new structure D3D12_RESOURCE_DESC1.">Allocator::CreateAliasingResource1</a>, but there are initial layout instead of state and castable formats list.  <a href="class_d3_d12_m_a_1_1_allocator.html#a562cbaa71cbd333cade09cd67ed82453">More...</a><br /></td></tr>
+<tr class="separator:a562cbaa71cbd333cade09cd67ed82453"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aac7b1f6bf53cbf4c4ce2264cb72ca515"><td class="memItemLeft" align="right" valign="top">HRESULT&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aac7b1f6bf53cbf4c4ce2264cb72ca515">CreatePool</a> (const <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html">POOL_DESC</a> *pPoolDesc, <a class="el" href="class_d3_d12_m_a_1_1_pool.html">Pool</a> **ppPool)</td></tr>
 <tr class="memdesc:aac7b1f6bf53cbf4c4ce2264cb72ca515"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates custom pool.  <a href="class_d3_d12_m_a_1_1_allocator.html#aac7b1f6bf53cbf4c4ce2264cb72ca515">More...</a><br /></td></tr>
 <tr class="separator:aac7b1f6bf53cbf4c4ce2264cb72ca515"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -354,6 +363,142 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="ad3b83cc5707cb4ed92bc277069c4ddd6" name="ad3b83cc5707cb4ed92bc277069c4ddd6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad3b83cc5707cb4ed92bc277069c4ddd6">&#9670;&#160;</a></span>CreateAliasingResource1()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">HRESULT D3D12MA::Allocator::CreateAliasingResource1 </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> *&#160;</td>
+          <td class="paramname"><em>pAllocation</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">UINT64&#160;</td>
+          <td class="paramname"><em>AllocationLocalOffset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const D3D12_RESOURCE_DESC1 *&#160;</td>
+          <td class="paramname"><em>pResourceDesc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">D3D12_RESOURCE_STATES&#160;</td>
+          <td class="paramname"><em>InitialResourceState</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const D3D12_CLEAR_VALUE *&#160;</td>
+          <td class="paramname"><em>pOptimizedClearValue</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">REFIID&#160;</td>
+          <td class="paramname"><em>riidResource</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void **&#160;</td>
+          <td class="paramname"><em>ppvResource</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ab45536f92410aedb7be44ea36b1b4717" title="Creates a new resource in place of an existing allocation. This is useful for memory aliasing.">Allocator::CreateAliasingResource</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>. </p>
+<p >It internally uses <code>ID3D12Device8::CreatePlacedResource1</code>.</p>
+<p >To work correctly, <code>ID3D12Device8</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
+
+</div>
+</div>
+<a id="a562cbaa71cbd333cade09cd67ed82453" name="a562cbaa71cbd333cade09cd67ed82453"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a562cbaa71cbd333cade09cd67ed82453">&#9670;&#160;</a></span>CreateAliasingResource2()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">HRESULT D3D12MA::Allocator::CreateAliasingResource2 </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> *&#160;</td>
+          <td class="paramname"><em>pAllocation</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">UINT64&#160;</td>
+          <td class="paramname"><em>AllocationLocalOffset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const D3D12_RESOURCE_DESC1 *&#160;</td>
+          <td class="paramname"><em>pResourceDesc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">D3D12_BARRIER_LAYOUT&#160;</td>
+          <td class="paramname"><em>InitialLayout</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const D3D12_CLEAR_VALUE *&#160;</td>
+          <td class="paramname"><em>pOptimizedClearValue</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">UINT32&#160;</td>
+          <td class="paramname"><em>NumCastableFormats</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">DXGI_FORMAT *&#160;</td>
+          <td class="paramname"><em>pCastableFormats</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">REFIID&#160;</td>
+          <td class="paramname"><em>riidResource</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void **&#160;</td>
+          <td class="paramname"><em>ppvResource</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#ad3b83cc5707cb4ed92bc277069c4ddd6" title="Similar to Allocator::CreateAliasingResource, but supports new structure D3D12_RESOURCE_DESC1.">Allocator::CreateAliasingResource1</a>, but there are initial layout instead of state and castable formats list. </p>
+<p >It internally uses <code>ID3D12Device10::CreatePlacedResource2</code>.</p>
+<p >To work correctly, <code>ID3D12Device10</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
+
+</div>
+</div>
 <a id="aac7b1f6bf53cbf4c4ce2264cb72ca515" name="aac7b1f6bf53cbf4c4ce2264cb72ca515"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aac7b1f6bf53cbf4c4ce2264cb72ca515">&#9670;&#160;</a></span>CreatePool()</h2>
 
@@ -519,6 +664,80 @@ Public Member Functions</h2></td></tr>
 <p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a" title="Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...">Allocator::CreateResource</a>, but supports new structure <code>D3D12_RESOURCE_DESC1</code>. </p>
 <p >It internally uses <code>ID3D12Device8::CreateCommittedResource2</code> or <code>ID3D12Device8::CreatePlacedResource1</code>.</p>
 <p >To work correctly, <code>ID3D12Device8</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
+
+</div>
+</div>
+<a id="a323b2af320b01d0fdecfc515c75db747" name="a323b2af320b01d0fdecfc515c75db747"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a323b2af320b01d0fdecfc515c75db747">&#9670;&#160;</a></span>CreateResource3()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">HRESULT D3D12MA::Allocator::CreateResource3 </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">ALLOCATION_DESC</a> *&#160;</td>
+          <td class="paramname"><em>pAllocDesc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const D3D12_RESOURCE_DESC1 *&#160;</td>
+          <td class="paramname"><em>pResourceDesc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">D3D12_BARRIER_LAYOUT&#160;</td>
+          <td class="paramname"><em>InitialLayout</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const D3D12_CLEAR_VALUE *&#160;</td>
+          <td class="paramname"><em>pOptimizedClearValue</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">UINT32&#160;</td>
+          <td class="paramname"><em>NumCastableFormats</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">DXGI_FORMAT *&#160;</td>
+          <td class="paramname"><em>pCastableFormats</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="class_d3_d12_m_a_1_1_allocation.html">Allocation</a> **&#160;</td>
+          <td class="paramname"><em>ppAllocation</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">REFIID&#160;</td>
+          <td class="paramname"><em>riidResource</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void **&#160;</td>
+          <td class="paramname"><em>ppvResource</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Similar to <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a7a1c79c79a7a573c438aa45c4a531b96" title="Similar to Allocator::CreateResource, but supports new structure D3D12_RESOURCE_DESC1.">Allocator::CreateResource2</a>, but there are initial layout instead of state and castable formats list. </p>
+<p >It internally uses <code>ID3D12Device10::CreateCommittedResource3</code> or <code>ID3D12Device10::CreatePlacedResource2</code>.</p>
+<p >To work correctly, <code>ID3D12Device10</code> interface must be available in the current system. Otherwise, <code>E_NOINTERFACE</code> is returned. </p>
 
 </div>
 </div>

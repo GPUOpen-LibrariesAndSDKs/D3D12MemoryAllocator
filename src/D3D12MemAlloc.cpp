@@ -6636,6 +6636,7 @@ private:
     const bool m_UseMutex;
     const bool m_AlwaysCommitted;
     const bool m_MsaaAlwaysCommitted;
+    bool m_DefaultPoolsNotZeroed = false;
     ID3D12Device* m_Device; // AddRef
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
     ID3D12Device1* m_Device1 = NULL; // AddRef, optional
@@ -6752,8 +6753,6 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
 
 HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 {
-    bool notZeroedSupported = false;
-
 #if D3D12MA_DXGI_1_4
     desc.pAdapter->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Adapter3));
 #endif
@@ -6769,10 +6768,14 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device8));
     
-    D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
-    if(SUCCEEDED(m_Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7))))
+    if((desc.Flags & ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED) != 0)
     {
-        notZeroedSupported = true;
+        D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
+        if(SUCCEEDED(m_Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7))))
+        {
+            // DEFAULT_POOLS_NOT_ZEROED both supported and enabled by the user.
+            m_DefaultPoolsNotZeroed = true;
+        }
     }
 #endif
 
@@ -6810,7 +6813,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         CalcDefaultPoolParams(heapProps.Type, heapFlags, i);
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-        if ((desc.Flags & ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED) != 0 && notZeroedSupported)
+        if(m_DefaultPoolsNotZeroed)
         {
             heapFlags |= D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
         }
@@ -8042,7 +8045,17 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
 
 UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, ResourceClass resourceClass) const
 {
-    const D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
+    D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+    // If allocator was created with ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED, also ignore
+    // D3D12_HEAP_FLAG_CREATE_NOT_ZEROED.
+    if(m_DefaultPoolsNotZeroed)
+    {
+        extraHeapFlags &= ~D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+    }
+#endif
+
     if (extraHeapFlags != 0)
     {
         return UINT32_MAX;
