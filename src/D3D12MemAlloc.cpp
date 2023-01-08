@@ -6848,6 +6848,9 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 
 AllocatorPimpl::~AllocatorPimpl()
 {
+#ifdef __ID3D12Device10_INTERFACE_DEFINED__
+    SAFE_RELEASE(m_Device10);
+#endif
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     SAFE_RELEASE(m_Device8);
 #endif
