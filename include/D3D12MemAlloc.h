@@ -160,9 +160,9 @@ class D3D12MA_API IUnknownImpl : public IUnknown
 {
 public:
     virtual ~IUnknownImpl() = default;
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);
-    virtual ULONG STDMETHODCALLTYPE AddRef();
-    virtual ULONG STDMETHODCALLTYPE Release();
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override;
+    ULONG STDMETHODCALLTYPE AddRef() override;
+    ULONG STDMETHODCALLTYPE Release() override;
 protected:
     virtual void ReleaseThis() { delete this; }
 private:
