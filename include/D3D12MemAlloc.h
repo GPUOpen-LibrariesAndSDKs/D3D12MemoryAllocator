@@ -61,7 +61,13 @@ Documentation of all members: D3D12MemAlloc.h
 // If using this library on a platform different than Windows PC or want to use different version of DXGI,
 // you should include D3D12-compatible headers before this library on your own and define this macro.
 #ifndef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
-    #include <d3d12.h>
+    #if defined(USING_DIRECTX_HEADERS)
+        #include <directx/d3d12.h>
+        #include <dxguids/dxguids.h>
+    #else
+        #include <d3d12.h>
+    #endif
+    
     #include <dxgi1_4.h>
 #endif
 
