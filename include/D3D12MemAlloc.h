@@ -24,9 +24,9 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 2.1.0-development</b> (2022-12-15)
+<b>Version 2.1.0-development</b> (2023-07-05)
 
-Copyright (c) 2019-2022 Advanced Micro Devices, Inc. All rights reserved. \n
+Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
 
 Documentation of all members: D3D12MemAlloc.h
@@ -402,8 +402,9 @@ struct TotalStatistics
     - 1 = `D3D12_HEAP_TYPE_UPLOAD`
     - 2 = `D3D12_HEAP_TYPE_READBACK`
     - 3 = `D3D12_HEAP_TYPE_CUSTOM`
+    - 4 = `D3D12_HEAP_TYPE_GPU_UPLOAD`
     */
-    DetailedStatistics HeapType[4];
+    DetailedStatistics HeapType[5];
     /** \brief One element for each memory segment group located at the following indices:
 
     - 0 = `DXGI_MEMORY_SEGMENT_GROUP_LOCAL`
@@ -413,9 +414,9 @@ struct TotalStatistics
 
     - When `IsUMA() == FALSE` (discrete graphics card):
       - `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` (index 0) represents GPU memory
-      (resources allocated in `D3D12_HEAP_TYPE_DEFAULT` or `D3D12_MEMORY_POOL_L1`).
+        (resources allocated in `D3D12_HEAP_TYPE_DEFAULT`, `D3D12_HEAP_TYPE_GPU_UPLOAD` or `D3D12_MEMORY_POOL_L1`).
       - `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL` (index 1) represents system memory
-      (resources allocated in `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`, or `D3D12_MEMORY_POOL_L0`).
+        (resources allocated in `D3D12_HEAP_TYPE_UPLOAD`, `D3D12_HEAP_TYPE_READBACK`, or `D3D12_MEMORY_POOL_L0`).
     - When `IsUMA() == TRUE` (integrated graphics chip):
       - `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` = (index 0) represents memory shared for all the resources.
       - `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL` = (index 1) is unused and always 0.
@@ -1130,6 +1131,15 @@ public:
     - "ID3D12Device::GetCustomHeapProperties method (d3d12.h)"
     */
     BOOL IsCacheCoherentUMA() const;
+    /** \brief Returns true if GPU Upload Heaps are supported on the current system.
+
+    When true, you can use `D3D12_HEAP_TYPE_GPU_UPLOAD`.
+
+    This flag is fetched from `D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported`.
+
+    `#define D3D12MA_OPTIONS16_SUPPORTED 1` is needed for the compilation of this library. Otherwise the flag is always false.
+    */
+    BOOL IsGPUUploadHeapSupported() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.
     
     \param memorySegmentGroup use `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.
@@ -1333,7 +1343,7 @@ public:
       - `pNonLocalBudget` returns the budget of the system memory available for D3D12 resources.
     - When IsUMA() `== TRUE` (integrated graphics chip):
       - `pLocalBudget` returns the budget of the shared memory available for all D3D12 resources.
-        All memory is considered "local".
+         All memory is considered "local".
       - `pNonLocalBudget` is not applicable and returns zeros.
 
     This function is called "get" not "calculate" because it is very fast, suitable to be called

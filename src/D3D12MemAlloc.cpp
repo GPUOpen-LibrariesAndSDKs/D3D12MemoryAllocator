@@ -134,9 +134,9 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 
 namespace D3D12MA
 {
-static constexpr UINT HEAP_TYPE_COUNT = 4;
-static constexpr UINT STANDARD_HEAP_TYPE_COUNT = 3; // Only DEFAULT, UPLOAD, READBACK.
-static constexpr UINT DEFAULT_POOL_MAX_COUNT = 9;
+static constexpr UINT HEAP_TYPE_COUNT = 5;
+static constexpr UINT STANDARD_HEAP_TYPE_COUNT = 4; // Only DEFAULT, UPLOAD, READBACK, GPU_UPLOAD.
+static constexpr UINT DEFAULT_POOL_MAX_COUNT = STANDARD_HEAP_TYPE_COUNT * 3;
 static const UINT NEW_BLOCK_SIZE_SHIFT_MAX = 3;
 // Minimum size of a free suballocation to register it in the free suballocation collection.
 static const UINT64 MIN_FREE_SUBALLOCATION_SIZE_TO_REGISTER = 16;
@@ -147,12 +147,22 @@ static const WCHAR* const HeapTypeNames[] =
     L"UPLOAD",
     L"READBACK",
     L"CUSTOM",
+    L"GPU_UPLOAD",
+};
+static const WCHAR* const StandardHeapTypeNames[] =
+{
+    L"DEFAULT",
+    L"UPLOAD",
+    L"READBACK",
+    L"GPU_UPLOAD",
 };
 
 static const D3D12_HEAP_FLAGS RESOURCE_CLASS_HEAP_FLAGS =
     D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES | D3D12_HEAP_FLAG_DENY_NON_RT_DS_TEXTURES;
 
 static const D3D12_RESIDENCY_PRIORITY D3D12_RESIDENCY_PRIORITY_NONE = D3D12_RESIDENCY_PRIORITY(0);
+
+static const D3D12_HEAP_TYPE D3D12_HEAP_TYPE_GPU_UPLOAD_COPY = (D3D12_HEAP_TYPE)5;
 
 #ifndef _D3D12MA_ENUM_DECLARATIONS
 
@@ -452,23 +462,28 @@ static IterT BinaryFindSorted(const IterT& beg, const IterT& end, const KeyT& va
     return end;
 }
 
-static UINT HeapTypeToIndex(D3D12_HEAP_TYPE type)
+static UINT StandardHeapTypeToIndex(D3D12_HEAP_TYPE type)
 {
     switch (type)
     {
     case D3D12_HEAP_TYPE_DEFAULT:  return 0;
     case D3D12_HEAP_TYPE_UPLOAD:   return 1;
     case D3D12_HEAP_TYPE_READBACK: return 2;
-    case D3D12_HEAP_TYPE_CUSTOM:   return 3;
+    case D3D12_HEAP_TYPE_GPU_UPLOAD_COPY: return 3;
     default: D3D12MA_ASSERT(0); return UINT_MAX;
     }
 }
 
-static D3D12_HEAP_TYPE IndexToHeapType(UINT heapTypeIndex)
+static D3D12_HEAP_TYPE IndexToStandardHeapType(UINT heapTypeIndex)
 {
-    D3D12MA_ASSERT(heapTypeIndex < 4);
-    // D3D12_HEAP_TYPE_DEFAULT starts at 1.
-    return (D3D12_HEAP_TYPE)(heapTypeIndex + 1);
+    switch(heapTypeIndex)
+    {
+    case 0: return D3D12_HEAP_TYPE_DEFAULT;
+    case 1: return D3D12_HEAP_TYPE_UPLOAD;
+    case 2: return D3D12_HEAP_TYPE_READBACK;
+    case 3: return D3D12_HEAP_TYPE_GPU_UPLOAD_COPY;
+    default: D3D12MA_ASSERT(0); return D3D12_HEAP_TYPE_CUSTOM;
+    }
 }
 
 static UINT64 HeapFlagsToAlignment(D3D12_HEAP_FLAGS flags, bool denyMsaaTextures)
@@ -516,7 +531,8 @@ static bool IsHeapTypeStandard(D3D12_HEAP_TYPE type)
 {
     return type == D3D12_HEAP_TYPE_DEFAULT ||
         type == D3D12_HEAP_TYPE_UPLOAD ||
-        type == D3D12_HEAP_TYPE_READBACK;
+        type == D3D12_HEAP_TYPE_READBACK ||
+        type == D3D12_HEAP_TYPE_GPU_UPLOAD_COPY;
 }
 
 static D3D12_HEAP_PROPERTIES StandardHeapTypeToHeapProperties(D3D12_HEAP_TYPE type)
@@ -6558,6 +6574,7 @@ public:
     BOOL IsUMA() const { return m_D3D12Architecture.UMA; }
     BOOL IsCacheCoherentUMA() const { return m_D3D12Architecture.CacheCoherentUMA; }
     bool SupportsResourceHeapTier2() const { return m_D3D12Options.ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2; }
+    bool IsGPUUploadHeapSupported() const { return m_GPUUploadHeapSupported != FALSE; }
     bool UseMutex() const { return m_UseMutex; }
     AllocationObjectAllocator& GetAllocationObjectAllocator() { return m_AllocationObjectAllocator; }
     UINT GetCurrentFrameIndex() const { return m_CurrentFrameIndex.load(); }
@@ -6566,6 +6583,7 @@ public:
         0: D3D12_HEAP_TYPE_DEFAULT
         1: D3D12_HEAP_TYPE_UPLOAD
         2: D3D12_HEAP_TYPE_READBACK
+        3: D3D12_HEAP_TYPE_GPU_UPLOAD
     else:
         0: D3D12_HEAP_TYPE_DEFAULT + buffer
         1: D3D12_HEAP_TYPE_DEFAULT + texture
@@ -6576,8 +6594,11 @@ public:
         6: D3D12_HEAP_TYPE_READBACK + buffer
         7: D3D12_HEAP_TYPE_READBACK + texture
         8: D3D12_HEAP_TYPE_READBACK + texture RT or DS
+        9: D3D12_HEAP_TYPE_GPU_UPLOAD + buffer
+        10: D3D12_HEAP_TYPE_GPU_UPLOAD + texture
+        11: D3D12_HEAP_TYPE_GPU_UPLOAD + texture RT or DS
     */
-    UINT GetDefaultPoolCount() const { return SupportsResourceHeapTier2() ? 3 : 9; }
+    UINT GetDefaultPoolCount() const { return SupportsResourceHeapTier2() ? 4 : 12; }
     BlockVector** GetDefaultPools() { return m_BlockVectors; }
 
     HRESULT Init(const ALLOCATOR_DESC& desc);
@@ -6625,8 +6646,8 @@ public:
     void SetResidencyPriority(ID3D12Pageable* obj, D3D12_RESIDENCY_PRIORITY priority) const;
 
     void SetCurrentFrameIndex(UINT frameIndex);
-    // For more deailed stats use outCutomHeaps to access statistics divided into L0 and L1 group
-    void CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCutomHeaps[2] = NULL);
+    // For more deailed stats use outCustomHeaps to access statistics divided into L0 and L1 group
+    void CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCustomHeaps[2] = NULL);
 
     void GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget);
     void GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE heapType);
@@ -6663,6 +6684,7 @@ private:
     D3D12MA_ATOMIC_UINT32 m_CurrentFrameIndex;
     DXGI_ADAPTER_DESC m_AdapterDesc;
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
+    BOOL m_GPUUploadHeapSupported = FALSE;
     D3D12_FEATURE_DATA_ARCHITECTURE m_D3D12Architecture;
     AllocationObjectAllocator m_AllocationObjectAllocator;
 
@@ -6747,7 +6769,7 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     {
         m_CommittedAllocations[i].Init(
             m_UseMutex,
-            (D3D12_HEAP_TYPE)(D3D12_HEAP_TYPE_DEFAULT + i),
+            IndexToStandardHeapType(i),
             NULL); // pool
     }
 
@@ -6800,6 +6822,20 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
     }
 #ifdef D3D12MA_FORCE_RESOURCE_HEAP_TIER
     m_D3D12Options.ResourceHeapTier = (D3D12MA_FORCE_RESOURCE_HEAP_TIER);
+#endif
+
+// You must define this macro to like `#define D3D12MA_OPTIONS16_SUPPORTED 1` to enable GPU Upload Heaps!
+// Unfortunately there is no way to programmatically check if the included <d3d12.h> defines D3D12_FEATURE_DATA_D3D12_OPTIONS16 or not.
+// Main interfaces have respective macros like __ID3D12Device4_INTERFACE_DEFINED__, but structures like this do not.
+#if D3D12MA_OPTIONS16_SUPPORTED
+    {
+        D3D12_FEATURE_DATA_D3D12_OPTIONS16 options16 = {};
+        hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS16, &options16, sizeof(options16));
+        if (SUCCEEDED(hr))
+        {
+            m_GPUUploadHeapSupported = options16.GPUUploadHeapSupported;
+        }
+    }
 #endif
 
     hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE, &m_D3D12Architecture, sizeof(m_D3D12Architecture));
@@ -6901,7 +6937,7 @@ UINT AllocatorPimpl::StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE heapTy
     D3D12MA_ASSERT(IsHeapTypeStandard(heapType));
     if (IsUMA())
         return DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY;
-    return heapType == D3D12_HEAP_TYPE_DEFAULT ?
+    return (heapType == D3D12_HEAP_TYPE_DEFAULT || heapType == D3D12_HEAP_TYPE_GPU_UPLOAD_COPY) ?
         DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY : DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY;
 }
 
@@ -7253,7 +7289,7 @@ void AllocatorPimpl::SetCurrentFrameIndex(UINT frameIndex)
 #endif
 }
 
-void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCutomHeaps[2])
+void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStatistics outCustomHeaps[2])
 {
     // Init stats
     for (size_t i = 0; i < HEAP_TYPE_COUNT; i++)
@@ -7261,21 +7297,22 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStat
     for (size_t i = 0; i < DXGI_MEMORY_SEGMENT_GROUP_COUNT; i++)
         ClearDetailedStatistics(outStats.MemorySegmentGroup[i]);
     ClearDetailedStatistics(outStats.Total);
-    if (outCutomHeaps)
+    if (outCustomHeaps)
     {
-        ClearDetailedStatistics(outCutomHeaps[0]);
-        ClearDetailedStatistics(outCutomHeaps[1]);
+        ClearDetailedStatistics(outCustomHeaps[0]);
+        ClearDetailedStatistics(outCustomHeaps[1]);
     }
 
-    // Process default pools. 3 standard heap types only. Add them to outStats.HeapType[i].
+    // Process default pools. 4 standard heap types only. Add them to outStats.HeapType[i].
     if (SupportsResourceHeapTier2())
     {
-        // DEFAULT, UPLOAD, READBACK.
+        // DEFAULT, UPLOAD, READBACK, GPU_UPLOAD.
         for (size_t heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
         {
             BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex];
             D3D12MA_ASSERT(pBlockVector);
-            pBlockVector->AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
+            const size_t outputIndex = heapTypeIndex < 3 ? heapTypeIndex : 4; // GPU_UPLOAD 3 -> 4
+            pBlockVector->AddDetailedStatistics(outStats.HeapType[outputIndex]);
         }
     }
     else
@@ -7287,7 +7324,9 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStat
             {
                 BlockVector* const pBlockVector = m_BlockVectors[heapTypeIndex * 3 + heapSubType];
                 D3D12MA_ASSERT(pBlockVector);
-                pBlockVector->AddDetailedStatistics(outStats.HeapType[heapTypeIndex]);
+
+                const size_t outputIndex = heapTypeIndex < 3 ? heapTypeIndex : 4; // GPU_UPLOAD 3 -> 4
+                pBlockVector->AddDetailedStatistics(outStats.HeapType[outputIndex]);
             }
         }
     }
@@ -7302,6 +7341,9 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStat
     AddDetailedStatistics(
         outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE_READBACK)],
         outStats.HeapType[2]);
+    AddDetailedStatistics(
+        outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(D3D12_HEAP_TYPE_GPU_UPLOAD_COPY)],
+        outStats.HeapType[4]);
 
     // Process custom pools.
     DetailedStatistics tmpStats;
@@ -7321,20 +7363,21 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStat
             AddDetailedStatistics(
                 outStats.MemorySegmentGroup[memorySegment], tmpStats);
 
-            if (outCutomHeaps)
-                AddDetailedStatistics(outCutomHeaps[memorySegment], tmpStats);
+            if (outCustomHeaps)
+                AddDetailedStatistics(outCustomHeaps[memorySegment], tmpStats);
         }
     }
 
-    // Process committed allocations. 3 standard heap types only.
+    // Process committed allocations. standard heap types only.
     for (UINT heapTypeIndex = 0; heapTypeIndex < STANDARD_HEAP_TYPE_COUNT; ++heapTypeIndex)
     {
         ClearDetailedStatistics(tmpStats);
         m_CommittedAllocations[heapTypeIndex].AddDetailedStatistics(tmpStats);
+        const size_t outputIndex = heapTypeIndex < 3 ? heapTypeIndex : 4; // GPU_UPLOAD 3 -> 4
         AddDetailedStatistics(
-            outStats.HeapType[heapTypeIndex], tmpStats);
+            outStats.HeapType[outputIndex], tmpStats);
         AddDetailedStatistics(
-            outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(IndexToHeapType(heapTypeIndex))], tmpStats);
+            outStats.MemorySegmentGroup[StandardHeapTypeToMemorySegmentGroup(IndexToStandardHeapType(heapTypeIndex))], tmpStats);
     }
 
     // Sum up memory segment groups to totals.
@@ -7354,19 +7397,24 @@ void AllocatorPimpl::CalculateStatistics(TotalStatistics& outStats, DetailedStat
 
     D3D12MA_ASSERT(outStats.Total.Stats.BlockCount ==
         outStats.HeapType[0].Stats.BlockCount + outStats.HeapType[1].Stats.BlockCount +
-        outStats.HeapType[2].Stats.BlockCount + outStats.HeapType[3].Stats.BlockCount);
+        outStats.HeapType[2].Stats.BlockCount + outStats.HeapType[3].Stats.BlockCount +
+        outStats.HeapType[4].Stats.BlockCount);
     D3D12MA_ASSERT(outStats.Total.Stats.AllocationCount ==
         outStats.HeapType[0].Stats.AllocationCount + outStats.HeapType[1].Stats.AllocationCount +
-        outStats.HeapType[2].Stats.AllocationCount + outStats.HeapType[3].Stats.AllocationCount);
+        outStats.HeapType[2].Stats.AllocationCount + outStats.HeapType[3].Stats.AllocationCount +
+        outStats.HeapType[4].Stats.AllocationCount);
     D3D12MA_ASSERT(outStats.Total.Stats.BlockBytes ==
         outStats.HeapType[0].Stats.BlockBytes + outStats.HeapType[1].Stats.BlockBytes +
-        outStats.HeapType[2].Stats.BlockBytes + outStats.HeapType[3].Stats.BlockBytes);
+        outStats.HeapType[2].Stats.BlockBytes + outStats.HeapType[3].Stats.BlockBytes +
+        outStats.HeapType[4].Stats.BlockBytes);
     D3D12MA_ASSERT(outStats.Total.Stats.AllocationBytes ==
         outStats.HeapType[0].Stats.AllocationBytes + outStats.HeapType[1].Stats.AllocationBytes +
-        outStats.HeapType[2].Stats.AllocationBytes + outStats.HeapType[3].Stats.AllocationBytes);
+        outStats.HeapType[2].Stats.AllocationBytes + outStats.HeapType[3].Stats.AllocationBytes +
+        outStats.HeapType[4].Stats.AllocationBytes);
     D3D12MA_ASSERT(outStats.Total.UnusedRangeCount ==
         outStats.HeapType[0].UnusedRangeCount + outStats.HeapType[1].UnusedRangeCount +
-        outStats.HeapType[2].UnusedRangeCount + outStats.HeapType[3].UnusedRangeCount);
+        outStats.HeapType[2].UnusedRangeCount + outStats.HeapType[3].UnusedRangeCount +
+        outStats.HeapType[4].UnusedRangeCount);
 }
 
 void AllocatorPimpl::GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget)
@@ -7414,6 +7462,7 @@ void AllocatorPimpl::GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE hea
     switch (heapType)
     {
     case D3D12_HEAP_TYPE_DEFAULT:
+    case D3D12_HEAP_TYPE_GPU_UPLOAD_COPY:
         GetBudget(&outBudget, NULL);
         break;
     case D3D12_HEAP_TYPE_UPLOAD:
@@ -7470,6 +7519,9 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                 json.WriteBool(m_D3D12Architecture.UMA);
                 json.WriteString(L"CacheCoherentUMA");
                 json.WriteBool(m_D3D12Architecture.CacheCoherentUMA);
+
+                json.WriteString(L"GPUUploadHeapSupported");
+                json.WriteBool(m_GPUUploadHeapSupported != FALSE);
             }
             json.EndObject();
         }
@@ -7502,6 +7554,17 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                                 json.AddDetailedStatisticsInfoObject(stats.HeapType[0]);
                             }
                             json.EndObject();
+
+                            if(IsGPUUploadHeapSupported())
+                            {
+                                json.WriteString(L"GPU_UPLOAD");
+                                json.BeginObject();
+                                {
+                                    json.WriteString(L"Stats");
+                                    json.AddDetailedStatisticsInfoObject(stats.HeapType[4]);
+                                }
+                                json.EndObject();
+                            }
                         }
                         json.WriteString(L"UPLOAD");
                         json.BeginObject();
@@ -7552,6 +7615,17 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                             }
                             json.EndObject();
 
+                            if(IsGPUUploadHeapSupported())
+                            {
+                                json.WriteString(L"GPU_UPLOAD");
+                                json.BeginObject();
+                                {
+                                    json.WriteString(L"Stats");
+                                    json.AddDetailedStatisticsInfoObject(stats.HeapType[4]);
+                                }
+                                json.EndObject();
+                            }
+                            
                             json.WriteString(L"CUSTOM");
                             json.BeginObject();
                             {
@@ -7678,7 +7752,7 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                 {
                     for (uint8_t heapType = 0; heapType < STANDARD_HEAP_TYPE_COUNT; ++heapType)
                     {
-                        json.WriteString(HeapTypeNames[heapType]);
+                        json.WriteString(StandardHeapTypeNames[heapType]);
                         json.BeginObject();
                         writeHeapInfo(m_BlockVectors[heapType], m_CommittedAllocations + heapType, false);
                         json.EndObject();
@@ -7695,11 +7769,11 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
                                 L" - Textures",
                                 L" - Textures RT/DS",
                             };
-                            json.BeginString(HeapTypeNames[heapType]);
+                            json.BeginString(StandardHeapTypeNames[heapType]);
                             json.EndString(heapSubTypeName[heapSubType]);
 
                             json.BeginObject();
-                            writeHeapInfo(m_BlockVectors[heapType + heapSubType], m_CommittedAllocations + heapType, false);
+                            writeHeapInfo(m_BlockVectors[heapType * 3 + heapSubType], m_CommittedAllocations + heapType, false);
                             json.EndObject();
                         }
                     }
@@ -7989,6 +8063,9 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     outCommittedAllocationParams = CommittedAllocationParameters();
     outPreferCommitted = false;
 
+    D3D12MA_ASSERT((allocDesc.HeapType != D3D12_HEAP_TYPE_GPU_UPLOAD_COPY || IsGPUUploadHeapSupported()) &&
+        "Trying to allocate from D3D12_HEAP_TYPE_GPU_UPLOAD while GPUUploadHeapSupported == FALSE or D3D12MA_OPTIONS16_SUPPORTED macro was not defined when compiling D3D12MA library.");
+
     bool msaaAlwaysCommitted;
     if (allocDesc.CustomPool != NULL)
     {
@@ -8014,7 +8091,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
 
         outCommittedAllocationParams.m_HeapProperties = StandardHeapTypeToHeapProperties(allocDesc.HeapType);
         outCommittedAllocationParams.m_HeapFlags = allocDesc.ExtraHeapFlags;
-        outCommittedAllocationParams.m_List = &m_CommittedAllocations[HeapTypeToIndex(allocDesc.HeapType)];
+        outCommittedAllocationParams.m_List = &m_CommittedAllocations[StandardHeapTypeToIndex(allocDesc.HeapType)];
         // outCommittedAllocationParams.m_ResidencyPriority intentionally left with default value.
 
         const ResourceClass resourceClass = (resDesc != NULL) ?
@@ -8088,6 +8165,7 @@ UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, Reso
     case D3D12_HEAP_TYPE_DEFAULT:  poolIndex = 0; break;
     case D3D12_HEAP_TYPE_UPLOAD:   poolIndex = 1; break;
     case D3D12_HEAP_TYPE_READBACK: poolIndex = 2; break;
+    case D3D12_HEAP_TYPE_GPU_UPLOAD_COPY: poolIndex = 3; break;
     default: D3D12MA_ASSERT(0);
     }
 
@@ -8143,6 +8221,9 @@ void AllocatorPimpl::CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_H
     case 2:
         outHeapType = D3D12_HEAP_TYPE_READBACK;
         break;
+    case 3:
+        outHeapType = D3D12_HEAP_TYPE_GPU_UPLOAD_COPY;
+        break;
     default:
         D3D12MA_ASSERT(0);
     }
@@ -8150,7 +8231,7 @@ void AllocatorPimpl::CalcDefaultPoolParams(D3D12_HEAP_TYPE& outHeapType, D3D12_H
 
 void AllocatorPimpl::RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
 {
-    const UINT heapTypeIndex = HeapTypeToIndex(heapType);
+    const UINT heapTypeIndex = (UINT)heapType - 1;
 
     MutexLockWrite lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
     m_Pools[heapTypeIndex].PushBack(pool->m_Pimpl);
@@ -8158,7 +8239,7 @@ void AllocatorPimpl::RegisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
 
 void AllocatorPimpl::UnregisterPool(Pool* pool, D3D12_HEAP_TYPE heapType)
 {
-    const UINT heapTypeIndex = HeapTypeToIndex(heapType);
+    const UINT heapTypeIndex = (UINT)heapType - 1;
 
     MutexLockWrite lock(m_PoolsMutex[heapTypeIndex], m_UseMutex);
     m_Pools[heapTypeIndex].Remove(pool->m_Pimpl);
@@ -10131,6 +10212,11 @@ BOOL Allocator::IsUMA() const
 BOOL Allocator::IsCacheCoherentUMA() const
 {
     return m_Pimpl->IsCacheCoherentUMA();
+}
+
+BOOL Allocator::IsGPUUploadHeapSupported() const
+{
+    return m_Pimpl->IsGPUUploadHeapSupported();
 }
 
 UINT64 Allocator::GetMemoryCapacity(UINT memorySegmentGroup) const

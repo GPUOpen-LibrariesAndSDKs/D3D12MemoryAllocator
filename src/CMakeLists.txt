@@ -17,8 +17,7 @@ set_target_properties(
     D3D12MemoryAllocator PROPERTIES
 
     CXX_EXTENSIONS OFF
-    # Use C++14
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
 
     OUTPUT_NAME "D3D12MA"
@@ -108,8 +107,7 @@ if(D3D12MA_BUILD_SAMPLE)
             D3D12Sample PROPERTIES
 
             CXX_EXTENSIONS OFF
-            # Use C++14
-            CXX_STANDARD 14
+            CXX_STANDARD 17
             CXX_STANDARD_REQUIRED ON
         )
 
@@ -124,5 +122,37 @@ if(D3D12MA_BUILD_SAMPLE)
         )
     else()
         message(STATUS "D3D12Sample application is not supported to Linux")
+    endif()
+endif()
+
+set(D3D12MA_AGILITY_SDK_DIRECTORY "" CACHE STRING "Path to unpacked DX12 Agility SDK. Leave empty to compile without it.")
+option(D3D12MA_AGILITY_SDK_PREVIEW "Set if DX12 Agility SDK is preview version." OFF)
+if(D3D12MA_AGILITY_SDK_DIRECTORY)
+    if(EXISTS "${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/include/d3d12.h")
+        message(STATUS "DX12 Agility SDK used from \"${D3D12MA_AGILITY_SDK_DIRECTORY}\".")
+        target_compile_definitions(D3D12MemoryAllocator PRIVATE D3D12MA_USE_AGILITY_SDK=1)
+        target_include_directories(D3D12MemoryAllocator BEFORE PRIVATE "${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/include")
+        if(D3D12MA_AGILITY_SDK_PREVIEW)
+            target_compile_definitions(D3D12MemoryAllocator PRIVATE D3D12MA_USE_AGILITY_SDK_PREVIEW=1)
+        endif()
+        if(${D3D12MA_BUILD_SAMPLE} AND ${WIN32})
+            target_compile_definitions(D3D12Sample PRIVATE D3D12MA_USE_AGILITY_SDK=1)
+            target_include_directories(D3D12Sample BEFORE PRIVATE "${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/include")
+            if(D3D12MA_AGILITY_SDK_PREVIEW)
+                target_compile_definitions(D3D12Sample PRIVATE D3D12MA_USE_AGILITY_SDK_PREVIEW=1)
+            endif()
+        endif()
+    else()
+        message(FATAL_ERROR "DX12 Agility SDK not found - cannot find file \"${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/include/d3d12.h\".")
+    endif()
+else()
+    message(STATUS "DX12 Agility SDK not used.")
+endif()
+
+option(D3D12MA_OPTIONS16_SUPPORTED "Set if using Agility SDK 1.710.0-preview or newer that defines D3D12_FEATURE_DATA_D3D12_OPTIONS16." OFF)
+if(D3D12MA_OPTIONS16_SUPPORTED)
+    target_compile_definitions(D3D12MemoryAllocator PRIVATE D3D12MA_OPTIONS16_SUPPORTED=1)
+    if(${D3D12MA_BUILD_SAMPLE} AND ${WIN32})
+        target_compile_definitions(D3D12Sample PRIVATE D3D12MA_OPTIONS16_SUPPORTED=1)
     endif()
 endif()
