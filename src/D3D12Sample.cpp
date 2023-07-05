@@ -35,6 +35,15 @@ namespace PS
     #include "Shaders\PS_Compiled.h"
 }
 
+#if D3D12MA_USE_AGILITY_SDK
+    #if D3D12MA_USE_AGILITY_SDK_PREVIEW
+        extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_PREVIEW_SDK_VERSION; }
+    #else
+        extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = D3D12_SDK_VERSION; }
+    #endif
+    extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }
+#endif
+
 enum class ExitCode : int
 {
     GPUList = 2,
