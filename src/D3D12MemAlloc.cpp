@@ -8202,6 +8202,7 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(c
 template<typename D3D12_RESOURCE_DESC_T>
 D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const
 {
+#ifdef __ID3D12Device1_INTERFACE_DEFINED__
     /* Optional optimization: Microsoft documentation says:
     https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
 
@@ -8217,6 +8218,7 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
             AlignUp<UINT64>(inOutResourceDesc.Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT), // SizeInBytes
             D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT }; // Alignment
     }
+#endif // #ifdef __ID3D12Device1_INTERFACE_DEFINED__
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
     if (inOutResourceDesc.Alignment == 0 &&
