@@ -1801,13 +1801,14 @@ int Main2(int argc, wchar_t** argv)
         return (int)ExitCode::Help;
     }
 
-    std::unique_ptr<DXGIUsage> DXGIUsage(new DXGIUsage());
-    DXGIUsage->Init();
-    g_DXGIUsage = DXGIUsage.get();
+    // variable name should not same as class name
+    std::unique_ptr<DXGIUsage> dxgiUsage = std::make_unique<DXGIUsage>();
+    dxgiUsage->Init();
+    g_DXGIUsage = dxgiUsage.get();
 
     if(g_CommandLineParameters.m_List)
     {
-        DXGIUsage->PrintAdapterList();
+        dxgiUsage->PrintAdapterList();
         return (int)ExitCode::GPUList;
     }
 
