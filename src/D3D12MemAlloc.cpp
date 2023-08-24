@@ -8187,11 +8187,13 @@ HRESULT AllocatorPimpl::UpdateD3D12Budget()
 
 D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC& resourceDesc) const
 {
+    // This is how new D3D12 headers define GetResourceAllocationInfo function -
+    // different signature depending on these macros.
 #if defined(_MSC_VER) || !defined(_WIN32)
     return m_Device->GetResourceAllocationInfo(0, 1, &resourceDesc);
 #else
-    D3D12_RESOURCE_ALLOCATION_INFO RetVal;
-    return *m_Device->GetResourceAllocationInfo(&RetVal, 0, 1, &resourceDesc);
+    D3D12_RESOURCE_ALLOCATION_INFO retVal;
+    return *m_Device->GetResourceAllocationInfo(&retVal, 0, 1, &resourceDesc);
 #endif
 }
 
@@ -8200,11 +8202,14 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(c
 {
     D3D12MA_ASSERT(m_Device8 != NULL);
     D3D12_RESOURCE_ALLOCATION_INFO1 info1Unused;
+
+    // This is how new D3D12 headers define GetResourceAllocationInfo function -
+    // different signature depending on these macros.
 #if defined(_MSC_VER) || !defined(_WIN32)
     return m_Device8->GetResourceAllocationInfo2(0, 1, &resourceDesc, &info1Unused);
 #else
-    D3D12_RESOURCE_ALLOCATION_INFO RetVal;
-    return *m_Device8->GetResourceAllocationInfo2(&RetVal, 0, 1, &resourceDesc, &info1Unused);
+    D3D12_RESOURCE_ALLOCATION_INFO retVal;
+    return *m_Device8->GetResourceAllocationInfo2(&retVal, 0, 1, &resourceDesc, &info1Unused);
 #endif
 }
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
