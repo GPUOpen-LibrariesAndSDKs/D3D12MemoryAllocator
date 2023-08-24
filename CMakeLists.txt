@@ -32,5 +32,4 @@ option(D3D12MA_BUILD_SAMPLE "Build D3D12MemoryAllocator sample application" OFF)
 
 message(STATUS "D3D12MA_BUILD_SAMPLE = ${D3D12MA_BUILD_SAMPLE}")
 
-include_directories(include)
 add_subdirectory(src)

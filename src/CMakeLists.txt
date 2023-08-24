@@ -7,10 +7,6 @@ if(WIN32 AND ${CMAKE_GENERATOR} MATCHES "Visual Studio.*")
     set(D3D12MA_LIBRARY_SOURCE_FILES ${D3D12MA_LIBRARY_SOURCE_FILES} D3D12MemAlloc.natvis)
 endif()
 
-set(CMAKE_DEBUG_POSTFIX d)
-set(CMAKE_RELWITHDEBINFO_POSTFIX rd)
-set(CMAKE_MINSIZEREL_POSTFIX s)
-
 add_library(D3D12MemoryAllocator ${D3D12MA_LIBRARY_SOURCE_FILES})
 
 set_target_properties(
@@ -22,6 +18,14 @@ set_target_properties(
     CXX_STANDARD_REQUIRED ON
 
     OUTPUT_NAME "D3D12MA"
+    # Postfix for different profiles
+    DEBUG_POSTFIX "d"
+    RELWITHDEBINFO_POSTFIX "rd"
+    MINSIZEREL_POSTFIX "s"
+)
+
+target_include_directories(D3D12MemoryAllocator PUBLIC
+    "${PROJECT_SOURCE_DIR}/include"
 )
 
 target_link_libraries(D3D12MemoryAllocator PUBLIC
