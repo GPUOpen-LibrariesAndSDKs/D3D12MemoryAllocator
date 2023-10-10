@@ -44,7 +44,10 @@ if(BUILD_SHARED_LIBS)
     )
 endif()
 
-install(TARGETS D3D12MemoryAllocator DESTINATION "lib")
+install(TARGETS D3D12MemoryAllocator
+		RUNTIME DESTINATION "bin"
+        	ARCHIVE DESTINATION "lib"
+        	LIBRARY DESTINATION "lib")
 install(FILES "${PROJECT_SOURCE_DIR}/include/D3D12MemAlloc.h" DESTINATION "include")
 
 if(D3D12MA_BUILD_SAMPLE)
