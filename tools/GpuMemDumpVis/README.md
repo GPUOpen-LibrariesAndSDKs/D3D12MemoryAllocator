@@ -31,15 +31,19 @@ You can also use typical options:
 ## Legend
 
 * ![Free space](README_files/Legend_Bkg.png "Free space") Light gray without border - a space in Vulkan device memory block unused by any allocation.
-* ![Buffer 1](README_files/Legend_Buffer_1.png "Buffer 1") Buffer with usage containing INDIRECT_BUFFER, VERTEX_BUFFER, or INDEX_BUFFER.
-* ![Buffer 2](README_files/Legend_Buffer_2.png "Buffer 2") Buffer with usage containing STORAGE_BUFFER or STORAGE_TEXEL_BUFFER.
-* ![Buffer 3](README_files/Legend_Buffer_3.png "Buffer 3") Buffer with usage containing UNIFORM_BUFFER or UNIFORM_TEXEL_BUFFER.
+* ![Buffer 1](README_files/Legend_Buffer_1.png "Buffer 1") Buffer with usage containing INDIRECT_BUFFER, VERTEX_BUFFER, or INDEX_BUFFER (Vulkan).
+* ![Buffer 2](README_files/Legend_Buffer_2.png "Buffer 2") Buffer with usage containing STORAGE_BUFFER or STORAGE_TEXEL_BUFFER (Vulkan).
+* ![Buffer 3](README_files/Legend_Buffer_3.png "Buffer 3") Buffer with usage containing UNIFORM_BUFFER or UNIFORM_TEXEL_BUFFER (Vulkan).
 * ![Buffer 4](README_files/Legend_Buffer_4.png "Buffer 4") Other buffer.
-* ![Image 1](README_files/Legend_Image_1.png "Image 1") Image with OPTIMAL tiling and usage containing DEPTH_STENCIL_ATTACHMENT or 1D/2D/3D texture with usage containing D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL.
-* ![Image 2](README_files/Legend_Image_2.png "Image 2") Image with OPTIMAL tiling and usage containing INPUT_ATTACHMENT, TRANSIENT_ATTACHMENT or COLOR_ATTACHMENT, or 1D/2D/3D texture with usage containing D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET or D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS.
-* ![Image 3](README_files/Legend_Image_3.png "Image 3") Image with OPTIMAL tiling and usage containing SAMPLED or 1D/2D/3D texture with usage not containing D3D12_RESOURCE_FLAG_DENY_SHARED_RESOURCE.
-* ![Image 4](README_files/Legend_Image_4.png "Image 4") Other image with OPTIMAL tiling or 1D/2D/3D texture.
-* ![Image Linear](README_files/Legend_Image_Linear.png "Image Linear") Image with LINEAR tiling.
-* ![Image Unknown](README_files/Legend_Image_Unknown.png "Image Unknown") Image with tiling unknown to the allocator.
+* ![Image 1](README_files/Legend_Image_1.png "Image 1") Image with OPTIMAL tiling and usage containing DEPTH_STENCIL_ATTACHMENT (Vulkan) or a texture with usage containing D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL (D3D12).
+* ![Image 2](README_files/Legend_Image_2.png "Image 2") Image with OPTIMAL tiling and usage containing INPUT_ATTACHMENT, TRANSIENT_ATTACHMENT or COLOR_ATTACHMENT (Vulkan), or a texture with usage containing D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET or D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS (D3D12).
+* ![Image 3](README_files/Legend_Image_3.png "Image 3") Image with OPTIMAL tiling and usage containing SAMPLED (Vulkan) or a texture with usage not containing D3D12_RESOURCE_FLAG_DENY_SHARED_RESOURCE (D3D12).
+* ![Image 4](README_files/Legend_Image_4.png "Image 4") Other image with OPTIMAL tiling (Vulkan) or a texture (D3D12).
+* ![Image Linear](README_files/Legend_Image_Linear.png "Image Linear") Image with LINEAR tiling (Vulkan).
+* ![Image Unknown](README_files/Legend_Image_Unknown.png "Image Unknown") Image with tiling unknown to the allocator (Vulkan).
 * ![Unknown](README_files/Legend_Unknown.png "Unknown") Allocation of unknown type.
 * ![Details](README_files/Legend_Details.png "Details") Black bar - one or more allocations of any kind too small to be visualized as filled rectangles.
+
+## Additional notes
+
+Warning! Current version of the tool shows incorrect result when allocations alias (overlap) in memory, as it only looks at sizes of the allocations, not their offsets.
