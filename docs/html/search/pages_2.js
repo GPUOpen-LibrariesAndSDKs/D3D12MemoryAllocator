@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['general_20considerations_0',['General considerations',['../general_considerations.html',1,'index']]]
+  ['d3d12_20memory_20allocator_0',['D3D12 Memory Allocator',['../index.html',1,'']]],
+  ['defragmentation_1',['Defragmentation',['../defragmentation.html',1,'index']]]
 ];

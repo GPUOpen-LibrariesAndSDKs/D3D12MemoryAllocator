@@ -265,18 +265,18 @@ enum ALLOCATION_FLAGS
     */
     ALLOCATION_FLAG_CAN_ALIAS = 0x10,
 
-    /** Allocation strategy that chooses smallest possible free range for the allocation
+    /** %Allocation strategy that chooses smallest possible free range for the allocation
     to minimize memory usage and fragmentation, possibly at the expense of allocation time.
     */
     ALLOCATION_FLAG_STRATEGY_MIN_MEMORY = 0x00010000,
 
-    /** Allocation strategy that chooses first suitable free range for the allocation -
+    /** %Allocation strategy that chooses first suitable free range for the allocation -
     not necessarily in terms of the smallest offset but the one that is easiest and fastest to find
     to minimize allocation time, possibly at the expense of allocation quality.
     */
     ALLOCATION_FLAG_STRATEGY_MIN_TIME = 0x00020000,
 
-    /** Allocation strategy that chooses always the lowest offset in available space.
+    /** %Allocation strategy that chooses always the lowest offset in available space.
     This is not the most efficient strategy but achieves highly packed data.
     Used internally by defragmentation, not recomended in typical usage.
     */
@@ -1065,6 +1065,16 @@ enum ALLOCATOR_FLAGS
     to create its heaps on smaller alignment not suitable for MSAA textures.
     */
     ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED = 0x8,
+    /** \brief Disable optimization that prefers creating small buffers as committed to avoid 64 KB alignment.
+    
+    By default, the library prefers creating small buffers <= 32 KB as committed,
+    because drivers tend to pack them better, while placed buffers require 64 KB alignment.
+    This, however, may decrease performance, as creating committed resources involves allocation of implicit heaps,
+    which may take longer than creating placed resources in existing heaps.
+    Passing this flag will disable this committed preference globally for the allocator.
+    It can also be disabled for a single allocation by using #ALLOCATION_FLAG_STRATEGY_MIN_TIME.
+    */
+    ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED = 0x10,
 };
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().
@@ -1447,11 +1457,11 @@ enum VIRTUAL_ALLOCATION_FLAGS
     */
     VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS = ALLOCATION_FLAG_UPPER_ADDRESS,
 
-    /// Allocation strategy that tries to minimize memory usage.
+    /// %Allocation strategy that tries to minimize memory usage.
     VIRTUAL_ALLOCATION_FLAG_STRATEGY_MIN_MEMORY = ALLOCATION_FLAG_STRATEGY_MIN_MEMORY,
-    /// Allocation strategy that tries to minimize allocation time.
+    /// %Allocation strategy that tries to minimize allocation time.
     VIRTUAL_ALLOCATION_FLAG_STRATEGY_MIN_TIME = ALLOCATION_FLAG_STRATEGY_MIN_TIME,
-    /** \brief Allocation strategy that chooses always the lowest offset in available space.
+    /** %Allocation strategy that chooses always the lowest offset in available space.
     This is not the most efficient strategy but achieves highly packed data.
     */
     VIRTUAL_ALLOCATION_FLAG_STRATEGY_MIN_OFFSET = ALLOCATION_FLAG_STRATEGY_MIN_OFFSET,

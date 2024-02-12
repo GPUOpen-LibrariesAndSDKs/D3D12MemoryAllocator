@@ -1,7 +1,7 @@
 var searchData=
 [
-  ['unusedrangecount_0',['UnusedRangeCount',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#aff1aaecbb86eedfdb15c1b11987ac0d9',1,'D3D12MA::DetailedStatistics']]],
-  ['unusedrangesizemax_1',['UnusedRangeSizeMax',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#a5fae01864d6e6595cb9c416a9f365e7c',1,'D3D12MA::DetailedStatistics']]],
-  ['unusedrangesizemin_2',['UnusedRangeSizeMin',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#ac13f6cb1737f0d906e55182385f38b70',1,'D3D12MA::DetailedStatistics']]],
-  ['usagebytes_3',['UsageBytes',['../struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253',1,'D3D12MA::Budget']]]
+  ['table_20of_20contents_0',['Table of contents',['../index.html#main_table_of_contents',1,'']]],
+  ['thread_20safety_1',['Thread safety',['../general_considerations.html#general_considerations_thread_safety',1,'']]],
+  ['total_2',['Total',['../struct_d3_d12_m_a_1_1_total_statistics.html#ac0bb53579457ddec2872c547ae8922a6',1,'D3D12MA::TotalStatistics']]],
+  ['totalstatistics_3',['TotalStatistics',['../struct_d3_d12_m_a_1_1_total_statistics.html',1,'D3D12MA']]]
 ];

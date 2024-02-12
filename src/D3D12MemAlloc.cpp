@@ -6649,6 +6649,7 @@ private:
     const bool m_UseMutex;
     const bool m_AlwaysCommitted;
     const bool m_MsaaAlwaysCommitted;
+    const bool m_PreferSmallBuffersCommitted;
     bool m_DefaultPoolsNotZeroed = false;
     ID3D12Device* m_Device; // AddRef
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
@@ -6686,7 +6687,8 @@ private:
     dedicated allocation (committed resource rather than placed resource).
     */
     template<typename D3D12_RESOURCE_DESC_T>
-    static bool PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc);
+    bool PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc,
+        ALLOCATION_FLAGS strategy);
 
     // Allocates and registers new committed resource with implicit heap, as dedicated allocation.
     // Creates and returns Allocation object and optionally D3D12 resource.
@@ -6738,6 +6740,7 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     : m_UseMutex((desc.Flags & ALLOCATOR_FLAG_SINGLETHREADED) == 0),
     m_AlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_ALWAYS_COMMITTED) != 0),
     m_MsaaAlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0),
+    m_PreferSmallBuffersCommitted((desc.Flags & ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED) == 0),
     m_Device(desc.pDevice),
     m_Adapter(desc.pAdapter),
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
@@ -7766,8 +7769,19 @@ void AllocatorPimpl::FreeStatsString(WCHAR* pStatsString)
 }
 
 template<typename D3D12_RESOURCE_DESC_T>
-bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc)
+bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc,
+    ALLOCATION_FLAGS strategy)
 {
+    // Prefer creating small buffers <= 32 KB as committed, because drivers pack them better,
+    // while placed buffers require 64 KB alignment.
+    if(resourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
+        resourceDesc.Width <= D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT / 2 &&
+        strategy != ALLOCATION_FLAG_STRATEGY_MIN_TIME &&  // Creating as committed would be slower.
+        m_PreferSmallBuffersCommitted)
+    {
+        return true;
+    }
+
     // Intentional. It may change in the future.
     return false;
 }
@@ -8066,7 +8080,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     {
         if (resDesc->SampleDesc.Count > 1 && msaaAlwaysCommitted)
             outBlockVector = NULL;
-        if (!outPreferCommitted && PrefersCommittedAllocation(*resDesc))
+        if (!outPreferCommitted && PrefersCommittedAllocation(*resDesc, allocDesc.Flags & ALLOCATION_FLAG_STRATEGY_MASK))
             outPreferCommitted = true;
     }
 

@@ -14,7 +14,8 @@ var searchData=
   ['allocation_5fflag_5fwithin_5fbudget_11',['ALLOCATION_FLAG_WITHIN_BUDGET',['../namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6',1,'D3D12MA']]],
   ['allocator_5fflag_5falways_5fcommitted_12',['ALLOCATOR_FLAG_ALWAYS_COMMITTED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb',1,'D3D12MA']]],
   ['allocator_5fflag_5fdefault_5fpools_5fnot_5fzeroed_13',['ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335',1,'D3D12MA']]],
-  ['allocator_5fflag_5fmsaa_5ftextures_5falways_5fcommitted_14',['ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e',1,'D3D12MA']]],
-  ['allocator_5fflag_5fnone_15',['ALLOCATOR_FLAG_NONE',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f',1,'D3D12MA']]],
-  ['allocator_5fflag_5fsinglethreaded_16',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]]
+  ['allocator_5fflag_5fdont_5fprefer_5fsmall_5fbuffers_5fcommitted_14',['ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a15c1ba5fbc182ac927b3011e23e74a72',1,'D3D12MA']]],
+  ['allocator_5fflag_5fmsaa_5ftextures_5falways_5fcommitted_15',['ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e',1,'D3D12MA']]],
+  ['allocator_5fflag_5fnone_16',['ALLOCATOR_FLAG_NONE',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f',1,'D3D12MA']]],
+  ['allocator_5fflag_5fsinglethreaded_17',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]]
 ];

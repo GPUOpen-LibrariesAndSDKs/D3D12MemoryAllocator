@@ -701,6 +701,71 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
     ctx.allocator->FreeStatsString(jsonString);
 }
 
+static void TestSmallBuffers(const TestContext& ctx)
+{
+    wprintf(L"Test small buffers\n");
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, 8 * KILOBYTE);
+
+    D3D12_RESOURCE_DESC largeResDesc = resDesc;
+    largeResDesc.Width = 128 * KILOBYTE;
+
+    std::vector<ResourceWithAllocation> resources;
+
+    // A large buffer placed inside the heap to allocate first block.
+    {
+        resources.emplace_back();
+        ResourceWithAllocation& resWithAlloc = resources.back();
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &largeResDesc, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+        CHECK_BOOL(resWithAlloc.allocation->GetHeap()); // Expected to be placed.
+    }
+
+    // Test 1: COMMITTED.
+    {
+        resources.emplace_back();
+        ResourceWithAllocation& resWithAlloc = resources.back();
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+        CHECK_BOOL(!resWithAlloc.allocation->GetHeap()); // Expected to be committed.
+    }
+
+    // Test 2: Default.
+    {
+        resources.emplace_back();
+        ResourceWithAllocation& resWithAlloc = resources.back();
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+        CHECK_BOOL(!resWithAlloc.allocation->GetHeap()); // Expected to be committed.
+    }
+
+    // Test 3: NEVER_ALLOCATE.
+    {
+        resources.emplace_back();
+        ResourceWithAllocation& resWithAlloc = resources.back();
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+        CHECK_BOOL(resWithAlloc.allocation->GetHeap()); // Expected to be placed.
+    }
+}
+
 static void TestCustomHeapFlags(const TestContext& ctx)
 {
     wprintf(L"Test custom heap flags\n");
@@ -763,7 +828,7 @@ static void TestPlacedResources(const TestContext& ctx)
     const bool alwaysCommitted = (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED) != 0;
 
     const UINT count = 4;
-    const UINT64 bufSize = 32ull * 1024;
+    const UINT64 bufSize = 64ull * 1024;
     ResourceWithAllocation resources[count];
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -2763,7 +2828,7 @@ static void TestDevice4(const TestContext& ctx)
     }
 
     D3D12_RESOURCE_DESC resourceDesc;
-    FillResourceDescForBuffer(resourceDesc, 1024);
+    FillResourceDescForBuffer(resourceDesc, 64 * KILOBYTE);
 
     for(UINT testIndex = 0; testIndex < 2; ++testIndex)
     {
@@ -2857,7 +2922,11 @@ static void TestDevice10(const TestContext& ctx)
     wprintf(L"Test ID3D12Device10\n");
 
     ComPtr<ID3D12Device10> dev10;
-    CHECK_HR(ctx.device->QueryInterface(IID_PPV_ARGS(&dev10)));
+    if(FAILED(ctx.device->QueryInterface(IID_PPV_ARGS(&dev10))))
+    {
+        wprintf(L"QueryInterface for ID3D12Device10 failed!\n");
+        return;
+    }
 
     D3D12_RESOURCE_DESC1 resourceDesc = {};
     resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -4150,6 +4219,7 @@ static void TestGroupBasics(const TestContext& ctx)
 #else
     TestJson(ctx);
     TestCommittedResourcesAndJson(ctx);
+    TestSmallBuffers(ctx);
     TestCustomHeapFlags(ctx);
     TestPlacedResources(ctx);
     TestOtherComInterface(ctx);
