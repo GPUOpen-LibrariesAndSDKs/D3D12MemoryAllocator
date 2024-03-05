@@ -4034,6 +4034,10 @@ bool BlockMetadata_Linear::CreateAllocationRequest(
     D3D12MA_ASSERT(allocSize > 0 && "Cannot allocate empty block!");
     D3D12MA_ASSERT(pAllocationRequest != NULL);
     D3D12MA_HEAVY_ASSERT(Validate());
+
+    if(allocSize > GetSize())
+        return false;
+
     pAllocationRequest->size = allocSize;
     return upperAddress ?
         CreateAllocationRequest_UpperAddress(
