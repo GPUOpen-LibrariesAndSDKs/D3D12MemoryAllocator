@@ -2983,6 +2983,152 @@ static void TestDevice10(const TestContext& ctx)
 }
 #endif // #ifdef __ID3D12Device10_INTERFACE_DEFINED__
 
+static void TestGPUUploadHeap(const TestContext& ctx)
+{
+#if D3D12MA_OPTIONS16_SUPPORTED
+    using namespace D3D12MA;
+
+    wprintf(L"Test GPU Upload Heap\n");
+
+    if(!ctx.allocator->IsGPUUploadHeapSupported())
+    {
+        wprintf(L"    Skipped due to GPUUploadHeap not supported.\n");
+        return;
+    }
+
+    Budget begLocalBudget = {};
+    ctx.allocator->GetBudget(&begLocalBudget, NULL);
+    TotalStatistics begStats = {};
+    ctx.allocator->CalculateStatistics(&begStats);
+
+    // Create a buffer, likely placed.
+    ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_GPU_UPLOAD;
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, 64 * KILOBYTE);
+
+    ComPtr<Allocation> alloc;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, &alloc, IID_NULL, NULL));
+    CHECK_BOOL(alloc && alloc->GetResource());
+    CHECK_BOOL(alloc->GetResource()->GetGPUVirtualAddress() != 0);
+    
+    {
+        D3D12_HEAP_PROPERTIES heapProps = {};
+        D3D12_HEAP_FLAGS heapFlags = {};
+        CHECK_HR(alloc->GetResource()->GetHeapProperties(&heapProps, &heapFlags));
+        CHECK_BOOL(heapProps.Type == D3D12_HEAP_TYPE_GPU_UPLOAD);
+    }
+
+    // Create a committed one.
+    ALLOCATION_DESC committedAllocDesc = allocDesc;
+    committedAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
+    ComPtr<Allocation> committedAlloc;
+    CHECK_HR(ctx.allocator->CreateResource(&committedAllocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, &committedAlloc, IID_NULL, NULL));
+    CHECK_BOOL(committedAlloc && committedAlloc->GetResource());
+    CHECK_BOOL(committedAlloc->GetHeap() == NULL); // Committed, heap is implicit and inaccessible.
+
+    // Create a custom pool and a buffer inside of it.
+    POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_GPU_UPLOAD;
+    ComPtr<Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+    
+    ALLOCATION_DESC poolAllocDesc = {};
+    poolAllocDesc.CustomPool = pool.Get();
+    ComPtr<Allocation> poolAlloc;
+    CHECK_HR(ctx.allocator->CreateResource(&poolAllocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, &poolAlloc, IID_NULL, NULL));
+    CHECK_BOOL(poolAlloc && poolAlloc->GetResource());
+
+    // Map the original buffer, write, then read
+    {
+        const auto res = alloc->GetResource();
+
+        UINT* mappedData = NULL;
+        CHECK_HR(res->Map(0, &EMPTY_RANGE, (void**)&mappedData)); // {0, 0} - not reading anything.
+        for(UINT i = 0; i < resDesc.Width / sizeof(UINT); ++i)
+        {
+            mappedData[i] = i * 3;
+        }
+        res->Unmap(0, NULL); // NULL - written everything.
+
+        CHECK_HR(res->Map(0, NULL, (void**)&mappedData)); // NULL - reading everything.
+        CHECK_BOOL(mappedData[100] = 300);
+        res->Unmap(0, &EMPTY_RANGE); // {0, 0} - not written anything.
+
+    }
+
+    // Create two big buffers.
+    D3D12_RESOURCE_DESC bigResDesc = resDesc;
+    bigResDesc.Width = 128 * MEGABYTE;
+
+    ComPtr<Allocation> bigAllocs[2];
+    for(UINT i = 0; i < 2; ++i)
+    {
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &bigResDesc,
+            D3D12_RESOURCE_STATE_COMMON, NULL, &bigAllocs[i], IID_NULL, NULL));
+        CHECK_BOOL(bigAllocs[i] && bigAllocs[i]->GetResource());
+    }
+
+    // Create a texture.
+    constexpr UINT texSize = 256;
+    D3D12_RESOURCE_DESC texDesc = {};
+    texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    texDesc.Alignment = 0;
+    texDesc.Width = texSize;
+    texDesc.Height = texSize;
+    texDesc.DepthOrArraySize = 1;
+    texDesc.MipLevels = 1;
+    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.SampleDesc.Quality = 0;
+    texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    texDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    ComPtr<Allocation> texAlloc;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &texDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, &texAlloc, IID_NULL, NULL));
+    CHECK_BOOL(texAlloc && texAlloc->GetResource());
+
+    {
+        std::vector<UINT> texPixels(texSize * texSize);
+        // Contents of texPixels[i] doesn't matter.
+        const auto texRes = texAlloc->GetResource();
+        // Need to pass ppData == NULL for Map() to be used with a texture having D3D12_TEXTURE_LAYOUT_UNKNOWN.
+        CHECK_HR(texRes->Map(0, &EMPTY_RANGE, NULL)); // {0, 0} - not reading anything.
+        CHECK_HR(texRes->WriteToSubresource(
+            0, // DstSubresource
+            NULL, // pDstBox
+            texPixels.data(), // pSrcData
+            texSize * sizeof(DWORD), // SrcRowPitch
+            texSize * texSize * sizeof(DWORD))); // SrcDepthPitch
+        texRes->Unmap(0, NULL); // NULL - written everything.
+    }
+
+    // Check budget and stats
+    constexpr UINT totalAllocCount = 6;
+    Budget endLocalBudget = {};
+    ctx.allocator->GetBudget(&endLocalBudget, NULL);
+    TotalStatistics endStats = {};
+    ctx.allocator->CalculateStatistics(&endStats);
+    CHECK_BOOL(endLocalBudget.UsageBytes >= begLocalBudget.UsageBytes
+        + 2 * bigResDesc.Width
+        && "This can fail if GPU_UPLOAD falls back to system RAM e.g. when under PIX?");
+    auto validateStats = [totalAllocCount, &bigResDesc](const Statistics& begStats, const Statistics& endStats)
+    {
+        CHECK_BOOL(endStats.BlockCount >= begStats.BlockCount);
+        CHECK_BOOL(endStats.BlockBytes >= begStats.BlockBytes);
+        CHECK_BOOL(endStats.AllocationCount == begStats.AllocationCount + totalAllocCount);
+        CHECK_BOOL(endStats.AllocationBytes > begStats.AllocationBytes + 2 * bigResDesc.Width);
+    };
+    validateStats(begLocalBudget.Stats, endLocalBudget.Stats);
+    validateStats(begStats.Total.Stats, endStats.Total.Stats);
+    validateStats(begStats.MemorySegmentGroup[0].Stats, endStats.MemorySegmentGroup[0].Stats); // DXGI_MEMORY_SEGMENT_GROUP_LOCAL
+    validateStats(begStats.HeapType[4].Stats, endStats.HeapType[4].Stats); // D3D12_HEAP_TYPE_GPU_UPLOAD
+#endif
+}
+
 static void TestVirtualBlocks(const TestContext& ctx)
 {
     wprintf(L"Test virtual blocks\n");
@@ -4249,6 +4395,8 @@ static void TestGroupBasics(const TestContext& ctx)
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     TestDevice10(ctx);
 #endif
+
+    TestGPUUploadHeap(ctx);
 
     FILE* file;
     fopen_s(&file, "Results.csv", "w");

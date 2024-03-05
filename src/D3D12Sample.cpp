@@ -572,6 +572,8 @@ static std::wstring SizeToStr(size_t size)
 
 static void PrintAdapterInformation(IDXGIAdapter1* adapter)
 {
+    assert(g_Allocator);
+
     wprintf(L"DXGI_ADAPTER_DESC1:\n");
     wprintf(L"    Description = %s\n", g_AdapterDesc.Description);
     wprintf(L"    VendorId = 0x%X (%s)\n", g_AdapterDesc.VendorId, VendorIDToStr(g_AdapterDesc.VendorId));
@@ -597,6 +599,9 @@ static void PrintAdapterInformation(IDXGIAdapter1* adapter)
     default:
         assert(0);
     }
+
+    wprintf(L"D3D12_FEATURE_DATA_D3D12_OPTIONS16:\n");
+    wprintf(L"    GPUUploadHeapSupported = %u\n", g_Allocator->IsGPUUploadHeapSupported() ? 1 : 0);
 
     ComPtr<IDXGIAdapter3> adapter3;
     if(SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(&adapter3))))

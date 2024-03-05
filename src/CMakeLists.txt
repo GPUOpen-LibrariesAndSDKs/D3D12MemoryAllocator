@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.25)
+
 set(D3D12MA_LIBRARY_SOURCE_FILES
     D3D12MemAlloc.cpp
     "${PROJECT_SOURCE_DIR}/include/D3D12MemAlloc.h"
@@ -150,10 +152,24 @@ if(D3D12MA_AGILITY_SDK_DIRECTORY)
             if(D3D12MA_AGILITY_SDK_PREVIEW)
                 target_compile_definitions(D3D12Sample PRIVATE D3D12MA_USE_AGILITY_SDK_PREVIEW=1)
             endif()
+            add_custom_command(TARGET D3D12Sample POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:D3D12Sample>/D3D12"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/bin/x64/D3D12Core.dll"
+                    "$<TARGET_FILE_DIR:D3D12Sample>/D3D12/"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/bin/x64/d3d12SDKLayers.dll"
+                    "$<TARGET_FILE_DIR:D3D12Sample>/D3D12/")
         endif()
     else()
         message(FATAL_ERROR "DX12 Agility SDK not found - cannot find file \"${D3D12MA_AGILITY_SDK_DIRECTORY}/build/native/include/d3d12.h\".")
     endif()
 else()
     message(STATUS "DX12 Agility SDK not used.")
+endif()
+
+option(D3D12MA_OPTIONS16_SUPPORTED "Set if using Agility SDK 1.710.0-preview or newer that defines D3D12_FEATURE_DATA_D3D12_OPTIONS16." OFF)
+if(D3D12MA_OPTIONS16_SUPPORTED)
+    target_compile_definitions(D3D12MemoryAllocator PRIVATE D3D12MA_OPTIONS16_SUPPORTED=1)
+    if(${D3D12MA_BUILD_SAMPLE} AND ${WIN32})
+        target_compile_definitions(D3D12Sample PRIVATE D3D12MA_OPTIONS16_SUPPORTED=1)
+    endif()
 endif()
