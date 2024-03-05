@@ -1864,8 +1864,9 @@ to obtain object D3D12MA::Pool. Example:
 \code
 POOL_DESC poolDesc = {};
 poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-// This flag is optional but recommended.
+// These flags are optional but recommended.
 poolDesc.Flags = D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED;
+poolDesc.HeapFlags = D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
 
 Pool* pool;
 HRESULT hr = allocator->CreatePool(&poolDesc, &pool);

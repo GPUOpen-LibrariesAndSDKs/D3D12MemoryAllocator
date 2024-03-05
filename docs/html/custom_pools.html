@@ -84,8 +84,9 @@ Usage</h1>
 <p>To create a custom pool, fill in structure <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html" title="Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.">D3D12MA::POOL_DESC</a> and call function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aac7b1f6bf53cbf4c4ce2264cb72ca515" title="Creates custom pool.">D3D12MA::Allocator::CreatePool</a> to obtain object <a class="el" href="class_d3_d12_m_a_1_1_pool.html" title="Custom memory pool.">D3D12MA::Pool</a>. Example:</p>
 <div class="fragment"><div class="line">POOL_DESC poolDesc = {};</div>
 <div class="line">poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;</div>
-<div class="line"><span class="comment">// This flag is optional but recommended.</span></div>
+<div class="line"><span class="comment">// These flags are optional but recommended.</span></div>
 <div class="line">poolDesc.Flags = <a class="code hl_enumvalue" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a>;</div>
+<div class="line">poolDesc.HeapFlags = D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;</div>
 <div class="line"> </div>
 <div class="line">Pool* pool;</div>
 <div class="line">HRESULT hr = allocator-&gt;CreatePool(&amp;poolDesc, &amp;pool);</div>
