@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 
 
-PROGRAM_VERSION = 'Vulkan/D3D12 Memory Allocator Dump Visualization 3.0.3'
+PROGRAM_VERSION = 'Vulkan/D3D12 Memory Allocator Dump Visualization 3.0.4'
 IMG_WIDTH = 1200
 IMG_MARGIN = 8
 TEXT_MARGIN = 4
@@ -159,7 +159,7 @@ def TypeToColor(type, usage):
         elif type == 'IMAGE_OPTIMAL':
             if (usage & 0x20) != 0: # DEPTH_STENCIL_ATTACHMENT
                 return 246, 128, 255, 255 # Pink
-            elif (usage & 0xD0) != 0: # INPUT_ATTACHMENT | TRANSIENT_ATTACHMENT | COLOR_ATTACHMENT
+            elif (usage & 0xD8) != 0: # INPUT_ATTACHMENT | TRANSIENT_ATTACHMENT | COLOR_ATTACHMENT | STORAGE
                 return 179, 179, 255, 255 # Blue
             elif (usage & 0x4) != 0: # SAMPLED
                 return 0, 255, 255, 255 # Aqua
