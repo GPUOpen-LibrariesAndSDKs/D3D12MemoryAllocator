@@ -1637,6 +1637,9 @@ ID3D12Device* device = (...)
 D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
 allocatorDesc.pDevice = device;
 allocatorDesc.pAdapter = adapter;
+// These flags are optional but recommended.
+allocatorDesc.Flags = D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED |
+    D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED;
 
 D3D12MA::Allocator* allocator;
 HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
@@ -1861,6 +1864,8 @@ to obtain object D3D12MA::Pool. Example:
 \code
 POOL_DESC poolDesc = {};
 poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+// This flag is optional but recommended.
+poolDesc.Flags = D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED;
 
 Pool* pool;
 HRESULT hr = allocator->CreatePool(&poolDesc, &pool);

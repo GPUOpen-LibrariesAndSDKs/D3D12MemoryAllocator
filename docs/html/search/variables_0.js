@@ -6,6 +6,6 @@ var searchData=
   ['allocationsizemax_3',['AllocationSizeMax',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#a2f47015bebf9a30ce221aef88fe11991',1,'D3D12MA::DetailedStatistics']]],
   ['allocationsizemin_4',['AllocationSizeMin',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#a187e5562265c3daa87c15d54f1396a6a',1,'D3D12MA::DetailedStatistics']]],
   ['allocationsmoved_5',['AllocationsMoved',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___s_t_a_t_s.html#a708fa1b14c35da8d5d6abd4a457ef0c2',1,'D3D12MA::DEFRAGMENTATION_STATS']]],
-  ['allochandle_6',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]],
-  ['allochandle_7',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation']]]
+  ['allochandle_6',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation']]],
+  ['allochandle_7',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]]
 ];

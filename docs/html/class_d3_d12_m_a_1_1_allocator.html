@@ -104,6 +104,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a08210561b92c4bd7ede9dd7beba4bb80" id="r_a08210561b92c4bd7ede9dd7beba4bb80"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a08210561b92c4bd7ede9dd7beba4bb80">IsCacheCoherentUMA</a> () const</td></tr>
 <tr class="memdesc:a08210561b92c4bd7ede9dd7beba4bb80"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if <code>D3D12_FEATURE_DATA_ARCHITECTURE1::CacheCoherentUMA</code> was found to be true.  <br /></td></tr>
 <tr class="separator:a08210561b92c4bd7ede9dd7beba4bb80"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3f3fd1e88cf2cd02257fe272e08a273c" id="r_a3f3fd1e88cf2cd02257fe272e08a273c"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3f3fd1e88cf2cd02257fe272e08a273c">IsGPUUploadHeapSupported</a> () const</td></tr>
+<tr class="memdesc:a3f3fd1e88cf2cd02257fe272e08a273c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if GPU Upload Heaps are supported on the current system.  <br /></td></tr>
+<tr class="separator:a3f3fd1e88cf2cd02257fe272e08a273c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a434ae3147209953253da26687bfd62dc" id="r_a434ae3147209953253da26687bfd62dc"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a434ae3147209953253da26687bfd62dc">GetMemoryCapacity</a> (UINT memorySegmentGroup) const</td></tr>
 <tr class="memdesc:a434ae3147209953253da26687bfd62dc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns total amount of memory of specific segment group, in bytes.  <br /></td></tr>
 <tr class="separator:a434ae3147209953253da26687bfd62dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -779,6 +782,28 @@ Public Member Functions</h2></td></tr>
 <li>"D3D12_FEATURE_DATA_ARCHITECTURE structure (d3d12.h)"</li>
 <li>"ID3D12Device::GetCustomHeapProperties method (d3d12.h)" </li>
 </ul>
+
+</div>
+</div>
+<a id="a3f3fd1e88cf2cd02257fe272e08a273c" name="a3f3fd1e88cf2cd02257fe272e08a273c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3f3fd1e88cf2cd02257fe272e08a273c">&#9670;&#160;</a></span>IsGPUUploadHeapSupported()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">BOOL D3D12MA::Allocator::IsGPUUploadHeapSupported </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if GPU Upload Heaps are supported on the current system. </p>
+<p>When true, you can use <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code>.</p>
+<p>This flag is fetched from <code>D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported</code>.</p>
+<p><code>#define D3D12MA_OPTIONS16_SUPPORTED 1</code> is needed for the compilation of this library. Otherwise the flag is always false. </p>
 
 </div>
 </div>

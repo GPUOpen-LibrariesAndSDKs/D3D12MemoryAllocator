@@ -125,9 +125,6 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a65fab0c479df1b6b72c9300e68dc6770" id="r_a65fab0c479df1b6b72c9300e68dc6770"><td class="memItemLeft" align="right" valign="top">LPCWSTR&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a65fab0c479df1b6b72c9300e68dc6770">GetName</a> () const</td></tr>
 <tr class="memdesc:a65fab0c479df1b6b72c9300e68dc6770"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the name associated with the allocation object.  <br /></td></tr>
 <tr class="separator:a65fab0c479df1b6b72c9300e68dc6770"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b1ef2717beed503fcb3cb7e6a171762" id="r_a1b1ef2717beed503fcb3cb7e6a171762"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a1b1ef2717beed503fcb3cb7e6a171762">WasZeroInitialized</a> () const</td></tr>
-<tr class="memdesc:a1b1ef2717beed503fcb3cb7e6a171762"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns <code>TRUE</code> if the memory of the allocation was filled with zeros when the allocation was created.  <br /></td></tr>
-<tr class="separator:a1b1ef2717beed503fcb3cb7e6a171762"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Represents single memory allocation. </p>
@@ -384,40 +381,6 @@ Public Member Functions</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Releases the resource currently pointed by the allocation (if any), sets it to new one, incrementing its reference counter (if not null). </p>
-
-</div>
-</div>
-<a id="a1b1ef2717beed503fcb3cb7e6a171762" name="a1b1ef2717beed503fcb3cb7e6a171762"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1b1ef2717beed503fcb3cb7e6a171762">&#9670;&#160;</a></span>WasZeroInitialized()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">BOOL D3D12MA::Allocation::WasZeroInitialized </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"></span></td><td>)</td>
-          <td> const</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Returns <code>TRUE</code> if the memory of the allocation was filled with zeros when the allocation was created. </p>
-<p>Returns <code>TRUE</code> only if the allocator is sure that the entire memory where the allocation was created was filled with zeros at the moment the allocation was made.</p>
-<p>Returns <code>FALSE</code> if the memory could potentially contain garbage data. If it's a render-target or depth-stencil texture, it then needs proper initialization with <code>ClearRenderTargetView</code>, <code>ClearDepthStencilView</code>, <code>DiscardResource</code>, or a copy operation, as described on page "ID3D12Device::CreatePlacedResource method - Notes on the required resource initialization" in Microsoft documentation. Please note that rendering a fullscreen triangle or quad to the texture as a render target is not a proper way of initialization!</p>
-<p>See also articles:</p>
-<ul>
-<li>"Coming to DirectX 12: More control over memory allocation" on DirectX Developer Blog</li>
-<li><a href="https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing">"Initializing DX12 Textures After Allocation and Aliasing"</a>. </li>
-</ul>
 
 </div>
 </div>

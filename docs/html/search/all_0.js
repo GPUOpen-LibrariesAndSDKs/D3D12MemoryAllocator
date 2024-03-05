@@ -42,12 +42,13 @@ var searchData=
   ['allocator_5fflag_5fnone_39',['ALLOCATOR_FLAG_NONE',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a2fb30967b492c27823a80b5de3aea26f',1,'D3D12MA']]],
   ['allocator_5fflag_5fsinglethreaded_40',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]],
   ['allocator_5fflags_41',['ALLOCATOR_FLAGS',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916',1,'D3D12MA']]],
-  ['allochandle_42',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]],
-  ['allochandle_43',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation::AllocHandle'],['../namespace_d3_d12_m_a.html#a15e349adce86a40e0417d405aef1af80',1,'D3D12MA::AllocHandle']]],
-  ['also_44',['See also',['../index.html#main_see_also',1,'']]],
-  ['and_20benefits_45',['Features and benefits',['../custom_pools.html#custom_pools_features_and_benefits',1,'']]],
-  ['and_20compatibility_46',['Versioning and compatibility',['../general_considerations.html#general_considerations_versioning_and_compatibility',1,'']]],
-  ['and_20initialization_47',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
-  ['and_20units_48',['Alignment and units',['../virtual_allocator.html#virtual_allocator_alignment_and_units',1,'']]],
-  ['at_20once_49',['Free-at-once',['../linear_algorithm.html#linear_algorithm_free_at_once',1,'']]]
+  ['allochandle_42',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation']]],
+  ['allochandle_43',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]],
+  ['allochandle_44',['AllocHandle',['../namespace_d3_d12_m_a.html#a15e349adce86a40e0417d405aef1af80',1,'D3D12MA']]],
+  ['also_45',['See also',['../index.html#main_see_also',1,'']]],
+  ['and_20benefits_46',['Features and benefits',['../custom_pools.html#custom_pools_features_and_benefits',1,'']]],
+  ['and_20compatibility_47',['Versioning and compatibility',['../general_considerations.html#general_considerations_versioning_and_compatibility',1,'']]],
+  ['and_20initialization_48',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
+  ['and_20units_49',['Alignment and units',['../virtual_allocator.html#virtual_allocator_alignment_and_units',1,'']]],
+  ['at_20once_50',['Free-at-once',['../linear_algorithm.html#linear_algorithm_free_at_once',1,'']]]
 ];

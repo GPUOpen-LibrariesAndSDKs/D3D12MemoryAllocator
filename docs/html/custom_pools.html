@@ -84,9 +84,12 @@ Usage</h1>
 <p>To create a custom pool, fill in structure <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html" title="Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.">D3D12MA::POOL_DESC</a> and call function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#aac7b1f6bf53cbf4c4ce2264cb72ca515" title="Creates custom pool.">D3D12MA::Allocator::CreatePool</a> to obtain object <a class="el" href="class_d3_d12_m_a_1_1_pool.html" title="Custom memory pool.">D3D12MA::Pool</a>. Example:</p>
 <div class="fragment"><div class="line">POOL_DESC poolDesc = {};</div>
 <div class="line">poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;</div>
+<div class="line"><span class="comment">// This flag is optional but recommended.</span></div>
+<div class="line">poolDesc.Flags = <a class="code hl_enumvalue" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a>;</div>
 <div class="line"> </div>
 <div class="line">Pool* pool;</div>
 <div class="line">HRESULT hr = allocator-&gt;CreatePool(&amp;poolDesc, &amp;pool);</div>
+<div class="ttc" id="anamespace_d3_d12_m_a_html_a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa"><div class="ttname"><a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a></div><div class="ttdeci">@ POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</div><div class="ttdoc">Optimization, allocate MSAA textures as committed resources always.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:842</div></div>
 </div><!-- fragment --><p>To allocate resources out of a custom pool, only set member <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934" title="Custom pool to place the new resource in. Optional.">D3D12MA::ALLOCATION_DESC::CustomPool</a>. Example:</p>
 <div class="fragment"><div class="line">ALLOCATION_DESC allocDesc = {};</div>
 <div class="line">allocDesc.CustomPool = pool;</div>

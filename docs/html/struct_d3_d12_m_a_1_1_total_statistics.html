@@ -89,9 +89,9 @@ $(function() {
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a07247152fc70a8ee5605cab0fe220ea5" id="r_a07247152fc70a8ee5605cab0fe220ea5"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a07247152fc70a8ee5605cab0fe220ea5">HeapType</a> [4]</td></tr>
-<tr class="memdesc:a07247152fc70a8ee5605cab0fe220ea5"><td class="mdescLeft">&#160;</td><td class="mdescRight">One element for each type of heap located at the following indices:  <br /></td></tr>
-<tr class="separator:a07247152fc70a8ee5605cab0fe220ea5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abad2e48b38f8a73a4daf8577e7a33b89" id="r_abad2e48b38f8a73a4daf8577e7a33b89"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#abad2e48b38f8a73a4daf8577e7a33b89">HeapType</a> [5]</td></tr>
+<tr class="memdesc:abad2e48b38f8a73a4daf8577e7a33b89"><td class="mdescLeft">&#160;</td><td class="mdescRight">One element for each type of heap located at the following indices:  <br /></td></tr>
+<tr class="separator:abad2e48b38f8a73a4daf8577e7a33b89"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aed7d22d5cd773aa896bc4c786c7f3650" id="r_aed7d22d5cd773aa896bc4c786c7f3650"><td class="memItemLeft" align="right" valign="top"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aed7d22d5cd773aa896bc4c786c7f3650">MemorySegmentGroup</a> [2]</td></tr>
 <tr class="memdesc:aed7d22d5cd773aa896bc4c786c7f3650"><td class="mdescLeft">&#160;</td><td class="mdescRight">One element for each memory segment group located at the following indices:  <br /></td></tr>
 <tr class="separator:aed7d22d5cd773aa896bc4c786c7f3650"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -103,14 +103,14 @@ Public Attributes</h2></td></tr>
 <div class="textblock"><p>General statistics from current state of the allocator - total memory usage across all memory heaps and segments. </p>
 <p>These are slower to calculate. Use for debugging purposes. See function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a99db00df909963573a976c203b107d22" title="Retrieves statistics from current state of the allocator.">D3D12MA::Allocator::CalculateStatistics()</a>. </p>
 </div><h2 class="groupheader">Member Data Documentation</h2>
-<a id="a07247152fc70a8ee5605cab0fe220ea5" name="a07247152fc70a8ee5605cab0fe220ea5"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a07247152fc70a8ee5605cab0fe220ea5">&#9670;&#160;</a></span>HeapType</h2>
+<a id="abad2e48b38f8a73a4daf8577e7a33b89" name="abad2e48b38f8a73a4daf8577e7a33b89"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abad2e48b38f8a73a4daf8577e7a33b89">&#9670;&#160;</a></span>HeapType</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a> D3D12MA::TotalStatistics::HeapType[4]</td>
+          <td class="memname"><a class="el" href="struct_d3_d12_m_a_1_1_detailed_statistics.html">DetailedStatistics</a> D3D12MA::TotalStatistics::HeapType[5]</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -120,7 +120,8 @@ Public Attributes</h2></td></tr>
 <li>0 = <code>D3D12_HEAP_TYPE_DEFAULT</code></li>
 <li>1 = <code>D3D12_HEAP_TYPE_UPLOAD</code></li>
 <li>2 = <code>D3D12_HEAP_TYPE_READBACK</code></li>
-<li>3 = <code>D3D12_HEAP_TYPE_CUSTOM</code> </li>
+<li>3 = <code>D3D12_HEAP_TYPE_CUSTOM</code></li>
+<li>4 = <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code> </li>
 </ul>
 
 </div>
@@ -145,7 +146,7 @@ Public Attributes</h2></td></tr>
 <p>Meaning of these segment groups is:</p>
 <ul>
 <li>When <code>IsUMA() == FALSE</code> (discrete graphics card):<ul>
-<li><code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> (index 0) represents GPU memory (resources allocated in <code>D3D12_HEAP_TYPE_DEFAULT</code> or <code>D3D12_MEMORY_POOL_L1</code>).</li>
+<li><code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> (index 0) represents GPU memory (resources allocated in <code>D3D12_HEAP_TYPE_DEFAULT</code>, <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code> or <code>D3D12_MEMORY_POOL_L1</code>).</li>
 <li><code>DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL</code> (index 1) represents system memory (resources allocated in <code>D3D12_HEAP_TYPE_UPLOAD</code>, <code>D3D12_HEAP_TYPE_READBACK</code>, or <code>D3D12_MEMORY_POOL_L0</code>).</li>
 </ul>
 </li>
