@@ -543,26 +543,6 @@ public:
     */
     LPCWSTR GetName() const { return m_Name; }
 
-    /** \brief Returns `TRUE` if the memory of the allocation was filled with zeros when the allocation was created.
-
-    Returns `TRUE` only if the allocator is sure that the entire memory where the
-    allocation was created was filled with zeros at the moment the allocation was made.
-    
-    Returns `FALSE` if the memory could potentially contain garbage data.
-    If it's a render-target or depth-stencil texture, it then needs proper
-    initialization with `ClearRenderTargetView`, `ClearDepthStencilView`, `DiscardResource`,
-    or a copy operation, as described on page
-    "ID3D12Device::CreatePlacedResource method - Notes on the required resource initialization" in Microsoft documentation.
-    Please note that rendering a fullscreen triangle or quad to the texture as
-    a render target is not a proper way of initialization!
-
-    See also articles:
-
-    - "Coming to DirectX 12: More control over memory allocation" on DirectX Developer Blog
-    - ["Initializing DX12 Textures After Allocation and Aliasing"](https://asawicki.info/news_1724_initializing_dx12_textures_after_allocation_and_aliasing).
-    */
-    BOOL WasZeroInitialized() const { return m_PackedData.WasZeroInitialized(); }
-
 protected:
     void ReleaseThis() override;
 
@@ -621,29 +601,26 @@ private:
     {
     public:
         PackedData() :
-            m_Type(0), m_ResourceDimension(0), m_ResourceFlags(0), m_TextureLayout(0), m_WasZeroInitialized(0) { }
+            m_Type(0), m_ResourceDimension(0), m_ResourceFlags(0), m_TextureLayout(0) { }
 
         Type GetType() const { return (Type)m_Type; }
         D3D12_RESOURCE_DIMENSION GetResourceDimension() const { return (D3D12_RESOURCE_DIMENSION)m_ResourceDimension; }
         D3D12_RESOURCE_FLAGS GetResourceFlags() const { return (D3D12_RESOURCE_FLAGS)m_ResourceFlags; }
         D3D12_TEXTURE_LAYOUT GetTextureLayout() const { return (D3D12_TEXTURE_LAYOUT)m_TextureLayout; }
-        BOOL WasZeroInitialized() const { return (BOOL)m_WasZeroInitialized; }
 
         void SetType(Type type);
         void SetResourceDimension(D3D12_RESOURCE_DIMENSION resourceDimension);
         void SetResourceFlags(D3D12_RESOURCE_FLAGS resourceFlags);
         void SetTextureLayout(D3D12_TEXTURE_LAYOUT textureLayout);
-        void SetWasZeroInitialized(BOOL wasZeroInitialized) { m_WasZeroInitialized = wasZeroInitialized ? 1 : 0; }
 
     private:
         UINT m_Type : 2;               // enum Type
         UINT m_ResourceDimension : 3;  // enum D3D12_RESOURCE_DIMENSION
         UINT m_ResourceFlags : 24;     // flags D3D12_RESOURCE_FLAGS
         UINT m_TextureLayout : 9;      // enum D3D12_TEXTURE_LAYOUT
-        UINT m_WasZeroInitialized : 1; // BOOL
     } m_PackedData;
 
-    Allocation(AllocatorPimpl* allocator, UINT64 size, UINT64 alignment, BOOL wasZeroInitialized);
+    Allocation(AllocatorPimpl* allocator, UINT64 size, UINT64 alignment);
     //  Nothing here, everything already done in Release.
     virtual ~Allocation() = default;
 
