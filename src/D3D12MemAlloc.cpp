@@ -2790,8 +2790,8 @@ class AllocationObjectAllocator
 {
     D3D12MA_CLASS_NO_COPY(AllocationObjectAllocator);
 public:
-    AllocationObjectAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks)
-        : m_Allocator(allocationCallbacks, 1024) {}
+    AllocationObjectAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks, bool useMutex)
+        : m_Allocator(allocationCallbacks, 1024), m_UseMutex(useMutex) {}
 
     template<typename... Types>
     Allocation* Allocate(Types... args);
@@ -2799,6 +2799,7 @@ public:
 
 private:
     D3D12MA_MUTEX m_Mutex;
+    bool m_UseMutex;
     PoolAllocator<Allocation> m_Allocator;
 };
 
@@ -2806,13 +2807,13 @@ private:
 template<typename... Types>
 Allocation* AllocationObjectAllocator::Allocate(Types... args)
 {
-    MutexLock mutexLock(m_Mutex);
+    MutexLock mutexLock(m_Mutex, m_UseMutex);
     return m_Allocator.Alloc(std::forward<Types>(args)...);
 }
 
 void AllocationObjectAllocator::Free(Allocation* alloc)
 {
-    MutexLock mutexLock(m_Mutex);
+    MutexLock mutexLock(m_Mutex, m_UseMutex);
     m_Allocator.Free(alloc);
 }
 #endif // _D3D12MA_ALLOCATION_OBJECT_ALLOCATOR_FUNCTIONS
@@ -6094,7 +6095,7 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     m_AllocationCallbacks(allocationCallbacks),
     m_CurrentFrameIndex(0),
     // Below this line don't use allocationCallbacks but m_AllocationCallbacks!!!
-    m_AllocationObjectAllocator(m_AllocationCallbacks)
+    m_AllocationObjectAllocator(m_AllocationCallbacks, m_UseMutex)
 {
     // desc.pAllocationCallbacks intentionally ignored here, preprocessed by CreateAllocator.
     ZeroMemory(&m_D3D12Options, sizeof(m_D3D12Options));
