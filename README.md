@@ -102,15 +102,16 @@ This software package uses third party software:
 
 For more information see [NOTICES.txt](NOTICES.txt).
 
+# See also
+
+- **[Vcpkg](https://github.com/Microsoft/vcpkg)** dependency manager from Microsoft offers a port of this library that is easy to install.
+- **[d3d12ma.c](https://github.com/milliewalky/d3d12ma.c)** - C bindings for this library. Author: Mateusz Maciejewski (Matt Walky). License: MIT.
+- **[TerraFX.Interop.D3D12MemoryAllocator](https://github.com/terrafx/terrafx.interop.d3d12memoryallocator)** - interop bindings for this library for C#, as used by [TerraFX](https://github.com/terrafx/terrafx). License: MIT.
+- **[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/)** - equivalent library for Vulkan. License: MIT.
+
 # Software using this library
 
 - **[The Forge](https://github.com/ConfettiFX/The-Forge)** - cross-platform rendering framework. Apache License 2.0.
 - **[Wicked Engine<img src="https://github.com/turanszkij/WickedEngine/blob/master/Content/logo_small.png" width="28px" align="center"/>](https://github.com/turanszkij/WickedEngine)** - 3D engine with modern graphics 
 
 [Some other projects on GitHub](https://github.com/search?q=D3D12MemAlloc.h&type=Code) and some game development studios that use DX12 in their games.
-
-# See also
-
-- **[Vcpkg](https://github.com/Microsoft/vcpkg)** dependency manager from Microsoft offers a port of this library that is easy to install.
-- **[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/)** - equivalent library for Vulkan. License: MIT.
-- **[TerraFX.Interop.D3D12MemoryAllocator](https://github.com/terrafx/terrafx.interop.d3d12memoryallocator)** - interop bindings for this library for C#, as used by [TerraFX](https://github.com/terrafx/terrafx). License: MIT.
