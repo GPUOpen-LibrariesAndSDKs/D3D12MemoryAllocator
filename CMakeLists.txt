@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9)
 
-project(D3D12MemoryAllocator)
+project(D3D12MemoryAllocator VERSION 3.0.0)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 

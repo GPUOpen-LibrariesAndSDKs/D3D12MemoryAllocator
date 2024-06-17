@@ -27,7 +27,7 @@ set_target_properties(
 )
 
 target_include_directories(D3D12MemoryAllocator PUBLIC
-    "${PROJECT_SOURCE_DIR}/include"
+     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:./include>
 )
 
 target_link_libraries(D3D12MemoryAllocator PUBLIC
@@ -46,7 +46,32 @@ if(BUILD_SHARED_LIBS)
     )
 endif()
 
+set(D3D12MA_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(D3D12MA_VERSION_CONFIG "${D3D12MA_GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake")
+set(D3D12MA_PROJECT_CONFIG "${D3D12MA_GENERATED_DIR}/${PROJECT_NAME}Config.cmake")
+set(D3D12MA_TARGETS_EXPORT_NAME "${PROJECT_NAME}Targets")
+set(D3D12MA_CONFIG_INSTALL_DIR "share/cmake/${PROJECT_NAME}")
+set(D3D12MA_NAMESPACE "GPUOpen::")
+set(D3D12MA_VERSION ${PROJECT_VERSION})
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${D3D12MA_VERSION_CONFIG}" VERSION ${D3D12MA_VERSION} COMPATIBILITY SameMajorVersion
+)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.cmake.in" "${D3D12MA_PROJECT_CONFIG}" @ONLY)
+
+# Install cmake config files
+install(
+  FILES "${D3D12MA_PROJECT_CONFIG}" "${D3D12MA_VERSION_CONFIG}"
+  DESTINATION "${D3D12MA_CONFIG_INSTALL_DIR}")
+
+install(
+  EXPORT "${D3D12MA_TARGETS_EXPORT_NAME}"
+  NAMESPACE "${D3D12MA_NAMESPACE}"
+  DESTINATION "${D3D12MA_CONFIG_INSTALL_DIR}")
+
 install(TARGETS D3D12MemoryAllocator
+        EXPORT ${D3D12MA_TARGETS_EXPORT_NAME} 
 		RUNTIME DESTINATION "bin"
         	ARCHIVE DESTINATION "lib"
         	LIBRARY DESTINATION "lib")
