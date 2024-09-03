@@ -111,6 +111,7 @@ For more information see [NOTICES.txt](NOTICES.txt).
 
 # Software using this library
 
+- **[Qt Project](https://github.com/qt)**
 - **[Ghost of Tsushima: Director's Cut PC](https://www.youtube.com/watch?v=cPKBDbCYctc&t=698s)** - Information avaliable in 11:38 of credits
 - **[The Forge](https://github.com/ConfettiFX/The-Forge)** - cross-platform rendering framework. Apache License 2.0.
 - **[Wicked Engine<img src="https://github.com/turanszkij/WickedEngine/blob/master/Content/logo_small.png" width="28px" align="center"/>](https://github.com/turanszkij/WickedEngine)** - 3D engine with modern graphics
