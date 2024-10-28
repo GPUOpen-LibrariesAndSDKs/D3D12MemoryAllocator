@@ -9312,11 +9312,6 @@ void Allocation::SetName(LPCWSTR Name)
 
 void Allocation::ReleaseThis()
 {
-    if (this == NULL)
-    {
-        return;
-    }
-
     SAFE_RELEASE(m_Resource);
 
     switch (m_PackedData.GetType())
@@ -9461,11 +9456,6 @@ void DefragmentationContext::GetStats(DEFRAGMENTATION_STATS* pStats)
 
 void DefragmentationContext::ReleaseThis()
 {
-    if (this == NULL)
-    {
-        return;
-    }
-
     D3D12MA_DELETE(m_Pimpl->GetAllocs(), this);
 }
 
@@ -9526,11 +9516,6 @@ HRESULT Pool::BeginDefragmentation(const DEFRAGMENTATION_DESC* pDesc, Defragment
 
 void Pool::ReleaseThis()
 {
-    if (this == NULL)
-    {
-        return;
-    }
-
     D3D12MA_DELETE(m_Pimpl->GetAllocator()->GetAllocs(), this);
 }
 
