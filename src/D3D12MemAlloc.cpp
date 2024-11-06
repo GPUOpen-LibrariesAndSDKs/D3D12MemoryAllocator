@@ -5030,7 +5030,8 @@ void BlockMetadata_TLSF::WriteAllocationInfoToJson(JsonWriter& json) const
     }
     D3D12MA_ASSERT(i == 0);
 
-    PrintDetailedMap_Begin(json, GetSumFreeSize(), GetAllocationCount(), m_BlocksFreeCount + static_cast<bool>(m_NullBlock->size));
+    PrintDetailedMap_Begin(json, GetSumFreeSize(), GetAllocationCount(), m_BlocksFreeCount +
+        (m_NullBlock->size > 0 ? 1 : 0));
     for (; i < blockCount; ++i)
     {
         Block* block = blockList[i];
