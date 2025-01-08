@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -2415,7 +2415,7 @@ static void ManuallyTestLinearAllocator(const TestContext& ctx)
 
         Totally:
         1 block allocated
-        393 216 DirectX 12 bytes
+        393216 DirectX 12 bytes
         6 new allocations
         2256 bytes in allocations (384 KB according to alignment)
         */

@@ -9,9 +9,11 @@ var searchData=
   ['setresource_6',['SetResource',['../class_d3_d12_m_a_1_1_allocation.html#a414a088c22bae0f29b1038f5f9346d14',1,'D3D12MA::Allocation']]],
   ['setup_20and_20initialization_7',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
   ['size_8',['Size',['../struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html#ac56491679f276a5a9956ed99bc4654e4',1,'D3D12MA::VIRTUAL_BLOCK_DESC::Size'],['../struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a976b649e45abdd0769da0d79acde4bac',1,'D3D12MA::VIRTUAL_ALLOCATION_DESC::Size'],['../struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___i_n_f_o.html#ac265159500190e35ebef8e4784c73a09',1,'D3D12MA::VIRTUAL_ALLOCATION_INFO::Size']]],
-  ['stack_9',['Stack',['../linear_algorithm.html#linear_algorithm_double_stack',1,'Double stack'],['../linear_algorithm.html#linear_algorithm_stack',1,'Stack']]],
-  ['start_10',['Quick start',['../quick_start.html',1,'index']]],
-  ['statistics_11',['Statistics',['../statistics.html#statistics_numeric_statistics',1,'Numeric statistics'],['../struct_d3_d12_m_a_1_1_statistics.html',1,'D3D12MA::Statistics'],['../statistics.html',1,'Statistics'],['../virtual_allocator.html#virtual_allocator_statistics',1,'Statistics']]],
-  ['stats_12',['Stats',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#a2490d4a08a5d47c87a699001dfc8737f',1,'D3D12MA::DetailedStatistics::Stats'],['../struct_d3_d12_m_a_1_1_budget.html#a1255508930766db238cfb1312b15f1cf',1,'D3D12MA::Budget::Stats']]],
-  ['supported_13',['Features not supported',['../general_considerations.html#general_considerations_features_not_supported',1,'']]]
+  ['stack_9',['Stack',['../linear_algorithm.html#linear_algorithm_stack',1,'']]],
+  ['stack_10',['Double stack',['../linear_algorithm.html#linear_algorithm_double_stack',1,'']]],
+  ['start_11',['Quick start',['../quick_start.html',1,'index']]],
+  ['statistics_12',['Statistics',['../struct_d3_d12_m_a_1_1_statistics.html',1,'D3D12MA::Statistics'],['../statistics.html',1,'Statistics'],['../virtual_allocator.html#virtual_allocator_statistics',1,'Statistics']]],
+  ['statistics_13',['Numeric statistics',['../statistics.html#statistics_numeric_statistics',1,'']]],
+  ['stats_14',['Stats',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#a2490d4a08a5d47c87a699001dfc8737f',1,'D3D12MA::DetailedStatistics::Stats'],['../struct_d3_d12_m_a_1_1_budget.html#a1255508930766db238cfb1312b15f1cf',1,'D3D12MA::Budget::Stats']]],
+  ['supported_15',['Features not supported',['../general_considerations.html#general_considerations_features_not_supported',1,'']]]
 ];
