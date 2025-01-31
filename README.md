@@ -113,7 +113,8 @@ For more information see [NOTICES.txt](NOTICES.txt).
 
 - **[Qt Project](https://github.com/qt)**
 - **[Ghost of Tsushima: Director's Cut PC](https://www.youtube.com/watch?v=cPKBDbCYctc&t=698s)** - Information avaliable in 11:38 of credits
+- **[Godot Engine](https://github.com/godotengine/godot/)** - multi-platform 2D and 3D game engine. License: MIT.
 - **[The Forge](https://github.com/ConfettiFX/The-Forge)** - cross-platform rendering framework. Apache License 2.0.
-- **[Wicked Engine<img src="https://github.com/turanszkij/WickedEngine/blob/master/Content/logo_small.png" width="28px" align="center"/>](https://github.com/turanszkij/WickedEngine)** - 3D engine with modern graphics
+- **[Wicked Engine](https://github.com/turanszkij/WickedEngine)** - 3D engine with modern graphics
 
 [Some other projects on GitHub](https://github.com/search?q=D3D12MemAlloc.h&type=Code) and some game development studios that use DX12 in their games.
