@@ -51,6 +51,17 @@ static constexpr UINT64 MEGABYTE = 1024 * KILOBYTE;
 static constexpr CONFIG_TYPE ConfigType = CONFIG_TYPE_AVERAGE;
 static const char* FREE_ORDER_NAMES[] = { "FORWARD", "BACKWARD", "RANDOM", };
 
+// Indexes match enum D3D12_HEAP_TYPE.
+static const WCHAR* const HEAP_TYPE_NAMES[] =
+{
+    L"",
+    L"DEFAULT",
+    L"UPLOAD",
+    L"READBACK",
+    L"CUSTOM",
+    L"GPU_UPLOAD",
+};
+
 static void CurrentTimeToStr(std::string& out)
 {
     time_t rawTime; time(&rawTime);
@@ -2990,6 +3001,55 @@ static void TestGPUUploadHeap(const TestContext& ctx)
 #endif
 }
 
+static void TestTightAlignment(const TestContext& ctx)
+{
+#if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
+    using namespace D3D12MA;
+
+    wprintf(L"Test resource tight alignment\n");
+
+    if(!ctx.allocator->IsTightAlignmentSupported())
+    {
+        wprintf(L"    Skipped due to tight alignment not supported.\n");
+        return;
+    }
+
+    // Use a custom heap to make sure our small buffers are not created as committed.
+    POOL_DESC poolDesc = {};
+    poolDesc.BlockSize = 1024 * 1024;
+    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, 16);
+
+    const D3D12_HEAP_TYPE heapTypes[] = { D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_TYPE_UPLOAD };
+    for (auto heapType : heapTypes)
+    {
+        poolDesc.HeapProperties.Type = heapType;
+        ComPtr<Pool> pool;
+        CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+        ALLOCATION_DESC allocDesc = {};
+        allocDesc.CustomPool = pool.Get();
+
+        ComPtr<Allocation> allocs[2] = {};
+
+        for (size_t i = 0; i < _countof(allocs); ++i)
+        {
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+                D3D12_RESOURCE_STATE_COMMON, NULL, &allocs[i], IID_NULL, NULL));
+            CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
+        }
+        
+        // Print the offset of the 2nd buffer.
+        wprintf(L"    In D3D12_HEAP_TYPE_%s, a %llu B buffer was aligned to %llu B.\n",
+            HEAP_TYPE_NAMES[(size_t)heapType],
+            resDesc.Width,
+            allocs[1]->GetOffset());
+    }
+#endif
+}
+
 static void TestVirtualBlocks(const TestContext& ctx)
 {
     wprintf(L"Test virtual blocks\n");
@@ -4257,6 +4317,7 @@ static void TestGroupBasics(const TestContext& ctx)
 #endif
 
     TestGPUUploadHeap(ctx);
+    TestTightAlignment(ctx);
 
     FILE* file;
     fopen_s(&file, "Results.csv", "w");

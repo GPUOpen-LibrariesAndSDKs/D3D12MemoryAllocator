@@ -1053,6 +1053,8 @@ enum ALLOCATOR_FLAGS
     It can also be disabled for a single allocation by using #ALLOCATION_FLAG_STRATEGY_MIN_TIME.
     */
     ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED = 0x10,
+    /** TODO document... */
+    ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT = 0x20,
 };
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().
@@ -1127,6 +1129,15 @@ public:
     `#define D3D12MA_OPTIONS16_SUPPORTED 1` is needed for the compilation of this library. Otherwise the flag is always false.
     */
     BOOL IsGPUUploadHeapSupported() const;
+    /** \brief Returns true if resource tight alignment is supported on the current system.
+    When supported, it is automatically used by the library, unless
+    #ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT flag was specified on allocator creation.
+
+    This flag is fetched from `D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier`.
+
+    `#define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 1` is needed for the compilation of this library. Otherwise the flag is always false.
+    */
+    BOOL IsTightAlignmentSupported() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.
     
     \param memorySegmentGroup use `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.

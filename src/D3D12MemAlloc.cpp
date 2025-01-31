@@ -5911,6 +5911,8 @@ public:
     BOOL IsCacheCoherentUMA() const { return m_D3D12Architecture.CacheCoherentUMA; }
     bool SupportsResourceHeapTier2() const { return m_D3D12Options.ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2; }
     bool IsGPUUploadHeapSupported() const { return m_GPUUploadHeapSupported != FALSE; }
+    bool IsTightAlignmentSupported() const { return m_TightAlignmentSupported != FALSE; }
+    bool IsTightAlignmentEnabled() const { return IsTightAlignmentSupported() && m_UseTightAlignment; }
     bool UseMutex() const { return m_UseMutex; }
     AllocationObjectAllocator& GetAllocationObjectAllocator() { return m_AllocationObjectAllocator; }
     UINT GetCurrentFrameIndex() const { return m_CurrentFrameIndex.load(); }
@@ -5998,6 +6000,7 @@ private:
     const bool m_AlwaysCommitted;
     const bool m_MsaaAlwaysCommitted;
     const bool m_PreferSmallBuffersCommitted;
+    const bool m_UseTightAlignment;
     bool m_DefaultPoolsNotZeroed = false;
     ID3D12Device* m_Device; // AddRef
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
@@ -6022,6 +6025,7 @@ private:
     DXGI_ADAPTER_DESC m_AdapterDesc;
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
     BOOL m_GPUUploadHeapSupported = FALSE;
+    BOOL m_TightAlignmentSupported = FALSE;
     D3D12_FEATURE_DATA_ARCHITECTURE m_D3D12Architecture;
     AllocationObjectAllocator m_AllocationObjectAllocator;
 
@@ -6089,7 +6093,8 @@ AllocatorPimpl::AllocatorPimpl(const ALLOCATION_CALLBACKS& allocationCallbacks, 
     : m_UseMutex((desc.Flags & ALLOCATOR_FLAG_SINGLETHREADED) == 0),
     m_AlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_ALWAYS_COMMITTED) != 0),
     m_MsaaAlwaysCommitted((desc.Flags & ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0),
-    m_PreferSmallBuffersCommitted((desc.Flags & ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED) == 0),
+    m_PreferSmallBuffersCommitted((desc.Flags& ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED) == 0),
+    m_UseTightAlignment((desc.Flags & ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT) == 0),
     m_Device(desc.pDevice),
     m_Adapter(desc.pAdapter),
     m_PreferredBlockSize(desc.PreferredBlockSize != 0 ? desc.PreferredBlockSize : D3D12MA_DEFAULT_BLOCK_SIZE),
@@ -6173,6 +6178,20 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         if (SUCCEEDED(hr))
         {
             m_GPUUploadHeapSupported = options16.GPUUploadHeapSupported;
+        }
+    }
+#endif
+
+    // You must define macro `#define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 1` to enable resource tight alignment!
+    // Unfortunately there is no way to programmatically check if the included <d3d12.h> defines D3D12_FEATURE_DATA_TIGHT_ALIGNMENT or not.
+    // Main interfaces have respective macros like __ID3D12Device4_INTERFACE_DEFINED__, but structures like this do not.
+#if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
+    {
+        D3D12_FEATURE_DATA_TIGHT_ALIGNMENT tightAlignment = {};
+        hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_TIGHT_ALIGNMENT, &tightAlignment, sizeof(tightAlignment));
+        if (SUCCEEDED(hr))
+        {
+            m_TightAlignmentSupported = tightAlignment.SupportTier >= D3D12_TIGHT_ALIGNMENT_TIER_1;
         }
     }
 #endif
@@ -6861,6 +6880,9 @@ void AllocatorPimpl::BuildStatsString(WCHAR** ppStatsString, BOOL detailedMap)
 
                 json.WriteString(L"GPUUploadHeapSupported");
                 json.WriteBool(m_GPUUploadHeapSupported != FALSE);
+
+                json.WriteString(L"TightAlignmentSupported");
+                json.WriteBool(m_TightAlignmentSupported != FALSE);
             }
             json.EndObject();
         }
@@ -7623,8 +7645,19 @@ template<typename D3D12_RESOURCE_DESC_T>
 D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const
 {
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
-    /* Optional optimization: Microsoft documentation says:
-    https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-getresourceallocationinfo
+
+#if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
+    if (IsTightAlignmentEnabled() &&
+        // Don't allow USE_TIGHT_ALIGNMENT together with ALLOW_CROSS_ADAPTER as there is a D3D Debug Layer error:
+        // D3D12 ERROR: ID3D12Device::GetResourceAllocationInfo: D3D12_RESOURCE_DESC::Flag D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT will be ignored since D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER is set. [ STATE_CREATION ERROR #599: CREATERESOURCE_INVALIDMISCFLAGS]
+        (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER) == 0)
+    {
+        inOutResourceDesc.Flags |= D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT;
+    }
+#endif // #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
+
+    /* Optional optimization: Microsoft documentation of the ID3D12Device::
+    GetResourceAllocationInfo function says:
 
     Your application can forgo using GetResourceAllocationInfo for buffer resources
     (D3D12_RESOURCE_DIMENSION_BUFFER). Buffers have the same size on all adapters,
@@ -7632,12 +7665,14 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
     D3D12_RESOURCE_DESC::Width.
     */
     if (inOutResourceDesc.Alignment == 0 &&
-        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
+        !IsTightAlignmentEnabled())
     {
         return {
             AlignUp<UINT64>(inOutResourceDesc.Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT), // SizeInBytes
             D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT }; // Alignment
     }
+
 #endif // #ifdef __ID3D12Device1_INTERFACE_DEFINED__
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
@@ -9550,6 +9585,11 @@ BOOL Allocator::IsCacheCoherentUMA() const
 BOOL Allocator::IsGPUUploadHeapSupported() const
 {
     return m_Pimpl->IsGPUUploadHeapSupported();
+}
+
+BOOL Allocator::IsTightAlignmentSupported() const
+{
+    return m_Pimpl->IsTightAlignmentSupported();
 }
 
 UINT64 Allocator::GetMemoryCapacity(UINT memorySegmentGroup) const

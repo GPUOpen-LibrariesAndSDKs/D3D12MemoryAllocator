@@ -438,6 +438,11 @@ inline UINT64 UpdateSubresources(
     UINT* pNumRows = reinterpret_cast<UINT*>(pRowSizesInBytes + NumSubresources);
 
     D3D12_RESOURCE_DESC Desc = pDestinationResource->GetDesc();
+    
+    // Needed because of the D3D Debug Layer error:
+    // D3D12 ERROR: ID3D12Device::GetCopyableFootprints: D3D12_RESOURCE_DESC::Alignment is invalid. The value is 16. When D3D12_RESOURCE_DESC::Flag bit for D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT is set, Alignment must be 0. [ STATE_CREATION ERROR #721: CREATERESOURCE_INVALIDALIGNMENT]
+    Desc.Alignment = 0;
+    
     ID3D12Device* pDevice;
     pDestinationResource->GetDevice(__uuidof(*pDevice), reinterpret_cast<void**>(&pDevice));
     pDevice->GetCopyableFootprints(&Desc, FirstSubresource, NumSubresources, IntermediateOffset, pLayouts, pNumRows, pRowSizesInBytes, &RequiredSize);
@@ -1052,8 +1057,7 @@ static void InitD3D() // initializes direct3d 12
     CHECK_HR( g_Allocator->CreateResource(
         &vertexBufferAllocDesc,
         &vertexBufferResourceDesc, // resource description for a buffer
-        D3D12_RESOURCE_STATE_COPY_DEST, // we will start this heap in the copy destination state since we will copy data
-                                        // from the upload heap to this heap
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr, // optimized clear value must be null for this type of resource. used for render targets and depth/stencil buffers
         &g_VertexBufferAllocation,
         IID_PPV_ARGS(&vertexBufferPtr)) );
@@ -1165,7 +1169,7 @@ static void InitD3D() // initializes direct3d 12
     CHECK_HR( g_Allocator->CreateResource(
         &indexBufferAllocDesc,
         &indexBufferResourceDesc, // resource description for a buffer
-        D3D12_RESOURCE_STATE_COPY_DEST, // start in the copy destination state
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr, // optimized clear value must be null for this type of resource
         &g_IndexBufferAllocation,
         IID_PPV_ARGS(&g_IndexBuffer)) );
