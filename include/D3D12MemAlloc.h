@@ -1051,6 +1051,11 @@ enum ALLOCATOR_FLAGS
     which may take longer than creating placed resources in existing heaps.
     Passing this flag will disable this committed preference globally for the allocator.
     It can also be disabled for a single allocation by using #ALLOCATION_FLAG_STRATEGY_MIN_TIME.
+
+    If the tight resource alignment feature is used by the library (which happens automatically whenever supported,
+    unless you use flag #ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT), then small buffers are not preferred as committed.
+    Long story short, you don't need to specify any of these flags.
+    The library chooses the most optimal method automatically.
     */
     ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED = 0x10,
     /** TODO document... */

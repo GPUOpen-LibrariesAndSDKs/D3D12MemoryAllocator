@@ -5999,7 +5999,7 @@ private:
     const bool m_UseMutex;
     const bool m_AlwaysCommitted;
     const bool m_MsaaAlwaysCommitted;
-    const bool m_PreferSmallBuffersCommitted;
+    bool m_PreferSmallBuffersCommitted;
     const bool m_UseTightAlignment;
     bool m_DefaultPoolsNotZeroed = false;
     ID3D12Device* m_Device; // AddRef
@@ -6192,6 +6192,14 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         if (SUCCEEDED(hr))
         {
             m_TightAlignmentSupported = tightAlignment.SupportTier >= D3D12_TIGHT_ALIGNMENT_TIER_1;
+            
+            // If tight alignment is supported (checked by the code above) and wasn't disabled by the developer
+            // (with ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT), disable the preference for creating small buffers as committed,
+            // as if ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED was specified.
+            if (IsTightAlignmentEnabled())
+            {
+                m_PreferSmallBuffersCommitted = false;
+            }
         }
     }
 #endif
