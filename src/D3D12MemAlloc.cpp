@@ -7710,7 +7710,15 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
     }
 #endif // #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
 
-    return GetResourceAllocationInfoNative(inOutResourceDesc);
+    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfoNative(inOutResourceDesc);
+
+    // Align up to 256 B because this is the alignment required for constant buffers.
+    if (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+    {
+        resAllocInfo.Alignment = D3D12MA_MAX(resAllocInfo.Alignment, (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+    }
+
+    return resAllocInfo;
 }
 
 bool AllocatorPimpl::NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size)
