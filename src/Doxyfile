@@ -42,7 +42,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = "Direct3D 12 Memory Allocator"
+PROJECT_NAME           = "D3D12 Memory Allocator"
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -2372,6 +2372,8 @@ PREDEFINED             = __ID3D12Device1_INTERFACE_DEFINED__ \
                          __ID3D12Device4_INTERFACE_DEFINED__ \
                          __ID3D12Device8_INTERFACE_DEFINED__ \
                          __ID3D12Device10_INTERFACE_DEFINED__ \
+                         D3D12_PREVIEW_SDK_VERSION=716 \
+                         D3D12_SDK_VERSION=716 \
                          protected=private
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this

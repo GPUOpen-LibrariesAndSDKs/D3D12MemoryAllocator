@@ -107,6 +107,22 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
    #define D3D12MA_DEFAULT_BLOCK_SIZE (64ull * 1024 * 1024)
 #endif
 
+#ifndef D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
+    #if D3D12_PREVIEW_SDK_VERSION >= 716
+        #define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 1
+    #else
+        #define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 0
+    #endif
+#endif
+
+#ifndef D3D12MA_OPTIONS16_SUPPORTED
+    #if D3D12_SDK_VERSION >= 610
+        #define D3D12MA_OPTIONS16_SUPPORTED 1
+    #else
+        #define D3D12MA_OPTIONS16_SUPPORTED 0
+    #endif
+#endif
+
 #ifndef D3D12MA_DEBUG_LOG
    #define D3D12MA_DEBUG_LOG(format, ...)
    /*
@@ -6168,9 +6184,6 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
     m_D3D12Options.ResourceHeapTier = (D3D12MA_FORCE_RESOURCE_HEAP_TIER);
 #endif
 
-// You must define this macro to like `#define D3D12MA_OPTIONS16_SUPPORTED 1` to enable GPU Upload Heaps!
-// Unfortunately there is no way to programmatically check if the included <d3d12.h> defines D3D12_FEATURE_DATA_D3D12_OPTIONS16 or not.
-// Main interfaces have respective macros like __ID3D12Device4_INTERFACE_DEFINED__, but structures like this do not.
 #if D3D12MA_OPTIONS16_SUPPORTED
     {
         D3D12_FEATURE_DATA_D3D12_OPTIONS16 options16 = {};
@@ -6180,11 +6193,8 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             m_GPUUploadHeapSupported = options16.GPUUploadHeapSupported;
         }
     }
-#endif
+#endif // #if D3D12MA_OPTIONS16_SUPPORTED
 
-    // You must define macro `#define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 1` to enable resource tight alignment!
-    // Unfortunately there is no way to programmatically check if the included <d3d12.h> defines D3D12_FEATURE_DATA_TIGHT_ALIGNMENT or not.
-    // Main interfaces have respective macros like __ID3D12Device4_INTERFACE_DEFINED__, but structures like this do not.
 #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
     {
         D3D12_FEATURE_DATA_TIGHT_ALIGNMENT tightAlignment = {};
@@ -6202,7 +6212,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             }
         }
     }
-#endif
+#endif // #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
 
     hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE, &m_D3D12Architecture, sizeof(m_D3D12Architecture));
     if (FAILED(hr))
@@ -7427,7 +7437,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     outPreferCommitted = false;
 
     D3D12MA_ASSERT((allocDesc.HeapType != D3D12_HEAP_TYPE_GPU_UPLOAD_COPY || IsGPUUploadHeapSupported()) &&
-        "Trying to allocate from D3D12_HEAP_TYPE_GPU_UPLOAD while GPUUploadHeapSupported == FALSE or D3D12MA_OPTIONS16_SUPPORTED macro was not defined when compiling D3D12MA library.");
+        "Trying to allocate from D3D12_HEAP_TYPE_GPU_UPLOAD while GPUUploadHeapSupported == FALSE.");
 
     bool msaaAlwaysCommitted;
     if (allocDesc.CustomPool != NULL)

@@ -1130,8 +1130,6 @@ public:
     When true, you can use `D3D12_HEAP_TYPE_GPU_UPLOAD`.
 
     This flag is fetched from `D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported`.
-
-    `#define D3D12MA_OPTIONS16_SUPPORTED 1` is needed for the compilation of this library. Otherwise the flag is always false.
     */
     BOOL IsGPUUploadHeapSupported() const;
     /** \brief Returns true if resource tight alignment is supported on the current system.
@@ -1139,8 +1137,6 @@ public:
     #ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT flag was specified on allocator creation.
 
     This flag is fetched from `D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier`.
-
-    `#define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 1` is needed for the compilation of this library. Otherwise the flag is always false.
     */
     BOOL IsTightAlignmentSupported() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.
