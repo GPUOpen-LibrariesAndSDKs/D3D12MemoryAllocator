@@ -10,7 +10,8 @@ var searchData=
   ['budget_7',['Budget',['../struct_d3_d12_m_a_1_1_budget.html',1,'D3D12MA']]],
   ['budgetbytes_8',['BudgetBytes',['../struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71',1,'D3D12MA::Budget']]],
   ['buffer_9',['Ring buffer',['../linear_algorithm.html#linear_algorithm_ring_buffer',1,'']]],
-  ['buildstatsstring_10',['BuildStatsString',['../class_d3_d12_m_a_1_1_allocator.html#a29716b3084916abed7793bf2ec4b65db',1,'D3D12MA::Allocator::BuildStatsString()'],['../class_d3_d12_m_a_1_1_virtual_block.html#a828a27070bfa762cae796d4c8f2ef703',1,'D3D12MA::VirtualBlock::BuildStatsString()']]],
-  ['bytesfreed_11',['BytesFreed',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___s_t_a_t_s.html#a7ed1bf228f39989ff3419ce3f50002c9',1,'D3D12MA::DEFRAGMENTATION_STATS']]],
-  ['bytesmoved_12',['BytesMoved',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___s_t_a_t_s.html#adc4c36df302a6b320443a4a33a3e31c8',1,'D3D12MA::DEFRAGMENTATION_STATS']]]
+  ['buffers_10',['Sub-allocating buffers',['../optimal_allocation.html#optimal_allocation_suballocating_buffers',1,'']]],
+  ['buildstatsstring_11',['BuildStatsString',['../class_d3_d12_m_a_1_1_allocator.html#a29716b3084916abed7793bf2ec4b65db',1,'D3D12MA::Allocator::BuildStatsString()'],['../class_d3_d12_m_a_1_1_virtual_block.html#a828a27070bfa762cae796d4c8f2ef703',1,'D3D12MA::VirtualBlock::BuildStatsString()']]],
+  ['bytesfreed_12',['BytesFreed',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___s_t_a_t_s.html#a7ed1bf228f39989ff3419ce3f50002c9',1,'D3D12MA::DEFRAGMENTATION_STATS']]],
+  ['bytesmoved_13',['BytesMoved',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___s_t_a_t_s.html#adc4c36df302a6b320443a4a33a3e31c8',1,'D3D12MA::DEFRAGMENTATION_STATS']]]
 ];

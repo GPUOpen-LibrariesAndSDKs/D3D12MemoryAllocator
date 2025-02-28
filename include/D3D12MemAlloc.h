@@ -39,6 +39,14 @@ Documentation of all members: D3D12MemAlloc.h
     - [Resource reference counting](@ref quick_start_resource_reference_counting)
     - [Mapping memory](@ref quick_start_mapping_memory)
 - \subpage custom_pools
+- \subpage optimal_allocation
+    - [Avoiding running out of memory](@ref optimal_allocation_avoiding_running_out_of_memory)
+    - [Allocation performance](@ref optimal_allocation_allocation_Performance)
+    - [Sub-allocating buffers](@ref optimal_allocation_suballocating_buffers)
+    - [Residency priority](@ref optimal_allocation_residency_priority)
+    - [GPU upload heap](@ref optimal_allocation_gpu_upload_heap)
+    - [Committed versus placed resources](@ref optimal_allocation_committed_vs_placed)
+    - [Resource alignment](@ref optimal_allocation_resource_alignment)
 - \subpage defragmentation
 - \subpage statistics
 - \subpage resource_aliasing
@@ -52,10 +60,10 @@ Documentation of all members: D3D12MemAlloc.h
   - [Versioning and compatibility](@ref general_considerations_versioning_and_compatibility)
   - [Features not supported](@ref general_considerations_features_not_supported)
         
-\section main_see_also See also
+\section main_see_also Web links
 
-- [Product page on GPUOpen](https://gpuopen.com/gaming-product/d3d12-memory-allocator/)
-- [Source repository on GitHub](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator)
+- [Direct3D 12 Memory Allocator at GPUOpen.com](https://gpuopen.com/gaming-product/d3d12-memory-allocator/) - product page
+- [GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator at GitHub.com](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator) - source code repository
 */
 
 // If using this library on a platform different than Windows PC or want to use different version of DXGI,
@@ -83,24 +91,24 @@ Documentation of all members: D3D12MemAlloc.h
     #endif
 #endif
 
-/*
-When defined to value other than 0, the library will try to use
-D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT or D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT
-for created textures when possible, which can save memory because some small textures
-may get their alignment 4K and their size a multiply of 4K instead of 64K.
-
-#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 0
-    Disables small texture alignment.
-#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 1
-    Enables conservative algorithm that will use small alignment only for some textures
-    that are surely known to support it.
-#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 2
-    Enables query for small alignment to D3D12 (based on Microsoft sample) which will
-    enable small alignment for more textures, but will also generate D3D Debug Layer
-    error #721 on call to ID3D12Device::GetResourceAllocationInfo, which you should just
-    ignore.
-*/
 #ifndef D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
+    /** \brief
+    When defined to value other than 0, the library will try to use
+    `D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT` or `D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT`
+    for created textures when possible, which can save memory because some small textures
+    may get their alignment 4 KB and their size a multiply of 4 KB instead of 64 KB.
+
+    - `#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 0` -
+      Disables small texture alignment.
+    - `#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 1` (the default) -
+      Enables conservative algorithm that will use small alignment only for some textures
+      that are surely known to support it.
+    - `#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 2` -
+      Enables query for small alignment to D3D12 (based on Microsoft sample) which will
+      enable small alignment for more textures, but will also generate D3D Debug Layer
+      error #721 on call to `ID3D12Device::GetResourceAllocationInfo`, which you should just
+      ignore.
+    */
     #define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 1
 #endif
 
@@ -1127,7 +1135,7 @@ public:
     BOOL IsGPUUploadHeapSupported() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.
     
-    \param memorySegmentGroup use `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.
+    \param memorySegmentGroup use `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` or `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.
 
     This information is taken from `DXGI_ADAPTER_DESC`.
     It is not recommended to use this number.
@@ -1601,13 +1609,13 @@ DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::VIRTUAL_ALLOCATION_FLAGS);
 
 \section quick_start_project_setup Project setup and initialization
 
-This is a small, standalone C++ library. It consists of a pair of 2 files:
+This is a small, standalone C++ library. It consists of 2 files:
 "D3D12MemAlloc.h" header file with public interface and "D3D12MemAlloc.cpp" with
 internal implementation. The only external dependencies are WinAPI, Direct3D 12,
 and parts of C/C++ standard library (but STL containers, exceptions, or RTTI are
 not used).
 
-The library is developed and tested using Microsoft Visual Studio 2019, but it
+The library is developed and tested using Microsoft Visual Studio 2022, but it
 should work with other compilers as well. It is designed for 64-bit code.
 
 To use the library in your project:
@@ -1645,16 +1653,16 @@ HRESULT hr = D3D12MA::CreateAllocator(&allocatorDesc, &allocator);
 
 (5.) Right before destroying the D3D12 device, destroy the allocator object.
 
+\code
+allocator->Release();
+\endcode
+
 Objects of this library must be destroyed by calling `Release` method.
 They are somewhat compatible with COM: they implement `IUnknown` interface with its virtual methods: `AddRef`, `Release`, `QueryInterface`,
 and they are reference-counted internally.
 You can use smart pointers designed for COM with objects of this library - e.g. `CComPtr` or `Microsoft::WRL::ComPtr`.
 The reference counter is thread-safe.
 `QueryInterface` method supports only `IUnknown`, as classes of this library don't define their own GUIDs.
-
-\code
-allocator->Release();
-\endcode
 
 
 \section quick_start_creating_resources Creating resources
@@ -1718,10 +1726,10 @@ parts of them are occupied and which parts are free to be used for new resources
 It is important to remember that resources created as placed don't have their memory
 initialized to zeros, but may contain garbage data, so they need to be fully initialized
 before usage, e.g. using Clear (`ClearRenderTargetView`), Discard (`DiscardResource`),
-or copy (`CopyResource`).
+or Copy (`CopyResource`).
 
 The library also automatically handles resource heap tier.
-When `D3D12_FEATURE_DATA_D3D12_OPTIONS::ResourceHeapTier` equals `D3D12_RESOURCE_HEAP_TIER_1`,
+When `D3D12_FEATURE_DATA_D3D12_OPTIONS::ResourceHeapTier == D3D12_RESOURCE_HEAP_TIER_1`,
 resources of 3 types: buffers, textures that are render targets or depth-stencil,
 and other textures must be kept in separate heaps. When `D3D12_RESOURCE_HEAP_TIER_2`,
 they can be kept together. By using this library, you don't need to handle this
@@ -1744,7 +1752,7 @@ When only D3D12MA::Allocation object is obtained from a function call like D3D12
 it remembers the `ID3D12Resource` that was created with it and holds a reference to it.
 The resource can be obtained by calling `allocation->GetResource()`, which doesn't increment the resource
 reference counter.
-Calling `allocation->Release()` will decrease the resource reference counter, which is = 1 in this case,
+Calling `allocation->Release()` will decrease the resource reference counter, which is 1 in this case,
 so the resource will be released.
 
 <b>Second option</b> is to retrieve a pointer to the resource along with D3D12MA::Allocation.
@@ -1838,8 +1846,9 @@ HRESULT hr = allocator->CreateResource(
     &allocation,
     IID_PPV_ARGS(&resource));
 
+D3D12_RANGE emptyRange = {0, 0};
 void* mappedPtr;
-hr = resource->Map(0, NULL, &mappedPtr);
+hr = resource->Map(0, &emptyRange, &mappedPtr);
 
 memcpy(mappedPtr, bufData, bufSize);
 
@@ -1930,6 +1939,486 @@ This feature may seem unnecessary, but creating committed allocations from custo
 in some cases, e.g. to have separate memory usage statistics for some group of resources or to use
 extended allocation parameters, like custom `D3D12_HEAP_PROPERTIES`, which are available only in custom pools.
 
+
+\page optimal_allocation Optimal resource allocation
+
+This library tries to automatically make optimal choices for the resources you create,
+so you don't need to care about them.
+There are some advanced features of Direct3D 12 that you may use to optimize your memory management.
+There are also some settings in %D3D12MA that you may change to alter its default behavior.
+This page provides miscellaneous advice about features of D3D12 and %D3D12MA that are
+non-essential, but may improve the stability or performance of your app.
+
+\section optimal_allocation_avoiding_running_out_of_memory Avoiding running out of memory
+
+When trying to allocate more memory than available in the current heap
+(e.g., video memory on the graphics card, system memory), one of few bad things can happen:
+
+- The allocation (resource creation) function call can fail with `HRESULT` value other than `S_OK`.
+- The allocation may succeed, but take long time (even a significant fraction of a second).
+- Some resources are automatically evicted from video memory to system memory, degrading the app performance.
+- Even a crash of the entire graphics driver can happen, resulting in the D3D12 "device removal", which is usually
+  catastrophic for the application.
+
+Unfortunately, there is no way to be 100% protected against memory overcommitment.
+The best approach is to avoid allocating too much memory.
+
+The full capacity of the memory can be queried using function D3D12MA::Allocator::GetMemoryCapacity.
+However, it is not recommended, because the amount of memory available to the application
+is typically smaller than the full capacity, as some portion of it is reserved by the operating system
+or used by other processes.
+
+Because of this, the recommended way of fetching the **memory budget** available to the application
+is using function D3D12MA::Allocator::GetBudget.
+Preventing value D3D12MA::Budget::UsageBytes from exceeding the D3D12MA::Budget::BudgetBytes
+is probably the best we can do in trying to avoid the consequences of over-commitment.
+For more information, see also: \subpage statistics.
+
+Example:
+
+\code
+D3D12MA::Budget videoMemBudget = {};
+allocator->GetBudget(&videoMemBudget, NULL);
+
+UINT64 freeBytes = videoMemBudget.BudgetBytes - videoMemBudget.UsageBytes;
+gameStreamingSystem->SetAvailableFreeMemory(freeBytes);
+\endcode
+
+\par Implementation detail
+DXGI interface offers function `IDXGIAdapter3::QueryVideoMemoryInfo` that queries the current memory usage and budget.
+This library automatically makes use of it when available (when you use recent enough version of the DirectX SDK).
+If not, it falls back to estimating the usage and budget based on the total amount of the allocated memory
+and 80% of the full memory capacity, respectively.
+
+\par Implementation detail
+Allocating large heaps and creating placed resources in them is one of the main features of this library.
+However, if allocating new such block would exceed the budget, it will automatically prefer creating the resource as committed
+to have exactly the right size, which can lower the chance of getting into trouble in case of over-commitment.
+
+When creating non-essential resources, you can use D3D12MA::ALLOCATION_FLAG_WITHIN_BUDGET.
+Then, in case the allocation would exceed the budget, the library will return failure from the function
+without attempting to allocate the actual D3D12 memory.
+
+It may also be a good idea to support failed resource creation.
+For non-essential resources, when function D3D12MA::Allocator::CreateResource fails with a result other than `S_OK`,
+it is worth implementing some way of recovery instead of terminating or crashing the entire app.
+
+\section optimal_allocation_allocation_Performance Allocation performance
+
+Creating D3D12 resources (buffers and textures) can be a time-consuming operation.
+The duration can be unpredictable, spanning from a small fraction of a millisecond to a significant fraction of a second.
+Thus, it is recommended to allocate all the memory and create all the resources needed upfront
+rather than doing it during application runtime.
+For example, a video game can try to create its resources on startup or when loading a new level.
+Of course, is is not always possible.
+For example, open-world games may require loading and unloading some graphical assets in the background (often called "streaming").
+
+Creating and releasing D3D12 resources **on a separate thread** in the background may help.
+Both `ID3D12Device` and D3D12MA::Allocator objects are thread-safe, synchronized internally.
+However, cases were observed where resource creation calls like `ID3D12Device::CreateCommittedResource`
+were blocking other D3D12 calls like `ExecuteCommandLists` or `Present`
+somewhere inside the graphics driver, so hitches can happen even when using multithreading.
+
+The most expensive part is typically **the allocation of a new D3D12 memory heap**.
+This library tackles this problem by automatically allocating large heaps (64 MB by default)
+and creating resources as placed inside of them.
+When a new requested resource can be placed in a free space of an existing heap and doesn't require allocating a new heap,
+this operation is typically much faster, as it only requires creating a new `ID3D12Resource` object
+and not allocating new memory.
+This is the main benefit of using %D3D12MA compared to the naive approach of using Direct3D 12 directly
+and creating each resource as committed with `CreateCommittedResource`, which would result in a separate allocation of an implicit heap every time.
+
+When **a large number of small buffers** needs to be created, the overhead of creating even just separate `ID3D12Resource` objects can be significant.
+It can be avoided by creating one or few larger buffers and manually sub-allocating parts of them for specific needs.
+This library can also help with it. See section "Sub-allocating buffers" below.
+
+\par Implementation detail
+The CPU performance overhead of using this library is low.
+It uses a high-quality allocation algorithm called Two-Level Segregated Fit (TLSF),
+which in most cases can find a free place for a new allocation in few steps.
+The library also doesn't perform too many CPU heap allocations.
+In may cases, the allocation happens with 0 new CPU heap allocations performed by the library.
+Even the creation of a D3D12MA::Allocation object itself doesn't typically feature an CPU allocation,
+because these objects are returned out of a dedicated memory pool.
+
+Another reason for the slowness of D3D12 memory allocation is the guarantee that the **newly allocated memory is filled with zeros**.
+When creating and destroying resources placed in an existing heap, this overhead is not present,
+and the memory is not zeroed - it may contain random data left by the resource previously allocated in that place.
+In recent versions of the DirectX 12 SDK, clearing the memory of the newly created D3D12 heaps can also be disabled for the improved performance.
+%D3D12MA can use this feature when:
+
+- D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED is used during the creation of the main allocator object.
+- `D3D12_HEAP_FLAG_CREATE_NOT_ZEROED` is passed to D3D12MA::POOL_DESC::HeapFlags during the creation of a custom pool.
+
+It is recommended to always use these flags.
+The downside is that when the memory is not filled with zeros, while you don't properly clear it or otherwise initialize its content before use
+(which is required by D3D12), you may observe incorrect behavior.
+This problem mostly affects render-target and depth-stencil textures.
+
+When an allocation needs to be made in a performance-critical code, you can use D3D12MA::ALLOCATION_FLAG_STRATEGY_MIN_TIME.
+In influences multiple heuristics inside the library to prefer faster allocation
+at the expense of possibly less optimal placement in the memory.
+
+If the resource to be created is non-essential, while the performance is paramount,
+you can also use D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE.
+It will create the resource only if it can be placed inside and existing memory heap
+and return failure from the function if a new heap would need to be allocated,
+which should guarantee good performance of such function call.
+
+\section optimal_allocation_suballocating_buffers Sub-allocating buffers
+
+When a large number of small buffers needs to be created, the overhead of creating separate `ID3D12Resource` objects can be significant.
+It can also cause a significant waste of memory, as placed buffers need to be aligned to `D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT` = 64 KB by default.
+These problems can be avoided by creating one or few larger buffers and manually sub-allocating parts of them for specific needs.
+
+It requires implementing a custom allocator for the data inside the buffer and using offsets to individual regions.
+When all the regions can be allocated linearly and freed all at once, implementing such allocator is trivial.
+When every region has the same size, implementing an allocator is also quite simple when using a "free list" algorithm.
+However, when regions can have different sizes and can be allocated and freed in random order,
+it requires a full allocation algorithm.
+%D3D12MA can help with it by exposing its core allocation algorithm for custom usages.
+For more details and example code, see chapter: \subpage virtual_allocator.
+It can be used for all the cases mentioned above without too much performance overhead,
+because the D3D12MA::VirtualAllocation object is just a lightweight handle.
+
+When sub-allocating a buffer, you need to remember to explicitly request proper alignment required for each region.
+For example, data used as a constant buffer must be aligned to `D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT` = 256 B.
+
+\section optimal_allocation_residency_priority Residency priority
+
+When too much video memory is allocated, one of the things that can happen is the system
+evicting some heaps to the system memory.
+Moving data between memory pools or reaching out directly to the system memory through PCI Express bus can have large performance overhead,
+which can slow down the application, or even make the game unplayable any more.
+Unfortunately, it is not possible to fully control or prevent this eviction.
+Best thing to do is avoiding memory over-commitment.
+For more information, see section "Avoiding running out of memory" above.
+
+Recent versions of DirectX 12 SDK offer function `ID3D12Device1::SetResidencyPriority` that sets a hint
+about the priority of a resource - how important it is to stay resident in the video memory.
+Setting the priority happens at the level of an entire memory heap.
+%D3D12MA offers an interface to set this priority in form of D3D12MA::POOL_DESC::ResidencyPriority parameter.
+It affects all allocations made out of the custom pool created with it, both placed inside large heaps
+and created as committed.
+
+It is recommended to create a custom pool for the purpose of using high residency priority
+of all resources that are critical for the performance, especially those that are written by the GPU,
+like render-target, depth-stencil textures, UAV textures and buffers.
+It is also worth creating them as committed, so that each one will have its own implicit heap.
+This can minimize the chance that an entire large heap is evicted to system memory, degrading performance
+of all the resources placed in it.
+
+Example:
+
+\code
+D3D12MA::POOL_DESC poolDesc = {};
+poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS | D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+poolDesc.ResidencyPriority = D3D12_RESIDENCY_PRIORITY_HIGH; // !!!
+
+D3D12MA::Pool* pool;
+HRESULT hr = allocator->CreatePool(&poolDesc, &pool);
+// Check hr...
+
+D3D12MA::ALLOCATION_DESC allocDesc = {};
+allocDesc.CustomPool = pool;
+allocDesc.Flags = ALLOCATION_FLAG_COMMITTED; // !!!
+
+D3D12_RESOURCE_DESC resDesc = {};
+resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+resDesc.Alignment = 0;
+resDesc.Width = 1048576; // Requested buffer size.
+resDesc.Height = 1;
+resDesc.DepthOrArraySize = 1;
+resDesc.MipLevels = 1;
+resDesc.Format = DXGI_FORMAT_UNKNOWN;
+resDesc.SampleDesc.Count = 1;
+resDesc.SampleDesc.Quality = 0;
+resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+D3D12MA::Allocation* alloc;
+hr = allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+    NULL, &alloc, IID_NULL, NULL);
+// Check hr...
+\endcode
+
+Note this is not the same as explicit eviction controlled using `ID3D12Device::Evict` and `MakeResident` functions.
+Resources evicted explicitly are illegal to access until they are made resident again,
+while the eviction described here happens automatically and only slows down the execution.
+
+\section optimal_allocation_gpu_upload_heap GPU upload heap
+
+Direct3D 12 offers a fixed set of memory heap types:
+
+- `D3D12_HEAP_TYPE_DEFAULT`: Represents the video memory. It is available and fast to access for the GPU.
+  It should be used for all resources that are written by the GPU (like render-target and depth-stencil textures,
+  UAV) and resources that are frequently read by the GPU (like textures intended for sampling,
+  vertex, index, and constant buffers).
+- `D3D12_HEAP_TYPE_UPLOAD`: Represents the system memory that is uncached and write-combined.
+  It can be mapped and accessed by the CPU code using a pointer.
+  It supports only buffers, not textures.
+  It is intended for "staging buffers" that are filled by the CPU code and then used as a source of copy operations to the `DEFAULT` heap.
+  It can also be accessed directly by the GPU - shaders can read from buffers created in this memory.
+- `D3D12_HEAP_TYPE_READBACK`: Represents the system memory that is cached.
+  It is intended for buffers used as a destination of copy operations from the `DEFAULT` heap.
+
+Note that in systems with a discrete graphics card, access to system memory is fast from the CPU code
+(like the C++ code mapping D3D12 buffers and accessing them through a pointer),
+while access to the video memory is fast from the GPU code (like shaders reading and writing buffers and textures).
+Any copy operation or direct access between these memory heap types happens through PCI Express bus, which can be relatively slow.
+
+Modern systems offer a feature called **Resizable BAR (ReBAR)** that gives the CPU direct access to the full video memory.
+To be available, this feature needs to be supported by the whole hardware-software environment, including:
+
+- Supporting motherboard and its UEFI.
+- Supporting graphics card and its graphics driver.
+- Supporting operating system.
+- The feature needs to be enabled in the UEFI settings. It is typically called "Above 4G Decoding" and "Resizable Bar".
+
+Recent versions of DirectX 12 SDK give access to this feature in form of a new, 4th memory pool: `D3D12_HEAP_TYPE_GPU_UPLOAD`.
+Resources created in it behave logically similar to the `D3D12_HEAP_TYPE_UPLOAD` heap:
+
+- They support mapping and direct access from the CPU code through a pointer.
+- The mapped memory is uncached and write-combined, so it should be only written sequentially
+  (e.g., number-by-number or using `memcpy`). It shouldn't be accessed randomly or read,
+  because it is extremely slow for uncached memory.
+- Only buffers are supported.
+- Those buffers can be used as a source of copy operations or directly accessed by the GPU.
+
+The main difference is that resources created in the new `D3D12_HEAP_TYPE_GPU_UPLOAD` are placed in the video memory,
+while resources created in the old `D3D12_HEAP_TYPE_UPLOAD` are placed in the system memory.
+This implies which budgets are consumed by new resources allocated in those heaps.
+This also implies which operations involve transferring data through the PCI Express bus.
+
+- As `D3D12_HEAP_TYPE_UPLOAD` uses the system memory, writes from the CPU code through a mapped pointer are faster,
+  while copies or direct access from the GPU are slower because they need to go through PCIe.
+- As the new `D3D12_HEAP_TYPE_GPU_UPLOAD` uses the video memory,
+  copies or direct access from the GPU are faster,
+  while writes from the CPU code through a mapped pointer can be slower, because they need to go through PCIe.
+  For maximum performance of copy operations from this heap, a graphics or compute queue should be used, not a copy queue.
+
+GPU Upload Heap can be used for performance optimization of some resources that need to be written by the CPU and read by the GPU.
+It can be beneficial especially for resources that need to change frequently (often called "dynamic").
+
+%D3D12MA supports GPU upload heap when recent enough version of DirectX 12 SDK is used and when the current system supports it.
+The support can be queried using function D3D12MA::Allocator::IsGPUUploadHeapSupported().
+When it returns `TRUE`, you can create resources using `D3D12_HEAP_TYPE_GPU_UPLOAD`.
+
+Example:
+
+\code
+// Fast path for data upload.
+if(allocator->IsGPUUploadHeapSupported())
+{
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_GPU_UPLOAD; // !!!
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resDesc.Alignment = 0;
+    resDesc.Width = 1048576; // Requested buffer size.
+    resDesc.Height = 1;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    D3D12MA::Allocation* alloc;
+    ID3D12Resource* res;
+    hr = allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+        NULL, &alloc, IID_PPV_ARGS(&res));
+    // Check hr...
+
+    D3D12_RANGE emptyRange = {0, 0};
+    void* mappedPtr = NULL;
+    hr = res->Map(0, &emptyRange, &mappedPtr);
+    memcpy(mappedPtr, srcData, 1048576);
+    res->Unmap(0, NULL); // Optional. You can leave it persistently mapped.
+
+    D3D12_GPU_VIRTUAL_ADDRESS gpuva = res->GetGPUVirtualAddress();
+    // Use gpuva to access the buffer on the GPU...
+\endcode
+
+\section optimal_allocation_committed_vs_placed Committed versus placed resources
+
+When using D3D12 API directly, there are 3 ways of creating resources:
+
+1. **Committed**, using function `ID3D12Device::CreateCommittedResource`.
+   It creates the resource with its own memory heap, which is called an "implicit heap" and cannot be accessed directly.
+2. **Placed**, using function `ID3D12Device::CreatePlacedResource`.
+   A `ID3D12Heap` needs to be created beforehand using `ID3D12Device::CreateHeap`.
+   Then, the resource can be created as placed inside the heap at a specific offset.
+3. **Reserved**, using function `ID3D12Device::CreateReservedResource`.
+   This library doesn't support them directly.
+
+A naive solution would be to create all the resources as committed.
+It works, because in D3D12 there is no strict limit on the number of resources or heaps that can be created.
+However, there are certain advantages and disadvantages of using committed versus placed resources:
+
+- The biggest advantage of using placed resources is the allocation performance.
+  Once a heap is allocated, creating and releasing resources placed in it can be much faster than
+  creating them as committed, which would involve allocating a new heap for each resource.
+  - Using large number of small heaps can put an extra burden on the software stack,
+    including D3D12 runtime, graphics driver, operating system, and developer tools like Radeon Memory Visualizer (RMV).
+- The advantage of committed resources is that their implicit heaps have exactly the right size,
+  while creating resources as placed inside larger heaps can lead to some memory wasted because:
+  - Some part of the allocated heap memory is unused.
+  - After placed resources of various sizes are created and released in random order,
+    gaps between remaining resources can be too small to fit new allocations.
+    This is also known as "fragmentation". A solution to this problem is implementing \subpage defragmentation.
+  - The alignment required by placed resources can leave gaps between them, while the driver can pack individual committed resources better.
+    For details, see section "Resource alignment" below.
+- The advantage of committed resources is that they are always created with a new heap, which is initialized with zeros.
+  When a resource is created as placed, the memory may contain random data left by the resource previously allocated in that place.
+  When the memory is not filled with zeros, while you don't properly clear it or otherwise initialize its content before use
+  (which is required by D3D12), you may observe incorrect behavior.
+  On the other hand, using committed resources and having every new resource filled with zeros can leave this kind of bugs undetected.
+- Manual eviction with `ID3D12Device::Evict` and `MakeResident` functions work at the level of the entire heap,
+  and so does `ID3D12Device1::SetResidencyPriority`, so creating resources as committed allows more fine-grained control
+  over the eviction and residency priority of individual resources.
+- The advantage of placed resources is that they can be created in a region of a heap overlapping with some other resources.
+  This approach is commonly called "aliasing".
+  It can save memory, but it needs careful control over the resources that overlap in memory
+  to make sure they are not used at the same time, there is an aliasing barrier issued between their usage,
+  and the resource used after aliasing is correctly cleared every time.
+  Committed resources don't offer this possibility, because every committed resource has its own exclusive memory heap.
+  For more information, see chapter \subpage resource_aliasing.
+
+When creating resources with the help of %D3D12MA using function D3D12MA::Allocator::CreateResource,
+you typically don't need to care about all this.
+The library automatically makes the choice of creating the new resource as committed or placed.
+However, in cases when you need the information or the control over this choice between committed and placed,
+the library offers facilities to do that, described below.
+
+\par Implementation detail
+%D3D12MA creates large heaps (default size is 64 MB) and creates resources as placed in them.
+However, it may decide that it is required or preferred to create the specific resource as committed for many reasons, including:
+- When the resource is large (larger than half of the default heap size).
+- When allocating an entire new heap would exceed the current budget or when we are already over the budget.
+- When the resource is a very small buffer. Placed buffers need to be aligned to 64 KB by default,
+  while creating them as committed can allow the driver to pack them better.
+  This heuristics can be disabled for an individual resource by using D3D12MA::ALLOCATION_FLAG_STRATEGY_MIN_TIME
+  and for the entire allocator by using D3D12MA::ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED.
+- When the resource uses non-standard flags specified via D3D12MA::ALLOCATION_DESC::ExtraHeapFlags.
+
+<b>You can check whether an allocation was created as a committed resource</b> by checking if its heap is null.
+Committed resources have an implicit heap that is not directly accessible.
+
+\code
+bool isCommitted = allocation->GetHeap() == NULL;
+\endcode
+
+<b>You can request a new resource to be created as committed</b> by using D3D12MA::ALLOCATION_FLAG_COMMITTED.
+Note that committed resources can also be created out of \subpage custom_pools.
+
+You can also request all resources to be created as committed globally for the entire allocator
+by using D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED.
+However, this contradicts the main purpose of using this library.
+It can also prevent certain other features of the library to be used.
+This flag should be used only for debugging purposes.
+
+You can create a custom pool with an explicit block size by specifying non-zero D3D12MA::POOL_DESC::BlockSize.
+When doing this, all **resources created in such pool are placed** in those blocks (heaps) and never created as committed.
+Example:
+
+\code
+D3D12MA::POOL_DESC poolDesc = {};
+poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS | D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
+poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+poolDesc.BlockSize = 100llu * 1024 * 1024; // 100 MB. Explicit BlockSize guarantees placed.
+
+D3D12MA::Pool* pool;
+HRESULT hr = allocator->CreatePool(&poolDesc, &pool);
+// Check hr...
+
+D3D12MA::ALLOCATION_DESC allocDesc = {};
+allocDesc.CustomPool = pool;
+
+D3D12_RESOURCE_DESC resDesc = {};
+resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+resDesc.Alignment = 0;
+resDesc.Width = 90llu * 1024 * 1024; // 90 MB
+resDesc.Height = 1;
+resDesc.DepthOrArraySize = 1;
+resDesc.MipLevels = 1;
+resDesc.Format = DXGI_FORMAT_UNKNOWN;
+resDesc.SampleDesc.Count = 1;
+resDesc.SampleDesc.Quality = 0;
+resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+D3D12MA::Allocation* alloc;
+ID3D12Resource* res;
+hr = allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+    NULL, &alloc, IID_PPV_ARGS(&res));
+// Check hr...
+
+// Even a large buffer like this, filling 90% of the block, was created as placed!
+assert(alloc->GetHeap() != NULL);
+\endcode
+
+<b>You can request a new resource to be created as placed</b> by using D3D12MA::ALLOCATION_FLAG_CAN_ALIAS.
+This is required especially if you plan to create another resource in the same region of memory, aliasing with your resource -
+hence the name of this flag.
+
+Note D3D12MA::ALLOCATION_FLAG_CAN_ALIAS can be even combined with D3D12MA::ALLOCATION_FLAG_COMMITTED.
+In this case, the resource is not created as committed, but it is also not placed as part of a larger heap.
+What happens instead is that a new heap is created with the exact size required for the resource,
+and the resource is created in it, placed at offset 0.
+
+\section optimal_allocation_resource_alignment Resource alignment
+
+Certain types of resources require certain alignment in memory.
+An alignment is a requirement for the address or offset to the beginning of the resource to be a multiply of some value, which is always a power of 2.
+For committed resources, the problem is non-existent, because committed resources have their own implicit heaps
+where they are created at offset 0, which meets any alignment requirement.
+For placed resources, %D3D12MA takes care of the alignment automatically.
+
+\par Implementation detail
+Default alignment required MSAA textures is `D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT` = 4 MB.
+Default alignment required for buffers and other textures is `D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT` = 64 KB.
+
+Because the alignment required for buffers is 64 KB, **small buffers** can waste a lot of memory in between when created as placed.
+When such small buffers are created as committed, some graphics drivers are able to pack them better.
+%D3D12MA automatically takes advantage of this by preferring to create small buffers as committed.
+This heuristics is enabled by default. It is also a tradeoff - it can make the allocation of these buffers slower.
+It can be disabled for an individual resource by using D3D12MA::ALLOCATION_FLAG_STRATEGY_MIN_TIME
+and for the entire allocator by using D3D12MA::ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED.
+
+For certain textures that meet a complex set of requirements, special **"small alignment"** can be applied.
+Details can be found in Microsoft documentation of the `D3D12_RESOURCE_DESC` structure.
+For MSAA textures, the small alignment is `D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT` = 64 KB.
+For other textures, the small alignment is `D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT` = 4 KB.
+%D3D12MA uses this feature automatically.
+Detailed behavior can be disabled or controlled by predefining macro #D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT.
+
+D3D12 also has a concept of **alignment of the entire heap**, passed through `D3D12_HEAP_DESC::Alignment`.
+This library automatically sets the alignment as small as possible.
+Unfortunately, any heap that has a chance of hosting an MSAA texture needs to have the alignment set to 4 MB.
+This problem can be overcome by passing D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED on the creation of the main allocator object
+and D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED on the creation of any custom heap that supports textures, not only buffers.
+With those flags, the alignment of the heaps created by %D3D12MA can be lower, but any MSAA textures are created as committed.
+You should always use these flags in your code unless you really need to create some MSAA textures as placed.
+
+With DirectX 12 Agility SDK 1.716.0-preview, Microsoft added a new feature called **"tight alignment"**.
+Note this is a separate feature than the "small alignment" described earlier.
+When using this new SDK and a compatible graphics driver, the API exposes support for this new feature.
+Then, a new flag `D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT` can be added when creating a resource.
+D3D12 can then return the alignment required for the resource smaller than the default ones described above.
+This library automatically makes use of the tight alignment feature when available and adds that new resource flag.
+When the tight alignment is enabled, the heuristics that creates small buffers as committed described above is deactivated,
+as it is no longer needed.
+
+You can check if the tight alignment it is available in the current system by calling D3D12MA::Allocator::IsTightAlignmentSupported().
+You can tell the library to not use it by specifying D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT.
+Typically, you don't need to do any of those.
+
+The library automatically aligns all buffers to at least 256 B, even when the system supports smaller alignment.
+This is the alignment required for constant buffers, expressed by `D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT` constant.
 
 \page defragmentation Defragmentation
 
@@ -2349,6 +2838,7 @@ As an extra feature, the core allocation algorithm of the library is exposed thr
 It doesn't allocate any real GPU memory. It just keeps track of used and free regions of a "virtual block".
 You can use it to allocate your own memory or other objects, even completely unrelated to D3D12.
 A common use case is sub-allocation of pieces of one large GPU buffer.
+Another suggested use case is allocating descriptors in a `ID3D12DescriptorHeap`.
 
 \section virtual_allocator_creating_virtual_block Creating virtual block
 

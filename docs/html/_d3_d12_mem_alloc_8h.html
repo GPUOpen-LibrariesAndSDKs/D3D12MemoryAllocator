@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Direct3D 12 Memory Allocator: D:/PROJECTS/D3D12 Memory Allocator/REPO/include/D3D12MemAlloc.h File Reference</title>
+<title>D3D12 Memory Allocator: D:/PROJECTS/D3D12 Memory Allocator/REPO/include/D3D12MemAlloc.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -25,7 +25,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Direct3D 12 Memory Allocator
+   <div id="projectname">D3D12 Memory Allocator
    </div>
   </td>
  </tr>
@@ -177,6 +177,7 @@ Macros</h2></td></tr>
 <tr class="memitem:aa623643886b8481adb32017e5c748b50" id="r_aa623643886b8481adb32017e5c748b50"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa623643886b8481adb32017e5c748b50">D3D12MA_DXGI_1_4</a>&#160;&#160;&#160;0</td></tr>
 <tr class="separator:aa623643886b8481adb32017e5c748b50"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad04069a2e2bbc53b7d65f85a04a2dcbc" id="r_ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ad04069a2e2bbc53b7d65f85a04a2dcbc">D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</a>&#160;&#160;&#160;1</td></tr>
+<tr class="memdesc:ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="mdescLeft">&#160;</td><td class="mdescRight">When defined to value other than 0, the library will try to use <code>D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</code> or <code>D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT</code> for created textures when possible, which can save memory because some small textures may get their alignment 4 KB and their size a multiply of 4 KB instead of 64 KB.  <br /></td></tr>
 <tr class="separator:ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="typedef-members" name="typedef-members"></a>
@@ -298,6 +299,13 @@ Functions</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+
+<p>When defined to value other than 0, the library will try to use <code>D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</code> or <code>D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT</code> for created textures when possible, which can save memory because some small textures may get their alignment 4 KB and their size a multiply of 4 KB instead of 64 KB. </p>
+<ul>
+<li><code>#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 0</code> - Disables small texture alignment.</li>
+<li><code>#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 1</code> (the default) - Enables conservative algorithm that will use small alignment only for some textures that are surely known to support it.</li>
+<li><code>#define D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT 2</code> - Enables query for small alignment to D3D12 (based on Microsoft sample) which will enable small alignment for more textures, but will also generate D3D Debug Layer error #721 on call to <code>ID3D12Device::GetResourceAllocationInfo</code>, which you should just ignore. </li>
+</ul>
 
 </div>
 </div>

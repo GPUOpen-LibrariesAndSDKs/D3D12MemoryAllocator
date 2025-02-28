@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Direct3D 12 Memory Allocator: Virtual allocator</title>
+<title>D3D12 Memory Allocator: Virtual allocator</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -25,7 +25,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Direct3D 12 Memory Allocator
+   <div id="projectname">D3D12 Memory Allocator
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ $(function(){ initResizable(false); });
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="index.html">D3D12 Memory Allocator</a></li>  </ul>
+<li class="navelem"><a class="el" href="index.html">D3D12 Memory Allocator</a></li><li class="navelem"><a class="el" href="optimal_allocation.html">Optimal resource allocation</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div id="doc-content">
@@ -91,7 +91,7 @@ $(function(){ initResizable(false); });
   <div class="headertitle"><div class="title">Virtual allocator</div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p>As an extra feature, the core allocation algorithm of the library is exposed through a simple and convenient API of "virtual allocator". It doesn't allocate any real GPU memory. It just keeps track of used and free regions of a "virtual block". You can use it to allocate your own memory or other objects, even completely unrelated to D3D12. A common use case is sub-allocation of pieces of one large GPU buffer.</p>
+<div class="textblock"><p>As an extra feature, the core allocation algorithm of the library is exposed through a simple and convenient API of "virtual allocator". It doesn't allocate any real GPU memory. It just keeps track of used and free regions of a "virtual block". You can use it to allocate your own memory or other objects, even completely unrelated to D3D12. A common use case is sub-allocation of pieces of one large GPU buffer. Another suggested use case is allocating descriptors in a <code>ID3D12DescriptorHeap</code>.</p>
 <h1><a class="anchor" id="virtual_allocator_creating_virtual_block"></a>
 Creating virtual block</h1>
 <p>To use this functionality, there is no main "allocator" object. You don't need to have <a class="el" href="class_d3_d12_m_a_1_1_allocator.html" title="Represents main object of this library initialized for particular ID3D12Device.">D3D12MA::Allocator</a> object created. All you need to do is to create a separate <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html" title="Represents pure allocation algorithm and a data structure with allocations in some memory block,...">D3D12MA::VirtualBlock</a> object for each block of memory you want to be managed by the allocator:</p>
@@ -105,9 +105,9 @@ Creating virtual block</h1>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_virtual_block.html">D3D12MA::VirtualBlock</a> *block;</div>
 <div class="line">HRESULT hr = CreateVirtualBlock(&amp;blockDesc, &amp;block);</div>
-<div class="ttc" id="aclass_d3_d12_m_a_1_1_virtual_block_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_virtual_block.html">D3D12MA::VirtualBlock</a></div><div class="ttdoc">Represents pure allocation algorithm and a data structure with allocations in some memory block,...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1513</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html">D3D12MA::VIRTUAL_BLOCK_DESC</a></div><div class="ttdoc">Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1419</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c_html_ac56491679f276a5a9956ed99bc4654e4"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html#ac56491679f276a5a9956ed99bc4654e4">D3D12MA::VIRTUAL_BLOCK_DESC::Size</a></div><div class="ttdeci">UINT64 Size</div><div class="ttdoc">Total size of the block.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1427</div></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_virtual_block_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_virtual_block.html">D3D12MA::VirtualBlock</a></div><div class="ttdoc">Represents pure allocation algorithm and a data structure with allocations in some memory block,...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1519</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html">D3D12MA::VIRTUAL_BLOCK_DESC</a></div><div class="ttdoc">Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1425</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c_html_ac56491679f276a5a9956ed99bc4654e4"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html#ac56491679f276a5a9956ed99bc4654e4">D3D12MA::VIRTUAL_BLOCK_DESC::Size</a></div><div class="ttdeci">UINT64 Size</div><div class="ttdoc">Total size of the block.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1433</div></div>
 </div><!-- fragment --><h1><a class="anchor" id="virtual_allocator_making_virtual_allocations"></a>
 Making virtual allocations</h1>
 <p><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html" title="Represents pure allocation algorithm and a data structure with allocations in some memory block,...">D3D12MA::VirtualBlock</a> object contains internal data structure that keeps track of free and occupied regions using the same code as the main D3D12 memory allocator. A single allocation is identified by a lightweight structure <a class="el" href="struct_d3_d12_m_a_1_1_virtual_allocation.html" title="Represents single memory allocation done inside VirtualBlock.">D3D12MA::VirtualAllocation</a>. You will also likely want to know the offset at which the allocation was made in the block.</p>
@@ -132,9 +132,9 @@ Making virtual allocations</h1>
 <div class="line">    <span class="comment">// Allocation failed - no space for it could be found. Handle this error!</span></div>
 <div class="line">}</div>
 <div class="ttc" id="aclass_d3_d12_m_a_1_1_virtual_block_html_a9281daf76e888ea1bd5247d5732e8179"><div class="ttname"><a href="class_d3_d12_m_a_1_1_virtual_block.html#a9281daf76e888ea1bd5247d5732e8179">D3D12MA::VirtualBlock::Allocate</a></div><div class="ttdeci">HRESULT Allocate(const VIRTUAL_ALLOCATION_DESC *pDesc, VirtualAllocation *pAllocation, UINT64 *pOffset)</div><div class="ttdoc">Creates new allocation.</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::VIRTUAL_ALLOCATION_DESC</a></div><div class="ttdoc">Parameters of created virtual allocation to be passed to VirtualBlock::Allocate().</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1464</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_a976b649e45abdd0769da0d79acde4bac"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a976b649e45abdd0769da0d79acde4bac">D3D12MA::VIRTUAL_ALLOCATION_DESC::Size</a></div><div class="ttdeci">UINT64 Size</div><div class="ttdoc">Size of the allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1471</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_virtual_allocation_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_virtual_allocation.html">D3D12MA::VirtualAllocation</a></div><div class="ttdoc">Represents single memory allocation done inside VirtualBlock.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:463</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::VIRTUAL_ALLOCATION_DESC</a></div><div class="ttdoc">Parameters of created virtual allocation to be passed to VirtualBlock::Allocate().</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1470</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_a976b649e45abdd0769da0d79acde4bac"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a976b649e45abdd0769da0d79acde4bac">D3D12MA::VIRTUAL_ALLOCATION_DESC::Size</a></div><div class="ttdeci">UINT64 Size</div><div class="ttdoc">Size of the allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1477</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_virtual_allocation_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_virtual_allocation.html">D3D12MA::VirtualAllocation</a></div><div class="ttdoc">Represents single memory allocation done inside VirtualBlock.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:471</div></div>
 </div><!-- fragment --><h1><a class="anchor" id="virtual_allocator_deallocation"></a>
 Deallocation</h1>
 <p>When no longer needed, an allocation can be freed by calling <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#aab44e46bd122054c894fc84740f1e8fb" title="Frees the allocation.">D3D12MA::VirtualBlock::FreeAllocation</a>.</p>
@@ -171,7 +171,7 @@ Alignment and units</h1>
 <div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_virtual_allocation.html">D3D12MA::VirtualAllocation</a> alloc;</div>
 <div class="line">UINT64 allocOffset;</div>
 <div class="line">hr = block-&gt;<a class="code hl_function" href="class_d3_d12_m_a_1_1_virtual_block.html#a9281daf76e888ea1bd5247d5732e8179">Allocate</a>(&amp;allocDesc, &amp;alloc, &amp;allocOffset);</div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aaa95e62f2f399339a09dcbb312a42de0"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aaa95e62f2f399339a09dcbb312a42de0">D3D12MA::VIRTUAL_ALLOCATION_DESC::Alignment</a></div><div class="ttdeci">UINT64 Alignment</div><div class="ttdoc">Required alignment of the allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1476</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aaa95e62f2f399339a09dcbb312a42de0"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aaa95e62f2f399339a09dcbb312a42de0">D3D12MA::VIRTUAL_ALLOCATION_DESC::Alignment</a></div><div class="ttdeci">UINT64 Alignment</div><div class="ttdoc">Required alignment of the allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1482</div></div>
 </div><!-- fragment --><p>Alignments of different allocations made from one block may vary. However, if all alignments and sizes are always multiply of some size e.g. 4 B or <code>sizeof(MyDataStruct)</code>, you can express all sizes, alignments, and offsets in multiples of that size instead of individual bytes. It might be more convenient, but you need to make sure to use this new unit consistently in all the places:</p>
 <ul>
 <li><a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html#ac56491679f276a5a9956ed99bc4654e4" title="Total size of the block.">D3D12MA::VIRTUAL_BLOCK_DESC::Size</a></li>
@@ -186,9 +186,9 @@ Statistics</h1>
 <div class="line">printf(<span class="stringliteral">&quot;My virtual block has %llu bytes used by %u virtual allocations\n&quot;</span>,</div>
 <div class="line">    stats.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_statistics.html#a53cfe3d241124b5a8e8058871a4b50e8">AllocationBytes</a>, stats.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_statistics.html#aef88ac53531db43a8888ad2be4a06c68">AllocationCount</a>);</div>
 <div class="ttc" id="aclass_d3_d12_m_a_1_1_virtual_block_html_a0f1dda0e019e218b021f64987a74b110"><div class="ttname"><a href="class_d3_d12_m_a_1_1_virtual_block.html#a0f1dda0e019e218b021f64987a74b110">D3D12MA::VirtualBlock::GetStatistics</a></div><div class="ttdeci">void GetStatistics(Statistics *pStats) const</div><div class="ttdoc">Retrieves basic statistics of the virtual block that are fast to calculate.</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_statistics_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_statistics.html">D3D12MA::Statistics</a></div><div class="ttdoc">Calculated statistics of memory usage e.g. in a specific memory heap type, memory segment group,...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:341</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_statistics_html_a53cfe3d241124b5a8e8058871a4b50e8"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_statistics.html#a53cfe3d241124b5a8e8058871a4b50e8">D3D12MA::Statistics::AllocationBytes</a></div><div class="ttdeci">UINT64 AllocationBytes</div><div class="ttdoc">Total number of bytes occupied by all D3D12MA::Allocation objects.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:359</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_statistics_html_aef88ac53531db43a8888ad2be4a06c68"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_statistics.html#aef88ac53531db43a8888ad2be4a06c68">D3D12MA::Statistics::AllocationCount</a></div><div class="ttdeci">UINT AllocationCount</div><div class="ttdoc">Number of D3D12MA::Allocation objects allocated.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:349</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_statistics_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_statistics.html">D3D12MA::Statistics</a></div><div class="ttdoc">Calculated statistics of memory usage e.g. in a specific memory heap type, memory segment group,...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:349</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_statistics_html_a53cfe3d241124b5a8e8058871a4b50e8"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_statistics.html#a53cfe3d241124b5a8e8058871a4b50e8">D3D12MA::Statistics::AllocationBytes</a></div><div class="ttdeci">UINT64 AllocationBytes</div><div class="ttdoc">Total number of bytes occupied by all D3D12MA::Allocation objects.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:367</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_statistics_html_aef88ac53531db43a8888ad2be4a06c68"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_statistics.html#aef88ac53531db43a8888ad2be4a06c68">D3D12MA::Statistics::AllocationCount</a></div><div class="ttdeci">UINT AllocationCount</div><div class="ttdoc">Number of D3D12MA::Allocation objects allocated.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:357</div></div>
 </div><!-- fragment --><p>More detailed statistics can be obtained using function <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a614a82247ce6cf29c38895e16eb971d9" title="Retrieves detailed statistics of the virtual block that are slower to calculate.">D3D12MA::VirtualBlock::CalculateStatistics()</a>, but they are slower to calculate.</p>
 <p>You can also request a full list of allocations and free regions as a string in JSON format by calling <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a828a27070bfa762cae796d4c8f2ef703" title="Builds and returns statistics as a string in JSON format, including the list of allocations with thei...">D3D12MA::VirtualBlock::BuildStatsString</a>. Returned string must be later freed using <a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html#a6f78ddaa7da194e239089e52093e68a9" title="Frees memory of a string returned from VirtualBlock::BuildStatsString.">D3D12MA::VirtualBlock::FreeStatsString</a>. The format of this string may differ from the one returned by the main D3D12 allocator, but it is similar.</p>
 <h1><a class="anchor" id="virtual_allocator_additional_considerations"></a>

@@ -8,7 +8,7 @@ var searchData=
   ['d3d12memalloc_2eh_5',['D3D12MemAlloc.h',['../_d3_d12_mem_alloc_8h.html',1,'']]],
   ['deallocation_6',['Deallocation',['../virtual_allocator.html#virtual_allocator_deallocation',1,'']]],
   ['debug_20margins_7',['Debug margins',['../configuration.html#debug_margins',1,'']]],
-  ['defragmentation_8',['Defragmentation',['../defragmentation.html',1,'index']]],
+  ['defragmentation_8',['Defragmentation',['../defragmentation.html',1,'optimal_allocation']]],
   ['defragmentation_5fdesc_9',['DEFRAGMENTATION_DESC',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___d_e_s_c.html',1,'D3D12MA']]],
   ['defragmentation_5fflag_5falgorithm_5fbalanced_10',['DEFRAGMENTATION_FLAG_ALGORITHM_BALANCED',['../namespace_d3_d12_m_a.html#ab433989212ee6736bf9d63c5bc565df4ace3a84861ed6a1b8066fa9c12c7e89b9',1,'D3D12MA']]],
   ['defragmentation_5fflag_5falgorithm_5ffast_11',['DEFRAGMENTATION_FLAG_ALGORITHM_FAST',['../namespace_d3_d12_m_a.html#ab433989212ee6736bf9d63c5bc565df4a9d0301a81136ca79e3ba52542c6d2e13',1,'D3D12MA']]],

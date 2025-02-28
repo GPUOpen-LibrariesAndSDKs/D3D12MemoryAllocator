@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Direct3D 12 Memory Allocator: D3D12MA::Allocator Class Reference</title>
+<title>D3D12 Memory Allocator: D3D12MA::Allocator Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -25,7 +25,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Direct3D 12 Memory Allocator
+   <div id="projectname">D3D12 Memory Allocator
    </div>
   </td>
  </tr>
@@ -753,7 +753,7 @@ Public Member Functions</h2></td></tr>
 <p>Returns total amount of memory of specific segment group, in bytes. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">memorySegmentGroup</td><td>use <code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.</td></tr>
+    <tr><td class="paramname">memorySegmentGroup</td><td>use <code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> or <code>DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL</code>.</td></tr>
   </table>
   </dd>
 </dl>
@@ -815,8 +815,7 @@ Public Member Functions</h2></td></tr>
 
 <p>Returns true if GPU Upload Heaps are supported on the current system. </p>
 <p>When true, you can use <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code>.</p>
-<p>This flag is fetched from <code>D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported</code>.</p>
-<p><code>#define D3D12MA_OPTIONS16_SUPPORTED 1</code> is needed for the compilation of this library. Otherwise the flag is always false. </p>
+<p>This flag is fetched from <code>D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported</code>. </p>
 
 </div>
 </div>
