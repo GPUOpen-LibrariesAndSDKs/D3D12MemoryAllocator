@@ -62,6 +62,14 @@ static const WCHAR* const HEAP_TYPE_NAMES[] =
     L"GPU_UPLOAD",
 };
 
+bool operator==(const D3D12MA::Statistics& lhs, const D3D12MA::Statistics& rhs)
+{
+    return lhs.BlockCount == rhs.BlockCount &&
+        lhs.AllocationCount == rhs.AllocationCount &&
+        lhs.BlockBytes == rhs.BlockBytes &&
+        lhs.AllocationBytes == rhs.AllocationBytes;
+}
+
 static void CurrentTimeToStr(std::string& out)
 {
     time_t rawTime; time(&rawTime);
@@ -1311,6 +1319,52 @@ static void TestCustomPool_Committed(const TestContext& ctx)
     CHECK_BOOL(alloc->GetHeap() == NULL);
     CHECK_BOOL(alloc->GetResource() != NULL);
     CHECK_BOOL(alloc->GetOffset() == 0);
+}
+
+static void TestCustomPool_AlwaysCommitted(const TestContext& ctx)
+{
+    wprintf(L"Test custom pool always committed\n");
+
+    const UINT64 BUFFER_SIZE = 256;
+
+    D3D12MA::POOL_DESC poolDesc = {};
+    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    poolDesc.Flags = D3D12MA::POOL_FLAG_ALWAYS_COMMITTED;
+
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.CustomPool = pool.Get();
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
+
+    ComPtr<D3D12MA::Allocation> alloc;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_COMMON,
+        NULL, // pOptimizedClearValue
+        &alloc,
+        IID_NULL, NULL)); // riidResource, ppvResource
+    CHECK_BOOL(alloc->GetHeap() == NULL);
+    CHECK_BOOL(alloc->GetResource() != NULL);
+    CHECK_BOOL(alloc->GetOffset() == 0);
+
+    D3D12MA::Statistics stats = {};
+    pool->GetStatistics(&stats);
+    CHECK_BOOL(stats.AllocationBytes >= BUFFER_SIZE);
+    CHECK_BOOL(stats.AllocationCount == 1);
+    CHECK_BOOL(stats.BlockBytes >= BUFFER_SIZE);
+    CHECK_BOOL(stats.BlockCount == 1);
+
+    D3D12MA::DetailedStatistics detailedStats = {};
+    pool->CalculateStatistics(&detailedStats);
+    CHECK_BOOL(detailedStats.Stats == stats);
+    CHECK_BOOL(detailedStats.AllocationSizeMin == stats.AllocationBytes);
+    CHECK_BOOL(detailedStats.AllocationSizeMax == stats.AllocationBytes);
+    CHECK_BOOL(detailedStats.UnusedRangeCount == 0);
+    CHECK_BOOL(detailedStats.UnusedRangeSizeMax == 0);
 }
 
 static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIES& heapProps)
@@ -4250,6 +4304,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCustomPools(ctx);
     TestCustomPool_MinAllocationAlignment(ctx);
     TestCustomPool_Committed(ctx);
+    TestCustomPool_AlwaysCommitted(ctx);
     TestPoolsAndAllocationParameters(ctx);
     TestCustomHeaps(ctx);
     TestStandardCustomCommittedPlaced(ctx);

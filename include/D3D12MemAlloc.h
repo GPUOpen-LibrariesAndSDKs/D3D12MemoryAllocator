@@ -828,7 +828,7 @@ enum POOL_FLAGS
     /// Zero
     POOL_FLAG_NONE = 0,
 
-    /** \brief Enables alternative, linear allocation algorithm in this pool.
+    /** Enables alternative, linear allocation algorithm in this pool.
 
     Specify this flag to enable linear allocation algorithm, which always creates
     new allocations after last one and doesn't reuse space from allocations freed in
@@ -841,13 +841,20 @@ enum POOL_FLAGS
     */
     POOL_FLAG_ALGORITHM_LINEAR = 0x1,
 
-    /** \brief Optimization, allocate MSAA textures as committed resources always.
+    /** Optimization, allocate MSAA textures as committed resources always.
     
     Specify this flag to create MSAA textures with implicit heaps, as if they were created
     with flag D3D12MA::ALLOCATION_FLAG_COMMITTED. Usage of this flags enables pool to create its heaps
     on smaller alignment not suitable for MSAA textures.
+
+    You should always use this flag unless you really need to create some MSAA textures in this pool as placed.
     */
     POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED = 0x2,
+    /** Every allocation made in this pool will be created as a committed resource - will have its own memory block.
+    
+    There is also an equivalent flag for the entire allocator: D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED.
+    */
+    POOL_FLAG_ALWAYS_COMMITTED = 0x4,
 
     // Bit mask to extract only `ALGORITHM` bits from entire set of flags.
     POOL_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_LINEAR
@@ -1022,9 +1029,11 @@ enum ALLOCATOR_FLAGS
     */
     ALLOCATOR_FLAG_SINGLETHREADED = 0x1,
 
-    /**
-    Every allocation will have its own memory block.
-    To be used for debugging purposes.
+    /** Every allocation will be created as a committed resource - will have its own memory block.
+    
+    Affects both default pools and custom pools.
+    To be used for debugging purposes only.
+    There is also an equivalent flag for custom pools: D3D12MA::POOL_FLAG_ALWAYS_COMMITTED.
     */
     ALLOCATOR_FLAG_ALWAYS_COMMITTED = 0x2,
 
@@ -1044,14 +1053,16 @@ enum ALLOCATOR_FLAGS
     */
     ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED = 0x4,
 
-    /** \brief Optimization, allocate MSAA textures as committed resources always.
+    /** Optimization, allocate MSAA textures as committed resources always.
 
     Specify this flag to create MSAA textures with implicit heaps, as if they were created
     with flag D3D12MA::ALLOCATION_FLAG_COMMITTED. Usage of this flags enables all default pools
     to create its heaps on smaller alignment not suitable for MSAA textures.
+
+    You should always use this flag unless you really need to create some MSAA textures as placed.
     */
     ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED = 0x8,
-    /** \brief Disable optimization that prefers creating small buffers as committed to avoid 64 KB alignment.
+    /** Disable optimization that prefers creating small buffers as committed to avoid 64 KB alignment.
     
     By default, the library prefers creating small buffers <= 32 KB as committed,
     because drivers tend to pack them better, while placed buffers require 64 KB alignment.

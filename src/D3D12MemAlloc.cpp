@@ -5855,6 +5855,7 @@ public:
 
     AllocatorPimpl* GetAllocator() const { return m_Allocator; }
     const POOL_DESC& GetDesc() const { return m_Desc; }
+    bool AlwaysCommitted() const { return (m_Desc.Flags & POOL_FLAG_ALWAYS_COMMITTED) != 0; }
     bool SupportsCommittedAllocations() const { return m_Desc.BlockSize == 0; }
     LPCWSTR GetName() const { return m_Name; }
 
@@ -7410,7 +7411,8 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         PoolPimpl* const pool = allocDesc.CustomPool->m_Pimpl;
 
         msaaAlwaysCommitted = pool->GetBlockVector()->DeniesMsaaTextures();
-        outBlockVector = pool->GetBlockVector();
+        if(!pool->AlwaysCommitted())
+            outBlockVector = pool->GetBlockVector();
 
         const auto& desc = pool->GetDesc();
         outCommittedAllocationParams.m_ProtectedSession = desc.pProtectedSession;
@@ -9514,6 +9516,8 @@ HRESULT Pool::BeginDefragmentation(const DEFRAGMENTATION_DESC* pDesc, Defragment
     // Check for support
     if (m_Pimpl->GetBlockVector()->GetAlgorithm() & POOL_FLAG_ALGORITHM_LINEAR)
         return E_NOINTERFACE;
+    if(m_Pimpl->AlwaysCommitted())
+        return E_NOINTERFACE;
 
     AllocatorPimpl* allocator = m_Pimpl->GetAllocator();
     *ppContext = D3D12MA_NEW(allocator->GetAllocs(), DefragmentationContext)(allocator, *pDesc, m_Pimpl->GetBlockVector());
@@ -9735,6 +9739,12 @@ HRESULT Allocator::CreatePool(
         (pPoolDesc->MinAllocationAlignment > 0 && !IsPow2(pPoolDesc->MinAllocationAlignment)))
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreatePool.");
+        return E_INVALIDARG;
+    }
+    if ((pPoolDesc->Flags & POOL_FLAG_ALWAYS_COMMITTED) != 0 &&
+        (pPoolDesc->BlockSize != 0 || pPoolDesc->MinBlockCount > 0))
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreatePool while POOL_FLAG_ALWAYS_COMMITTED is specified.");
         return E_INVALIDARG;
     }
     if (!m_Pimpl->HeapFlagsFulfillResourceHeapTier(pPoolDesc->HeapFlags))
