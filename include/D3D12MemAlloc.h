@@ -1123,8 +1123,6 @@ public:
     When true, you can use `D3D12_HEAP_TYPE_GPU_UPLOAD`.
 
     This flag is fetched from `D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported`.
-
-    `#define D3D12MA_OPTIONS16_SUPPORTED 1` is needed for the compilation of this library. Otherwise the flag is always false.
     */
     BOOL IsGPUUploadHeapSupported() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.

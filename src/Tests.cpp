@@ -762,7 +762,13 @@ static void TestSmallBuffers(const TestContext& ctx)
         CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
         CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        CHECK_BOOL(!resWithAlloc.allocation->GetHeap()); // Expected to be committed.
+        // May or may not be committed, depending on the PREFER_SMALL_BUFFERS_COMMITTED
+        // and TIGHT_ALIGNMENT settings.
+        const bool isCommitted = resWithAlloc.allocation->GetHeap() == NULL;
+        if (isCommitted)
+            wprintf(L"    Small buffer %llu B inside a custom pool was created as committed.\n", resDesc.Width);
+        else
+            wprintf(L"    Small buffer %llu B inside a custom pool was created as placed.\n", resDesc.Width);
     }
 
     // Test 3: NEVER_ALLOCATE.
@@ -2857,7 +2863,7 @@ static void TestDevice10(const TestContext& ctx)
 
 static void TestGPUUploadHeap(const TestContext& ctx)
 {
-#if D3D12MA_OPTIONS16_SUPPORTED
+#if D3D12_SDK_VERSION >= 610
     using namespace D3D12MA;
 
     wprintf(L"Test GPU Upload Heap\n");
