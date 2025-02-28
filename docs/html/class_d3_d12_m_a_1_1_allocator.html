@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Direct3D 12 Memory Allocator: D3D12MA::Allocator Class Reference</title>
+<title>D3D12 Memory Allocator: D3D12MA::Allocator Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -25,7 +25,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Direct3D 12 Memory Allocator
+   <div id="projectname">D3D12 Memory Allocator
    </div>
   </td>
  </tr>
@@ -120,6 +120,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a3f3fd1e88cf2cd02257fe272e08a273c" id="r_a3f3fd1e88cf2cd02257fe272e08a273c"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3f3fd1e88cf2cd02257fe272e08a273c">IsGPUUploadHeapSupported</a> () const</td></tr>
 <tr class="memdesc:a3f3fd1e88cf2cd02257fe272e08a273c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if GPU Upload Heaps are supported on the current system.  <br /></td></tr>
 <tr class="separator:a3f3fd1e88cf2cd02257fe272e08a273c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3f5aa191cebdca7c1932da4723cfc03e" id="r_a3f5aa191cebdca7c1932da4723cfc03e"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3f5aa191cebdca7c1932da4723cfc03e">IsTightAlignmentSupported</a> () const</td></tr>
+<tr class="memdesc:a3f5aa191cebdca7c1932da4723cfc03e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if resource tight alignment is supported on the current system. When supported, it is automatically used by the library, unless <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> flag was specified on allocator creation.  <br /></td></tr>
+<tr class="separator:a3f5aa191cebdca7c1932da4723cfc03e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a434ae3147209953253da26687bfd62dc" id="r_a434ae3147209953253da26687bfd62dc"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a434ae3147209953253da26687bfd62dc">GetMemoryCapacity</a> (UINT memorySegmentGroup) const</td></tr>
 <tr class="memdesc:a434ae3147209953253da26687bfd62dc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns total amount of memory of specific segment group, in bytes.  <br /></td></tr>
 <tr class="separator:a434ae3147209953253da26687bfd62dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -753,7 +756,7 @@ Public Member Functions</h2></td></tr>
 <p>Returns total amount of memory of specific segment group, in bytes. </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">memorySegmentGroup</td><td>use <code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> or DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.</td></tr>
+    <tr><td class="paramname">memorySegmentGroup</td><td>use <code>DXGI_MEMORY_SEGMENT_GROUP_LOCAL</code> or <code>DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL</code>.</td></tr>
   </table>
   </dd>
 </dl>
@@ -815,8 +818,27 @@ Public Member Functions</h2></td></tr>
 
 <p>Returns true if GPU Upload Heaps are supported on the current system. </p>
 <p>When true, you can use <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code>.</p>
-<p>This flag is fetched from <code>D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported</code>.</p>
-<p><code>#define D3D12MA_OPTIONS16_SUPPORTED 1</code> is needed for the compilation of this library. Otherwise the flag is always false. </p>
+<p>This flag is fetched from <code>D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported</code>. </p>
+
+</div>
+</div>
+<a id="a3f5aa191cebdca7c1932da4723cfc03e" name="a3f5aa191cebdca7c1932da4723cfc03e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3f5aa191cebdca7c1932da4723cfc03e">&#9670;&#160;</a></span>IsTightAlignmentSupported()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">BOOL D3D12MA::Allocator::IsTightAlignmentSupported </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Returns true if resource tight alignment is supported on the current system. When supported, it is automatically used by the library, unless <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> flag was specified on allocator creation. </p>
+<p>This flag is fetched from <code>D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier</code>. </p>
 
 </div>
 </div>

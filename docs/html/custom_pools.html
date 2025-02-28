@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Direct3D 12 Memory Allocator: Custom memory pools</title>
+<title>D3D12 Memory Allocator: Custom memory pools</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -25,7 +25,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Direct3D 12 Memory Allocator
+   <div id="projectname">D3D12 Memory Allocator
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ $(function(){ initResizable(false); });
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="index.html">D3D12 Memory Allocator</a></li>  </ul>
+<li class="navelem"><a class="el" href="index.html">D3D12 Memory Allocator</a></li><li class="navelem"><a class="el" href="optimal_allocation.html">Optimal resource allocation</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div id="doc-content">
@@ -103,7 +103,7 @@ Usage</h1>
 <div class="line"> </div>
 <div class="line">Pool* pool;</div>
 <div class="line">HRESULT hr = allocator-&gt;CreatePool(&amp;poolDesc, &amp;pool);</div>
-<div class="ttc" id="anamespace_d3_d12_m_a_html_a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa"><div class="ttname"><a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a></div><div class="ttdeci">@ POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</div><div class="ttdoc">Optimization, allocate MSAA textures as committed resources always.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:842</div></div>
+<div class="ttc" id="anamespace_d3_d12_m_a_html_a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa"><div class="ttname"><a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a></div><div class="ttdeci">@ POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</div><div class="ttdoc">Optimization, allocate MSAA textures as committed resources always.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:850</div></div>
 </div><!-- fragment --><p>To allocate resources out of a custom pool, only set member <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934" title="Custom pool to place the new resource in. Optional.">D3D12MA::ALLOCATION_DESC::CustomPool</a>. Example:</p>
 <div class="fragment"><div class="line">ALLOCATION_DESC allocDesc = {};</div>
 <div class="line">allocDesc.CustomPool = pool;</div>

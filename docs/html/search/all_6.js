@@ -14,5 +14,6 @@ var searchData=
   ['getresource_11',['GetResource',['../class_d3_d12_m_a_1_1_allocation.html#ad00308118252f82d8f803c623c67bf18',1,'D3D12MA::Allocation']]],
   ['getsize_12',['GetSize',['../class_d3_d12_m_a_1_1_allocation.html#a92c2fb6f22b28817eb83a59407d7dd30',1,'D3D12MA::Allocation']]],
   ['getstatistics_13',['GetStatistics',['../class_d3_d12_m_a_1_1_pool.html#aa9d849dc4667314b2a53eddf02f5af91',1,'D3D12MA::Pool::GetStatistics()'],['../class_d3_d12_m_a_1_1_virtual_block.html#a0f1dda0e019e218b021f64987a74b110',1,'D3D12MA::VirtualBlock::GetStatistics()']]],
-  ['getstats_14',['GetStats',['../class_d3_d12_m_a_1_1_defragmentation_context.html#a1c21c26f47dcbf8f4e562063a3e25f38',1,'D3D12MA::DefragmentationContext']]]
+  ['getstats_14',['GetStats',['../class_d3_d12_m_a_1_1_defragmentation_context.html#a1c21c26f47dcbf8f4e562063a3e25f38',1,'D3D12MA::DefragmentationContext']]],
+  ['gpu_20upload_20heap_15',['GPU upload heap',['../optimal_allocation.html#optimal_allocation_gpu_upload_heap',1,'']]]
 ];

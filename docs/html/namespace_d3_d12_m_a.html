@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Direct3D 12 Memory Allocator: D3D12MA Namespace Reference</title>
+<title>D3D12 Memory Allocator: D3D12MA Namespace Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -25,7 +25,7 @@
  <tbody>
  <tr id="projectrow">
   <td id="projectalign">
-   <div id="projectname">Direct3D 12 Memory Allocator
+   <div id="projectname">D3D12 Memory Allocator
    </div>
   </td>
  </tr>
@@ -220,6 +220,7 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<a class="el" href="#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e">ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a> = 0x8
 , <a class="el" href="#ad5ae5a5e42b878f2e18ab5d1fbfb9916a15c1ba5fbc182ac927b3011e23e74a72">ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED</a> = 0x10
+, <a class="el" href="#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> = 0x20
 <br />
  }</td></tr>
 <tr class="memdesc:ad5ae5a5e42b878f2e18ab5d1fbfb9916"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with ALLOCATOR_DESC::Flags.  <a href="#ad5ae5a5e42b878f2e18ab5d1fbfb9916">More...</a><br /></td></tr>
@@ -384,7 +385,11 @@ Functions</h2></td></tr>
 <p>Specify this flag to create MSAA textures with implicit heaps, as if they were created with flag <a class="el" href="#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a>. Usage of this flags enables all default pools to create its heaps on smaller alignment not suitable for MSAA textures. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="ad5ae5a5e42b878f2e18ab5d1fbfb9916a15c1ba5fbc182ac927b3011e23e74a72" name="ad5ae5a5e42b878f2e18ab5d1fbfb9916a15c1ba5fbc182ac927b3011e23e74a72"></a>ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED&#160;</td><td class="fielddoc"><p>Disable optimization that prefers creating small buffers as committed to avoid 64 KB alignment. </p>
-<p>By default, the library prefers creating small buffers &lt;= 32 KB as committed, because drivers tend to pack them better, while placed buffers require 64 KB alignment. This, however, may decrease performance, as creating committed resources involves allocation of implicit heaps, which may take longer than creating placed resources in existing heaps. Passing this flag will disable this committed preference globally for the allocator. It can also be disabled for a single allocation by using <a class="el" href="#abbad31a7e0b3d09d77f3fb704b77645eaa3ded8847563c24b4522af0586dbd2cb">ALLOCATION_FLAG_STRATEGY_MIN_TIME</a>. </p>
+<p>By default, the library prefers creating small buffers &lt;= 32 KB as committed, because drivers tend to pack them better, while placed buffers require 64 KB alignment. This, however, may decrease performance, as creating committed resources involves allocation of implicit heaps, which may take longer than creating placed resources in existing heaps. Passing this flag will disable this committed preference globally for the allocator. It can also be disabled for a single allocation by using <a class="el" href="#abbad31a7e0b3d09d77f3fb704b77645eaa3ded8847563c24b4522af0586dbd2cb">ALLOCATION_FLAG_STRATEGY_MIN_TIME</a>.</p>
+<p>If the tight resource alignment feature is used by the library (which happens automatically whenever supported, unless you use flag <a class="el" href="#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a>), then small buffers are not preferred as committed. Long story short, you don't need to specify any of these flags. The library chooses the most optimal method automatically. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed" name="ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed"></a>ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT&#160;</td><td class="fielddoc"><p>Disables the use of the tight alignment feature even when it is supported on the current system. By default, the feature is used whenever available.</p>
+<p>Support can be checked by <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a3f5aa191cebdca7c1932da4723cfc03e" title="Returns true if resource tight alignment is supported on the current system. When supported,...">D3D12MA::Allocator::IsTightAlignmentSupported()</a> regardless of using this flag. </p>
 </td></tr>
 </table>
 

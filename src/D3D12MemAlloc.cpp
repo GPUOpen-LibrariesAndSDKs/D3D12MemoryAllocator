@@ -108,7 +108,7 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 #endif
 
 #ifndef D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
-    #if D3D12_PREVIEW_SDK_VERSION >= 716
+    #if D3D12_PREVIEW_SDK_VERSION >= 716 // TODO: Change after the feature ships in the retail Agility SDK.
         #define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 1
     #else
         #define D3D12MA_TIGHT_ALIGNMENT_SUPPORTED 0
