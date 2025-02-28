@@ -1956,7 +1956,7 @@ When trying to allocate more memory than available in the current heap
 
 - The allocation (resource creation) function call can fail with `HRESULT` value other than `S_OK`.
 - The allocation may succeed, but take long time (even a significant fraction of a second).
-- Some resources are automatically evicted from video memory to system memory, degrading the app performance.
+- Some resources are automatically demoted from video memory to system memory, degrading the app performance.
 - Even a crash of the entire graphics driver can happen, resulting in the D3D12 "device removal", which is usually
   catastrophic for the application.
 
@@ -2087,10 +2087,10 @@ For example, data used as a constant buffer must be aligned to `D3D12_CONSTANT_B
 \section optimal_allocation_residency_priority Residency priority
 
 When too much video memory is allocated, one of the things that can happen is the system
-evicting some heaps to the system memory.
+demoting some heaps to the system memory.
 Moving data between memory pools or reaching out directly to the system memory through PCI Express bus can have large performance overhead,
 which can slow down the application, or even make the game unplayable any more.
-Unfortunately, it is not possible to fully control or prevent this eviction.
+Unfortunately, it is not possible to fully control or prevent this demotion.
 Best thing to do is avoiding memory over-commitment.
 For more information, see section "Avoiding running out of memory" above.
 
@@ -2105,7 +2105,7 @@ It is recommended to create a custom pool for the purpose of using high residenc
 of all resources that are critical for the performance, especially those that are written by the GPU,
 like render-target, depth-stencil textures, UAV textures and buffers.
 It is also worth creating them as committed, so that each one will have its own implicit heap.
-This can minimize the chance that an entire large heap is evicted to system memory, degrading performance
+This can minimize the chance that an entire large heap is demoted to system memory, degrading performance
 of all the resources placed in it.
 
 Example:
@@ -2145,7 +2145,7 @@ hr = allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON
 
 Note this is not the same as explicit eviction controlled using `ID3D12Device::Evict` and `MakeResident` functions.
 Resources evicted explicitly are illegal to access until they are made resident again,
-while the eviction described here happens automatically and only slows down the execution.
+while the demotion described here happens automatically and only slows down the execution.
 
 \section optimal_allocation_gpu_upload_heap GPU upload heap
 
