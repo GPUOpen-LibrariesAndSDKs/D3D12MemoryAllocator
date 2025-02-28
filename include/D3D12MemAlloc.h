@@ -2215,13 +2215,9 @@ It can be beneficial especially for resources that need to change frequently (of
 %D3D12MA supports GPU upload heap when recent enough version of DirectX 12 SDK is used and when the current system supports it.
 The support can be queried using function D3D12MA::Allocator::IsGPUUploadHeapSupported().
 When it returns `TRUE`, you can create resources using `D3D12_HEAP_TYPE_GPU_UPLOAD`.
-
-Example:
+You can also just try creating such resource. Example:
 
 \code
-// Fast path for data upload.
-if(allocator->IsGPUUploadHeapSupported())
-{
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_GPU_UPLOAD; // !!!
 
@@ -2242,16 +2238,29 @@ if(allocator->IsGPUUploadHeapSupported())
     ID3D12Resource* res;
     hr = allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
         NULL, &alloc, IID_PPV_ARGS(&res));
-    // Check hr...
+    if(SUCCEEDED(hr))
+    {
+        // Fast path for data upload.
 
-    D3D12_RANGE emptyRange = {0, 0};
-    void* mappedPtr = NULL;
-    hr = res->Map(0, &emptyRange, &mappedPtr);
-    memcpy(mappedPtr, srcData, 1048576);
-    res->Unmap(0, NULL); // Optional. You can leave it persistently mapped.
+        D3D12_RANGE emptyRange = {0, 0};
+        void* mappedPtr = NULL;
+        hr = res->Map(0, &emptyRange, &mappedPtr);
+        memcpy(mappedPtr, srcData, 1048576);
+        res->Unmap(0, NULL); // Optional. You can leave it persistently mapped.
 
-    D3D12_GPU_VIRTUAL_ADDRESS gpuva = res->GetGPUVirtualAddress();
-    // Use gpuva to access the buffer on the GPU...
+        D3D12_GPU_VIRTUAL_ADDRESS gpuva = res->GetGPUVirtualAddress();
+        // Use gpuva to access the buffer on the GPU...
+    }
+    else if(hr == E_NOTIMPL)
+    {
+        // GPU Upload Heap not supported in this system.
+        // Fall back to creating a staging buffer in UPLOAD and another copy in DEFAULT.
+        
+        allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        // ...
+    }
+    else
+        // Some other error code e.g., out of memory...
 \endcode
 
 \section optimal_allocation_committed_vs_placed Committed versus placed resources

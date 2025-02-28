@@ -2922,11 +2922,7 @@ static void TestGPUUploadHeap(const TestContext& ctx)
 
     wprintf(L"Test GPU Upload Heap\n");
 
-    if(!ctx.allocator->IsGPUUploadHeapSupported())
-    {
-        wprintf(L"    Skipped due to GPUUploadHeap not supported.\n");
-        return;
-    }
+    const bool supported = ctx.allocator->IsGPUUploadHeapSupported();
 
     Budget begLocalBudget = {};
     ctx.allocator->GetBudget(&begLocalBudget, NULL);
@@ -2940,8 +2936,15 @@ static void TestGPUUploadHeap(const TestContext& ctx)
     FillResourceDescForBuffer(resDesc, 64 * KILOBYTE);
 
     ComPtr<Allocation> alloc;
-    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
-        D3D12_RESOURCE_STATE_COMMON, NULL, &alloc, IID_NULL, NULL));
+    HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
+        D3D12_RESOURCE_STATE_COMMON, NULL, &alloc, IID_NULL, NULL);
+    if (!supported)
+    {
+        // Skip further tests. Just wanted to test that the respource creation fails with the right error code.
+        CHECK_BOOL(hr == E_NOTIMPL);
+        return;
+    }
+    CHECK_HR(hr);
     CHECK_BOOL(alloc && alloc->GetResource());
     CHECK_BOOL(alloc->GetResource()->GetGPUVirtualAddress() != 0);
     

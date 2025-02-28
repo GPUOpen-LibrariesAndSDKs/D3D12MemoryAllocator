@@ -7402,8 +7402,8 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     outCommittedAllocationParams = CommittedAllocationParameters();
     outPreferCommitted = false;
 
-    D3D12MA_ASSERT((allocDesc.HeapType != D3D12_HEAP_TYPE_GPU_UPLOAD_COPY || IsGPUUploadHeapSupported()) &&
-        "Trying to allocate from D3D12_HEAP_TYPE_GPU_UPLOAD while GPUUploadHeapSupported == FALSE.");
+    if (allocDesc.HeapType == D3D12_HEAP_TYPE_GPU_UPLOAD_COPY && !IsGPUUploadHeapSupported())
+        return E_NOTIMPL;
 
     bool msaaAlwaysCommitted;
     if (allocDesc.CustomPool != NULL)

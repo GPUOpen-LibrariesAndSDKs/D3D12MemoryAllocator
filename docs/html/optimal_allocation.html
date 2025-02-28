@@ -212,32 +212,30 @@ GPU upload heap</h1>
 <li>As the new <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code> uses the video memory, copies or direct access from the GPU are faster, while writes from the CPU code through a mapped pointer can be slower, because they need to go through PCIe. For maximum performance of copy operations from this heap, a graphics or compute queue should be used, not a copy queue.</li>
 </ul>
 <p>GPU Upload Heap can be used for performance optimization of some resources that need to be written by the CPU and read by the GPU. It can be beneficial especially for resources that need to change frequently (often called "dynamic").</p>
-<p>D3D12MA supports GPU upload heap when recent enough version of DirectX 12 SDK is used and when the current system supports it. The support can be queried using function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a3f3fd1e88cf2cd02257fe272e08a273c" title="Returns true if GPU Upload Heaps are supported on the current system.">D3D12MA::Allocator::IsGPUUploadHeapSupported()</a>. When it returns <code>TRUE</code>, you can create resources using <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code>.</p>
-<p>Example:</p>
-<div class="fragment"><div class="line"><span class="comment">// Fast path for data upload.</span></div>
-<div class="line"><span class="keywordflow">if</span>(allocator-&gt;IsGPUUploadHeapSupported())</div>
+<p>D3D12MA supports GPU upload heap when recent enough version of DirectX 12 SDK is used and when the current system supports it. The support can be queried using function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a3f3fd1e88cf2cd02257fe272e08a273c" title="Returns true if GPU Upload Heaps are supported on the current system.">D3D12MA::Allocator::IsGPUUploadHeapSupported()</a>. When it returns <code>TRUE</code>, you can create resources using <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code>. You can also just try creating such resource. Example:</p>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a> allocDesc = {};</div>
+<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a> = D3D12_HEAP_TYPE_GPU_UPLOAD; <span class="comment">// !!!</span></div>
+<div class="line"> </div>
+<div class="line">D3D12_RESOURCE_DESC resDesc = {};</div>
+<div class="line">resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
+<div class="line">resDesc.Alignment = 0;</div>
+<div class="line">resDesc.Width = 1048576; <span class="comment">// Requested buffer size.</span></div>
+<div class="line">resDesc.Height = 1;</div>
+<div class="line">resDesc.DepthOrArraySize = 1;</div>
+<div class="line">resDesc.MipLevels = 1;</div>
+<div class="line">resDesc.Format = DXGI_FORMAT_UNKNOWN;</div>
+<div class="line">resDesc.SampleDesc.Count = 1;</div>
+<div class="line">resDesc.SampleDesc.Quality = 0;</div>
+<div class="line">resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;</div>
+<div class="line">resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;</div>
+<div class="line"> </div>
+<div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
+<div class="line">ID3D12Resource* res;</div>
+<div class="line">hr = allocator-&gt;CreateResource(&amp;allocDesc, &amp;resDesc, D3D12_RESOURCE_STATE_COMMON,</div>
+<div class="line">    NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
+<div class="line"><span class="keywordflow">if</span>(SUCCEEDED(hr))</div>
 <div class="line">{</div>
-<div class="line">    <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a> allocDesc = {};</div>
-<div class="line">    allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a> = D3D12_HEAP_TYPE_GPU_UPLOAD; <span class="comment">// !!!</span></div>
-<div class="line"> </div>
-<div class="line">    D3D12_RESOURCE_DESC resDesc = {};</div>
-<div class="line">    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
-<div class="line">    resDesc.Alignment = 0;</div>
-<div class="line">    resDesc.Width = 1048576; <span class="comment">// Requested buffer size.</span></div>
-<div class="line">    resDesc.Height = 1;</div>
-<div class="line">    resDesc.DepthOrArraySize = 1;</div>
-<div class="line">    resDesc.MipLevels = 1;</div>
-<div class="line">    resDesc.Format = DXGI_FORMAT_UNKNOWN;</div>
-<div class="line">    resDesc.SampleDesc.Count = 1;</div>
-<div class="line">    resDesc.SampleDesc.Quality = 0;</div>
-<div class="line">    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;</div>
-<div class="line">    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;</div>
-<div class="line"> </div>
-<div class="line">    <a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
-<div class="line">    ID3D12Resource* res;</div>
-<div class="line">    hr = allocator-&gt;CreateResource(&amp;allocDesc, &amp;resDesc, D3D12_RESOURCE_STATE_COMMON,</div>
-<div class="line">        NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
-<div class="line">    <span class="comment">// Check hr...</span></div>
+<div class="line">    <span class="comment">// Fast path for data upload.</span></div>
 <div class="line"> </div>
 <div class="line">    D3D12_RANGE emptyRange = {0, 0};</div>
 <div class="line">    <span class="keywordtype">void</span>* mappedPtr = NULL;</div>
@@ -247,6 +245,16 @@ GPU upload heap</h1>
 <div class="line"> </div>
 <div class="line">    D3D12_GPU_VIRTUAL_ADDRESS gpuva = res-&gt;GetGPUVirtualAddress();</div>
 <div class="line">    <span class="comment">// Use gpuva to access the buffer on the GPU...</span></div>
+<div class="line">}</div>
+<div class="line"><span class="keywordflow">else</span> <span class="keywordflow">if</span>(hr == E_NOTIMPL)</div>
+<div class="line">{</div>
+<div class="line">    <span class="comment">// GPU Upload Heap not supported in this system.</span></div>
+<div class="line">    <span class="comment">// Fall back to creating a staging buffer in UPLOAD and another copy in DEFAULT.</span></div>
+<div class="line">    allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a> = D3D12_HEAP_TYPE_UPLOAD;</div>
+<div class="line">    <span class="comment">// ...</span></div>
+<div class="line">}</div>
+<div class="line"><span class="keywordflow">else</span></div>
+<div class="line">    <span class="comment">// Some other error code e.g., out of memory...</span></div>
 <div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aa46b3c0456e5a23edef3328607ebf4d7"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">D3D12MA::ALLOCATION_DESC::HeapType</a></div><div class="ttdeci">D3D12_HEAP_TYPE HeapType</div><div class="ttdoc">The type of memory heap where the new allocation should be placed.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:316</div></div>
 </div><!-- fragment --><h1><a class="anchor" id="optimal_allocation_committed_vs_placed"></a>
 Committed versus placed resources</h1>
