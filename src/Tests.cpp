@@ -51,6 +51,17 @@ static constexpr UINT64 MEGABYTE = 1024 * KILOBYTE;
 static constexpr CONFIG_TYPE ConfigType = CONFIG_TYPE_AVERAGE;
 static const char* FREE_ORDER_NAMES[] = { "FORWARD", "BACKWARD", "RANDOM", };
 
+// Indexes match enum D3D12_HEAP_TYPE.
+static const WCHAR* const HEAP_TYPE_NAMES[] =
+{
+    L"",
+    L"DEFAULT",
+    L"UPLOAD",
+    L"READBACK",
+    L"CUSTOM",
+    L"GPU_UPLOAD",
+};
+
 static void CurrentTimeToStr(std::string& out)
 {
     time_t rawTime; time(&rawTime);
