@@ -1,9 +1,7 @@
 var searchData=
 [
-  ['defragmentation_5fdesc_0',['DEFRAGMENTATION_DESC',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___d_e_s_c.html',1,'D3D12MA']]],
-  ['defragmentation_5fmove_1',['DEFRAGMENTATION_MOVE',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___m_o_v_e.html',1,'D3D12MA']]],
-  ['defragmentation_5fpass_5fmove_5finfo_2',['DEFRAGMENTATION_PASS_MOVE_INFO',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___p_a_s_s___m_o_v_e___i_n_f_o.html',1,'D3D12MA']]],
-  ['defragmentation_5fstats_3',['DEFRAGMENTATION_STATS',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___s_t_a_t_s.html',1,'D3D12MA']]],
-  ['defragmentationcontext_4',['DefragmentationContext',['../class_d3_d12_m_a_1_1_defragmentation_context.html',1,'D3D12MA']]],
-  ['detailedstatistics_5',['DetailedStatistics',['../struct_d3_d12_m_a_1_1_detailed_statistics.html',1,'D3D12MA']]]
+  ['callocation_5fdesc_0',['CALLOCATION_DESC',['../struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html',1,'D3D12MA']]],
+  ['cpool_5fdesc_1',['CPOOL_DESC',['../struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html',1,'D3D12MA']]],
+  ['cvirtual_5fallocation_5fdesc_2',['CVIRTUAL_ALLOCATION_DESC',['../struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html',1,'D3D12MA']]],
+  ['cvirtual_5fblock_5fdesc_3',['CVIRTUAL_BLOCK_DESC',['../struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html',1,'D3D12MA']]]
 ];

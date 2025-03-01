@@ -136,10 +136,6 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 
 #define D3D12MA_IID_PPV_ARGS(ppType)   __uuidof(**(ppType)), reinterpret_cast<void**>(ppType)
 
-#ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    #define D3D12MA_CREATE_NOT_ZEROED_AVAILABLE 1
-#endif
-
 namespace D3D12MA
 {
 static constexpr UINT HEAP_TYPE_COUNT = 5;

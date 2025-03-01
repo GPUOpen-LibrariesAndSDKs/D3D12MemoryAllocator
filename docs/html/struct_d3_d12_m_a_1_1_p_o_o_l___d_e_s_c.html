@@ -99,11 +99,20 @@ $(function(){ initResizable(false); });
  <a href="#details">More...</a></p>
 
 <p><code>#include &lt;D3D12MemAlloc.h&gt;</code></p>
+<div class="dynheader">
+Inheritance diagram for D3D12MA::POOL_DESC:</div>
+<div class="dyncontent">
+ <div class="center">
+  <img src="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.png" usemap="#D3D12MA::POOL_5FDESC_map" alt=""/>
+  <map id="D3D12MA::POOL_5FDESC_map" name="D3D12MA::POOL_5FDESC_map">
+<area href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html" title="Helper structure that helps with complete and conscise initialization of the D3D12MA::POOL_DESC struc..." alt="D3D12MA::CPOOL_DESC" shape="rect" coords="0,56,162,80"/>
+  </map>
+</div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:ac4ed93b0191344d68c0b4ac1a4822ff4" id="r_ac4ed93b0191344d68c0b4ac1a4822ff4"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">POOL_FLAGS</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac4ed93b0191344d68c0b4ac1a4822ff4">Flags</a></td></tr>
-<tr class="memdesc:ac4ed93b0191344d68c0b4ac1a4822ff4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Flags.  <br /></td></tr>
+<tr class="memdesc:ac4ed93b0191344d68c0b4ac1a4822ff4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Flags for the heap.  <br /></td></tr>
 <tr class="separator:ac4ed93b0191344d68c0b4ac1a4822ff4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a06e06813bcb5206e9f7a8b0564bf1d6a" id="r_a06e06813bcb5206e9f7a8b0564bf1d6a"><td class="memItemLeft" align="right" valign="top">D3D12_HEAP_PROPERTIES&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a06e06813bcb5206e9f7a8b0564bf1d6a">HeapProperties</a></td></tr>
 <tr class="memdesc:a06e06813bcb5206e9f7a8b0564bf1d6a"><td class="mdescLeft">&#160;</td><td class="mdescRight">The parameters of memory heap where allocations of this pool should be placed.  <br /></td></tr>
@@ -162,7 +171,8 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Flags. </p>
+<p>Flags for the heap. </p>
+<p>It is recommended to use <a class="el" href="_d3_d12_mem_alloc_8h.html#ac3d50f134ad24c58df4a934b87847653">D3D12MA_RECOMMENDED_HEAP_FLAGS</a>. </p>
 
 </div>
 </div>
@@ -180,7 +190,7 @@ Public Attributes</h2></td></tr>
 
 <p>Heap flags to be used when allocating heaps of this pool. </p>
 <p>It should contain one of these values, depending on type of resources you are going to create in this heap: <code>D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS</code>, <code>D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES</code>, <code>D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES</code>. Except if ResourceHeapTier = 2, then it may be <code>D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES</code> = 0.</p>
-<p>You can specify additional flags if needed. </p>
+<p>It is recommended to also add <a class="el" href="_d3_d12_mem_alloc_8h.html#a2679d8c9f6d900168bb45450bc88998b" title="Set of flags recommended for use in D3D12MA::POOL_DESC::Flags for optimal performance.">D3D12MA_RECOMMENDED_POOL_FLAGS</a>. You can specify additional flags if needed. </p>
 
 </div>
 </div>

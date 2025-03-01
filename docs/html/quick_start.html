@@ -103,26 +103,20 @@ Project setup and initialization</h1>
 <div class="ttc" id="a_d3_d12_mem_alloc_8h_html"><div class="ttname"><a href="_d3_d12_mem_alloc_8h.html">D3D12MemAlloc.h</a></div></div>
 </div><!-- fragment --><p>(4.) Right after you created <code>ID3D12Device</code>, fill <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html" title="Parameters of created Allocator object. To be used with CreateAllocator().">D3D12MA::ALLOCATOR_DESC</a> structure and call function <a class="el" href="namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0" title="Creates new main D3D12MA::Allocator object and returns it through ppAllocator.">D3D12MA::CreateAllocator</a> to create the main <a class="el" href="class_d3_d12_m_a_1_1_allocator.html" title="Represents main object of this library initialized for particular ID3D12Device.">D3D12MA::Allocator</a> object.</p>
 <p>Please note that all symbols of the library are declared inside <a class="el" href="namespace_d3_d12_m_a.html">D3D12MA</a> namespace.</p>
-<div class="fragment"><div class="line">IDXGIAdapter* adapter = (...)</div>
-<div class="line">ID3D12Device* device = (...)</div>
+<div class="fragment"><div class="line">IDXGIAdapter* adapter = ...</div>
+<div class="line">ID3D12Device* device = ...</div>
 <div class="line"> </div>
-<div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html">D3D12MA::ALLOCATOR_DESC</a> allocatorDesc = {};</div>
-<div class="line">allocatorDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ada1bf21205065b3aa0284b5a9ee1cb3c">pDevice</a> = device;</div>
-<div class="line">allocatorDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#abf9a9f87f0ffea52816efd363c5fcd7b">pAdapter</a> = adapter;</div>
-<div class="line"><span class="comment">// These flags are optional but recommended.</span></div>
-<div class="line">allocatorDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ad8abad7c80ea0d8df27c85243ce720f3">Flags</a> = <a class="code hl_enumvalue" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e">D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a> |</div>
-<div class="line">    <a class="code hl_enumvalue" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335">D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED</a>;</div>
+<div class="line">D3D12MA::ALLOCATOR_DESC allocatorDesc = {};</div>
+<div class="line">allocatorDesc.pDevice = device;</div>
+<div class="line">allocatorDesc.pAdapter = adapter;</div>
+<div class="line">allocatorDesc.Flags = <a class="code hl_define" href="_d3_d12_mem_alloc_8h.html#accfbeae642feeacf353ce695e91a5e73">D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</a>;</div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocator.html">D3D12MA::Allocator</a>* allocator;</div>
 <div class="line">HRESULT hr = <a class="code hl_function" href="namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0">D3D12MA::CreateAllocator</a>(&amp;allocatorDesc, &amp;allocator);</div>
-<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocator_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocator.html">D3D12MA::Allocator</a></div><div class="ttdoc">Represents main object of this library initialized for particular ID3D12Device.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1118</div></div>
+<div class="line"><span class="comment">// Check hr...</span></div>
+<div class="ttc" id="a_d3_d12_mem_alloc_8h_html_accfbeae642feeacf353ce695e91a5e73"><div class="ttname"><a href="_d3_d12_mem_alloc_8h.html#accfbeae642feeacf353ce695e91a5e73">D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</a></div><div class="ttdeci">#define D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</div><div class="ttdoc">Set of flags recommended for use in D3D12MA::ALLOCATOR_DESC::Flags for optimal performance.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:126</div></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocator_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocator.html">D3D12MA::Allocator</a></div><div class="ttdoc">Represents main object of this library initialized for particular ID3D12Device.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1155</div></div>
 <div class="ttc" id="anamespace_d3_d12_m_a_html_ab7a1cd1683986d75ce1488b0920f4cb0"><div class="ttname"><a href="namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0">D3D12MA::CreateAllocator</a></div><div class="ttdeci">D3D12MA_API HRESULT CreateAllocator(const ALLOCATOR_DESC *pDesc, Allocator **ppAllocator)</div><div class="ttdoc">Creates new main D3D12MA::Allocator object and returns it through ppAllocator.</div></div>
-<div class="ttc" id="anamespace_d3_d12_m_a_html_ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e"><div class="ttname"><a href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e">D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a></div><div class="ttdeci">@ ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1064</div></div>
-<div class="ttc" id="anamespace_d3_d12_m_a_html_ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335"><div class="ttname"><a href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335">D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED</a></div><div class="ttdeci">@ ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1054</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html">D3D12MA::ALLOCATOR_DESC</a></div><div class="ttdoc">Parameters of created Allocator object. To be used with CreateAllocator().</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1079</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c_html_abf9a9f87f0ffea52816efd363c5fcd7b"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#abf9a9f87f0ffea52816efd363c5fcd7b">D3D12MA::ALLOCATOR_DESC::pAdapter</a></div><div class="ttdeci">IDXGIAdapter * pAdapter</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1105</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c_html_ad8abad7c80ea0d8df27c85243ce720f3"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ad8abad7c80ea0d8df27c85243ce720f3">D3D12MA::ALLOCATOR_DESC::Flags</a></div><div class="ttdeci">ALLOCATOR_FLAGS Flags</div><div class="ttdoc">Flags.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1081</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c_html_ada1bf21205065b3aa0284b5a9ee1cb3c"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ada1bf21205065b3aa0284b5a9ee1cb3c">D3D12MA::ALLOCATOR_DESC::pDevice</a></div><div class="ttdeci">ID3D12Device * pDevice</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1087</div></div>
 </div><!-- fragment --><p>(5.) Right before destroying the D3D12 device, destroy the allocator object.</p>
 <div class="fragment"><div class="line">allocator-&gt;Release();</div>
 </div><!-- fragment --><p>Objects of this library must be destroyed by calling <code>Release</code> method. They are somewhat compatible with COM: they implement <code>IUnknown</code> interface with its virtual methods: <code>AddRef</code>, <code>Release</code>, <code>QueryInterface</code>, and they are reference-counted internally. You can use smart pointers designed for COM with objects of this library - e.g. <code>CComPtr</code> or <code>Microsoft::WRL::ComPtr</code>. The reference counter is thread-safe. <code>QueryInterface</code> method supports only <code>IUnknown</code>, as classes of this library don't define their own GUIDs.</p>
@@ -155,12 +149,15 @@ Creating resources</h1>
 <div class="line">    NULL,</div>
 <div class="line">    &amp;allocation,</div>
 <div class="line">    IID_NULL, NULL);</div>
+<div class="line"><span class="comment">// Check hr...</span></div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Use allocation-&gt;GetResource()...</span></div>
-<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocation_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a></div><div class="ttdoc">Represents single memory allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:491</div></div>
+<div class="line">ID3D12Resource* res = allocation-&gt;<a class="code hl_function" href="class_d3_d12_m_a_1_1_allocation.html#ad00308118252f82d8f803c623c67bf18">GetResource</a>();</div>
+<div class="line"><span class="comment">// Use res...</span></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocation_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a></div><div class="ttdoc">Represents single memory allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:521</div></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocation_html_ad00308118252f82d8f803c623c67bf18"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocation.html#ad00308118252f82d8f803c623c67bf18">D3D12MA::Allocation::GetResource</a></div><div class="ttdeci">ID3D12Resource * GetResource() const</div><div class="ttdoc">Returns D3D12 resource associated with this object.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:550</div></div>
 <div class="ttc" id="aclass_d3_d12_m_a_1_1_allocator_html_aa37d6b9fe8ea0864f7a35b9d68e8345a"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">D3D12MA::Allocator::CreateResource</a></div><div class="ttdeci">HRESULT CreateResource(const ALLOCATION_DESC *pAllocDesc, const D3D12_RESOURCE_DESC *pResourceDesc, D3D12_RESOURCE_STATES InitialResourceState, const D3D12_CLEAR_VALUE *pOptimizedClearValue, Allocation **ppAllocation, REFIID riidResource, void **ppvResource)</div><div class="ttdoc">Allocates memory and creates a D3D12 resource (buffer or texture). This is the main allocation functi...</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a></div><div class="ttdoc">Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:307</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aa46b3c0456e5a23edef3328607ebf4d7"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">D3D12MA::ALLOCATION_DESC::HeapType</a></div><div class="ttdeci">D3D12_HEAP_TYPE HeapType</div><div class="ttdoc">The type of memory heap where the new allocation should be placed.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:316</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a></div><div class="ttdoc">Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:336</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aa46b3c0456e5a23edef3328607ebf4d7"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">D3D12MA::ALLOCATION_DESC::HeapType</a></div><div class="ttdeci">D3D12_HEAP_TYPE HeapType</div><div class="ttdoc">The type of memory heap where the new allocation should be placed.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:345</div></div>
 </div><!-- fragment --><p>You need to release the allocation object when no longer needed. This will also release the D3D12 resource.</p>
 <div class="fragment"><div class="line">allocation-&gt;Release();</div>
 </div><!-- fragment --><p>The advantage of using the allocator instead of creating committed resource, and the main purpose of this library, is that it can decide to allocate bigger memory heap internally using <code>ID3D12Device::CreateHeap</code> and place multiple resources in it, at different offsets, using <code>ID3D12Device::CreatePlacedResource</code>. The library manages its own collection of allocated memory blocks (heaps) and remembers which parts of them are occupied and which parts are free to be used for new resources.</p>
@@ -201,7 +198,7 @@ Mapping memory</h1>
 <p>When using this library, you can map and use your resources normally without considering whether they are created as committed resources or placed resources in one large heap.</p>
 <p>Example for buffer created and filled in <code>UPLOAD</code> heap type:</p>
 <div class="fragment"><div class="line"><span class="keyword">const</span> UINT64 bufSize = 65536;</div>
-<div class="line"><span class="keyword">const</span> <span class="keywordtype">float</span>* bufData = (...);</div>
+<div class="line"><span class="keyword">const</span> <span class="keywordtype">float</span>* bufData = ...;</div>
 <div class="line"> </div>
 <div class="line">D3D12_RESOURCE_DESC resourceDesc = {};</div>
 <div class="line">resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
@@ -236,6 +233,60 @@ Mapping memory</h1>
 <div class="line">memcpy(mappedPtr, bufData, bufSize);</div>
 <div class="line"> </div>
 <div class="line">resource-&gt;Unmap(0, NULL);</div>
+</div><!-- fragment --><h1><a class="anchor" id="quick_start_helper_structures"></a>
+Helper structures</h1>
+<p>DirectX 12 Agility SDK offers a library of helpers in files "build\native\include\d3dx12\*.h". They include structures that help with complete and concise initialization of the core D3D12 <code>*_DESC</code> structures by using some basic C++ features (constructors, static methods, default parameters). They inherit from these structures, so they support implicit casting to them. For example, structure <code>CD3DX12_RESOURCE_DESC</code> can be used to conveniently fill in structure <code>D3D12_RESOURCE_DESC</code>.</p>
+<p>Similarly, this library provides a set of helper structures that aid in initialization of some of the <code>*_DESC</code> structures defined in the library. These are:</p>
+<ul>
+<li><a class="el" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Helper structure that helps with complete and conscise initialization of the D3D12MA::ALLOCATION_DESC...">D3D12MA::CALLOCATION_DESC</a>, which inherits from <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.">D3D12MA::ALLOCATION_DESC</a>.</li>
+<li><a class="el" href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html" title="Helper structure that helps with complete and conscise initialization of the D3D12MA::POOL_DESC struc...">D3D12MA::CPOOL_DESC</a>, which inherits from <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html" title="Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.">D3D12MA::POOL_DESC</a>.</li>
+<li><a class="el" href="struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Helper structure that helps with complete and conscise initialization of the D3D12MA::VIRTUAL_BLOCK_D...">D3D12MA::CVIRTUAL_BLOCK_DESC</a>, which inherits from <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a>.</li>
+<li><a class="el" href="struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Helper structure that helps with complete and conscise initialization of the D3D12MA::VIRTUAL_ALLOCAT...">D3D12MA::CVIRTUAL_ALLOCATION_DESC</a>, which inherits from <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Parameters of created virtual allocation to be passed to VirtualBlock::Allocate().">D3D12MA::VIRTUAL_ALLOCATION_DESC</a>.</li>
+</ul>
+<p>For example, when you want to create a buffer in the <code>UPLAOD</code> heap using minimal allocation time, you can use base structures:</p>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a> allocDesc;</div>
+<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a92dec49b788a334fc91c55340dfbace6">Flags</a> = <a class="code hl_enumvalue" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eaa3ded8847563c24b4522af0586dbd2cb">D3D12MA::ALLOCATION_FLAG_STRATEGY_MIN_TIME</a>;</div>
+<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a> = D3D12_HEAP_TYPE_UPLOAD;</div>
+<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a97878838f976b2d1e6b1a76881035690">ExtraHeapFlags</a> = D3D12_HEAP_FLAG_NONE;</div>
+<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934">CustomPool</a> = NULL;</div>
+<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ac638dd987f1326e2fdab91892d994d35">pPrivateData</a> = NULL;</div>
+<div class="line"> </div>
+<div class="line">D3D12_RESOURCE_DESC resDesc;</div>
+<div class="line">resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
+<div class="line">resDesc.Alignment = 0;</div>
+<div class="line">resDesc.Width = myBufSize;</div>
+<div class="line">resDesc.Height = 1;</div>
+<div class="line">resDesc.DepthOrArraySize = 1;</div>
+<div class="line">resDesc.MipLevels = 1;</div>
+<div class="line">resDesc.Format = DXGI_FORMAT_UNKNOWN;</div>
+<div class="line">resDesc.SampleDesc.Count = 1;</div>
+<div class="line">resDesc.SampleDesc.Quality = 0;</div>
+<div class="line">resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;</div>
+<div class="line">resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;</div>
+<div class="line"> </div>
+<div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
+<div class="line">ID3D12Resource* res;</div>
+<div class="line">HRESULT hr = allocator-&gt;<a class="code hl_function" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">CreateResource</a>(&amp;allocDesc, &amp;resDesc,</div>
+<div class="line">    D3D12_RESOURCE_STATE_COMMON, NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
+<div class="line"><span class="comment">// Check hr...</span></div>
+<div class="ttc" id="anamespace_d3_d12_m_a_html_abbad31a7e0b3d09d77f3fb704b77645eaa3ded8847563c24b4522af0586dbd2cb"><div class="ttname"><a href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eaa3ded8847563c24b4522af0586dbd2cb">D3D12MA::ALLOCATION_FLAG_STRATEGY_MIN_TIME</a></div><div class="ttdeci">@ ALLOCATION_FLAG_STRATEGY_MIN_TIME</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:314</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_a92dec49b788a334fc91c55340dfbace6"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a92dec49b788a334fc91c55340dfbace6">D3D12MA::ALLOCATION_DESC::Flags</a></div><div class="ttdeci">ALLOCATION_FLAGS Flags</div><div class="ttdoc">Flags for the allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:338</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_a97878838f976b2d1e6b1a76881035690"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a97878838f976b2d1e6b1a76881035690">D3D12MA::ALLOCATION_DESC::ExtraHeapFlags</a></div><div class="ttdeci">D3D12_HEAP_FLAGS ExtraHeapFlags</div><div class="ttdoc">Additional heap flags to be used when allocating memory.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:361</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_ab06b85f3cf3254f855b29264477e3934"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934">D3D12MA::ALLOCATION_DESC::CustomPool</a></div><div class="ttdeci">Pool * CustomPool</div><div class="ttdoc">Custom pool to place the new resource in. Optional.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:367</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_ac638dd987f1326e2fdab91892d994d35"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ac638dd987f1326e2fdab91892d994d35">D3D12MA::ALLOCATION_DESC::pPrivateData</a></div><div class="ttdeci">void * pPrivateData</div><div class="ttdoc">Custom general-purpose pointer that will be stored in D3D12MA::Allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:369</div></div>
+</div><!-- fragment --><p>Or you can use helper structs from both D3X12 library and this library to make the code shorter:</p>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a> allocDesc = <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a>{</div>
+<div class="line">    D3D12_HEAP_TYPE_UPLOAD,</div>
+<div class="line">    <a class="code hl_enumvalue" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eaa3ded8847563c24b4522af0586dbd2cb">D3D12MA::ALLOCATION_FLAG_STRATEGY_MIN_TIME</a> };</div>
+<div class="line"> </div>
+<div class="line">CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(myBufSize);</div>
+<div class="line"> </div>
+<div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
+<div class="line">ID3D12Resource* res;</div>
+<div class="line">HRESULT hr = allocator-&gt;<a class="code hl_function" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">CreateResource</a>(&amp;allocDesc, &amp;resDesc,</div>
+<div class="line">    D3D12_RESOURCE_STATE_COMMON, NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
+<div class="line"><span class="comment">// Check hr...</span></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a></div><div class="ttdoc">Helper structure that helps with complete and conscise initialization of the D3D12MA::ALLOCATION_DESC...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1649</div></div>
 </div><!-- fragment --> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 <!-- start footer part -->

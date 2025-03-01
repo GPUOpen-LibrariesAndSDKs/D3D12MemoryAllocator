@@ -110,9 +110,9 @@ Avoiding running out of memory</h1>
 <div class="line"> </div>
 <div class="line">UINT64 freeBytes = videoMemBudget.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71">BudgetBytes</a> - videoMemBudget.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253">UsageBytes</a>;</div>
 <div class="line">gameStreamingSystem-&gt;SetAvailableFreeMemory(freeBytes);</div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_budget_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_budget.html">D3D12MA::Budget</a></div><div class="ttdoc">Statistics of current memory usage and available budget for a specific memory segment group.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:442</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_budget_html_a326515f08d89ee2e31dcfdd5c1e8ac71"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71">D3D12MA::Budget::BudgetBytes</a></div><div class="ttdeci">UINT64 BudgetBytes</div><div class="ttdoc">Estimated amount of memory available to the program.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:465</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_budget_html_a77a8c9e32d6602f95b7d1c285cddd253"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253">D3D12MA::Budget::UsageBytes</a></div><div class="ttdeci">UINT64 UsageBytes</div><div class="ttdoc">Estimated current memory usage of the program.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:454</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_budget_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_budget.html">D3D12MA::Budget</a></div><div class="ttdoc">Statistics of current memory usage and available budget for a specific memory segment group.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:472</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_budget_html_a326515f08d89ee2e31dcfdd5c1e8ac71"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_budget.html#a326515f08d89ee2e31dcfdd5c1e8ac71">D3D12MA::Budget::BudgetBytes</a></div><div class="ttdeci">UINT64 BudgetBytes</div><div class="ttdoc">Estimated amount of memory available to the program.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:495</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_budget_html_a77a8c9e32d6602f95b7d1c285cddd253"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_budget.html#a77a8c9e32d6602f95b7d1c285cddd253">D3D12MA::Budget::UsageBytes</a></div><div class="ttdeci">UINT64 UsageBytes</div><div class="ttdoc">Estimated current memory usage of the program.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:484</div></div>
 </div><!-- fragment --><dl class="section user"><dt>Implementation detail</dt><dd>DXGI interface offers function <code>IDXGIAdapter3::QueryVideoMemoryInfo</code> that queries the current memory usage and budget. This library automatically makes use of it when available (when you use recent enough version of the DirectX SDK). If not, it falls back to estimating the usage and budget based on the total amount of the allocated memory and 80% of the full memory capacity, respectively.</dd></dl>
 <dl class="section user"><dt>Implementation detail</dt><dd>Allocating large heaps and creating placed resources in them is one of the main features of this library. However, if allocating new such block would exceed the budget, it will automatically prefer creating the resource as committed to have exactly the right size, which can lower the chance of getting into trouble in case of over-commitment.</dd></dl>
 <p>When creating non-essential resources, you can use <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645eab374417c1f22a833ead268a6c21424e6">D3D12MA::ALLOCATION_FLAG_WITHIN_BUDGET</a>. Then, in case the allocation would exceed the budget, the library will return failure from the function without attempting to allocate the actual D3D12 memory.</p>
@@ -143,45 +143,32 @@ Residency priority</h1>
 <p>Recent versions of DirectX 12 SDK offer function <code>ID3D12Device1::SetResidencyPriority</code> that sets a hint about the priority of a resource - how important it is to stay resident in the video memory. Setting the priority happens at the level of an entire memory heap. D3D12MA offers an interface to set this priority in form of <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a2e6074af8c8ff7b957fe8d4b5036a5e6" title="Residency priority to be set for all allocations made in this pool. Optional.">D3D12MA::POOL_DESC::ResidencyPriority</a> parameter. It affects all allocations made out of the custom pool created with it, both placed inside large heaps and created as committed.</p>
 <p>It is recommended to create a custom pool for the purpose of using high residency priority of all resources that are critical for the performance, especially those that are written by the GPU, like render-target, depth-stencil textures, UAV textures and buffers. It is also worth creating them as committed, so that each one will have its own implicit heap. This can minimize the chance that an entire large heap is demoted to system memory, degrading performance of all the resources placed in it.</p>
 <p>Example:</p>
-<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html">D3D12MA::POOL_DESC</a> poolDesc = {};</div>
-<div class="line">poolDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a06e06813bcb5206e9f7a8b0564bf1d6a">HeapProperties</a>.Type = D3D12_HEAP_TYPE_DEFAULT;</div>
-<div class="line">poolDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3795956e4fbfe7c3a23546e02e5d28dc">HeapFlags</a> = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS | D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;</div>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html">D3D12MA::CPOOL_DESC</a> poolDesc = <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html">D3D12MA::CPOOL_DESC</a>{</div>
+<div class="line">    D3D12_HEAP_TYPE_DEFAULT,</div>
+<div class="line">    <a class="code hl_define" href="_d3_d12_mem_alloc_8h.html#ac3d50f134ad24c58df4a934b87847653">D3D12MA_RECOMMENDED_HEAP_FLAGS</a> | D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };</div>
 <div class="line">poolDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a2e6074af8c8ff7b957fe8d4b5036a5e6">ResidencyPriority</a> = D3D12_RESIDENCY_PRIORITY_HIGH; <span class="comment">// !!!</span></div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_pool.html">D3D12MA::Pool</a>* pool;</div>
 <div class="line">HRESULT hr = allocator-&gt;CreatePool(&amp;poolDesc, &amp;pool);</div>
 <div class="line"><span class="comment">// Check hr...</span></div>
 <div class="line"> </div>
-<div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a> allocDesc = {};</div>
-<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934">CustomPool</a> = pool;</div>
-<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a92dec49b788a334fc91c55340dfbace6">Flags</a> = ALLOCATION_FLAG_COMMITTED; <span class="comment">// !!!</span></div>
+<div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a> allocDesc = <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a>{</div>
+<div class="line">    pool,</div>
+<div class="line">    ALLOCATION_FLAG_COMMITTED }; <span class="comment">// !!!</span></div>
 <div class="line"> </div>
-<div class="line">D3D12_RESOURCE_DESC resDesc = {};</div>
-<div class="line">resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
-<div class="line">resDesc.Alignment = 0;</div>
-<div class="line">resDesc.Width = 1048576; <span class="comment">// Requested buffer size.</span></div>
-<div class="line">resDesc.Height = 1;</div>
-<div class="line">resDesc.DepthOrArraySize = 1;</div>
-<div class="line">resDesc.MipLevels = 1;</div>
-<div class="line">resDesc.Format = DXGI_FORMAT_UNKNOWN;</div>
-<div class="line">resDesc.SampleDesc.Count = 1;</div>
-<div class="line">resDesc.SampleDesc.Quality = 0;</div>
-<div class="line">resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;</div>
-<div class="line">resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;</div>
+<div class="line">CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(</div>
+<div class="line">    1048576); <span class="comment">// Requested buffer size.</span></div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
 <div class="line">hr = allocator-&gt;CreateResource(&amp;allocDesc, &amp;resDesc, D3D12_RESOURCE_STATE_COMMON,</div>
 <div class="line">    NULL, &amp;alloc, IID_NULL, NULL);</div>
 <div class="line"><span class="comment">// Check hr...</span></div>
-<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocation_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a></div><div class="ttdoc">Represents single memory allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:491</div></div>
-<div class="ttc" id="aclass_d3_d12_m_a_1_1_pool_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_pool.html">D3D12MA::Pool</a></div><div class="ttdoc">Custom memory pool.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:950</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a></div><div class="ttdoc">Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:307</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_a92dec49b788a334fc91c55340dfbace6"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#a92dec49b788a334fc91c55340dfbace6">D3D12MA::ALLOCATION_DESC::Flags</a></div><div class="ttdeci">ALLOCATION_FLAGS Flags</div><div class="ttdoc">Flags.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:309</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_ab06b85f3cf3254f855b29264477e3934"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934">D3D12MA::ALLOCATION_DESC::CustomPool</a></div><div class="ttdeci">Pool * CustomPool</div><div class="ttdoc">Custom pool to place the new resource in. Optional.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:337</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html">D3D12MA::POOL_DESC</a></div><div class="ttdoc">Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:865</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html_a06e06813bcb5206e9f7a8b0564bf1d6a"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a06e06813bcb5206e9f7a8b0564bf1d6a">D3D12MA::POOL_DESC::HeapProperties</a></div><div class="ttdeci">D3D12_HEAP_PROPERTIES HeapProperties</div><div class="ttdoc">The parameters of memory heap where allocations of this pool should be placed.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:873</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html_a2e6074af8c8ff7b957fe8d4b5036a5e6"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a2e6074af8c8ff7b957fe8d4b5036a5e6">D3D12MA::POOL_DESC::ResidencyPriority</a></div><div class="ttdeci">D3D12_RESIDENCY_PRIORITY ResidencyPriority</div><div class="ttdoc">Residency priority to be set for all allocations made in this pool. Optional.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:938</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html_a3795956e4fbfe7c3a23546e02e5d28dc"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3795956e4fbfe7c3a23546e02e5d28dc">D3D12MA::POOL_DESC::HeapFlags</a></div><div class="ttdeci">D3D12_HEAP_FLAGS HeapFlags</div><div class="ttdoc">Heap flags to be used when allocating heaps of this pool.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:884</div></div>
+<div class="ttc" id="a_d3_d12_mem_alloc_8h_html_ac3d50f134ad24c58df4a934b87847653"><div class="ttname"><a href="_d3_d12_mem_alloc_8h.html#ac3d50f134ad24c58df4a934b87847653">D3D12MA_RECOMMENDED_HEAP_FLAGS</a></div><div class="ttdeci">#define D3D12MA_RECOMMENDED_HEAP_FLAGS</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:134</div></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocation_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a></div><div class="ttdoc">Represents single memory allocation.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:521</div></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_pool_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_pool.html">D3D12MA::Pool</a></div><div class="ttdoc">Custom memory pool.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:984</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a></div><div class="ttdoc">Helper structure that helps with complete and conscise initialization of the D3D12MA::ALLOCATION_DESC...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1649</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html">D3D12MA::CPOOL_DESC</a></div><div class="ttdoc">Helper structure that helps with complete and conscise initialization of the D3D12MA::POOL_DESC struc...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1685</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html_a2e6074af8c8ff7b957fe8d4b5036a5e6"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a2e6074af8c8ff7b957fe8d4b5036a5e6">D3D12MA::POOL_DESC::ResidencyPriority</a></div><div class="ttdeci">D3D12_RESIDENCY_PRIORITY ResidencyPriority</div><div class="ttdoc">Residency priority to be set for all allocations made in this pool. Optional.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:972</div></div>
 </div><!-- fragment --><p>Note this is not the same as explicit eviction controlled using <code>ID3D12Device::Evict</code> and <code>MakeResident</code> functions. Resources evicted explicitly are illegal to access until they are made resident again, while the demotion described here happens automatically and only slows down the execution.</p>
 <h1><a class="anchor" id="optimal_allocation_gpu_upload_heap"></a>
 GPU upload heap</h1>
@@ -213,21 +200,11 @@ GPU upload heap</h1>
 </ul>
 <p>GPU Upload Heap can be used for performance optimization of some resources that need to be written by the CPU and read by the GPU. It can be beneficial especially for resources that need to change frequently (often called "dynamic").</p>
 <p>D3D12MA supports GPU upload heap when recent enough version of DirectX 12 SDK is used and when the current system supports it. The support can be queried using function <a class="el" href="class_d3_d12_m_a_1_1_allocator.html#a3f3fd1e88cf2cd02257fe272e08a273c" title="Returns true if GPU Upload Heaps are supported on the current system.">D3D12MA::Allocator::IsGPUUploadHeapSupported()</a>. When it returns <code>TRUE</code>, you can create resources using <code>D3D12_HEAP_TYPE_GPU_UPLOAD</code>. You can also just try creating such resource. Example:</p>
-<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a> allocDesc = {};</div>
-<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a> = D3D12_HEAP_TYPE_GPU_UPLOAD; <span class="comment">// !!!</span></div>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a> allocDesc = <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a>{</div>
+<div class="line">    D3D12_HEAP_TYPE_GPU_UPLOAD }; <span class="comment">// !!!</span></div>
 <div class="line"> </div>
-<div class="line">D3D12_RESOURCE_DESC resDesc = {};</div>
-<div class="line">resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
-<div class="line">resDesc.Alignment = 0;</div>
-<div class="line">resDesc.Width = 1048576; <span class="comment">// Requested buffer size.</span></div>
-<div class="line">resDesc.Height = 1;</div>
-<div class="line">resDesc.DepthOrArraySize = 1;</div>
-<div class="line">resDesc.MipLevels = 1;</div>
-<div class="line">resDesc.Format = DXGI_FORMAT_UNKNOWN;</div>
-<div class="line">resDesc.SampleDesc.Count = 1;</div>
-<div class="line">resDesc.SampleDesc.Quality = 0;</div>
-<div class="line">resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;</div>
-<div class="line">resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;</div>
+<div class="line">CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(</div>
+<div class="line">    1048576); <span class="comment">// Requested buffer size.</span></div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
 <div class="line">ID3D12Resource* res;</div>
@@ -250,12 +227,13 @@ GPU upload heap</h1>
 <div class="line">{</div>
 <div class="line">    <span class="comment">// GPU Upload Heap not supported in this system.</span></div>
 <div class="line">    <span class="comment">// Fall back to creating a staging buffer in UPLOAD and another copy in DEFAULT.</span></div>
+<div class="line">    </div>
 <div class="line">    allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a> = D3D12_HEAP_TYPE_UPLOAD;</div>
 <div class="line">    <span class="comment">// ...</span></div>
 <div class="line">}</div>
 <div class="line"><span class="keywordflow">else</span></div>
 <div class="line">    <span class="comment">// Some other error code e.g., out of memory...</span></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aa46b3c0456e5a23edef3328607ebf4d7"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">D3D12MA::ALLOCATION_DESC::HeapType</a></div><div class="ttdeci">D3D12_HEAP_TYPE HeapType</div><div class="ttdoc">The type of memory heap where the new allocation should be placed.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:316</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html_aa46b3c0456e5a23edef3328607ebf4d7"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa46b3c0456e5a23edef3328607ebf4d7">D3D12MA::ALLOCATION_DESC::HeapType</a></div><div class="ttdeci">D3D12_HEAP_TYPE HeapType</div><div class="ttdoc">The type of memory heap where the new allocation should be placed.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:345</div></div>
 </div><!-- fragment --><h1><a class="anchor" id="optimal_allocation_committed_vs_placed"></a>
 Committed versus placed resources</h1>
 <p>When using D3D12 API directly, there are 3 ways of creating resources:</p>
@@ -293,30 +271,19 @@ Committed versus placed resources</h1>
 </div><!-- fragment --><p><b>You can request a new resource to be created as committed</b> by using <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a>. Note that committed resources can also be created out of <a class="el" href="custom_pools.html">Custom memory pools</a>.</p>
 <p>You can also request all resources to be created as committed globally for the entire allocator by using <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a068863dc0538ff4ea153b046b31e94fb">D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED</a>. However, this contradicts the main purpose of using this library. It can also prevent certain other features of the library to be used. This flag should be used only for debugging purposes.</p>
 <p>You can create a custom pool with an explicit block size by specifying non-zero <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#af7284cc51a8ed5b551075584256de23c" title="Size of a single heap (memory block) to be allocated as part of this pool, in bytes....">D3D12MA::POOL_DESC::BlockSize</a>. When doing this, all <b>resources created in such pool are placed</b> in those blocks (heaps) and never created as committed. Example:</p>
-<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html">D3D12MA::POOL_DESC</a> poolDesc = {};</div>
-<div class="line">poolDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3795956e4fbfe7c3a23546e02e5d28dc">HeapFlags</a> = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS | D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;</div>
-<div class="line">poolDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a06e06813bcb5206e9f7a8b0564bf1d6a">HeapProperties</a>.Type = D3D12_HEAP_TYPE_DEFAULT;</div>
+<div class="fragment"><div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html">D3D12MA::CPOOL_DESC</a> poolDesc = <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html">D3D12MA::CPOOL_DESC</a>{</div>
+<div class="line">    D3D12_HEAP_TYPE_DEFAULT,</div>
+<div class="line">    <a class="code hl_define" href="_d3_d12_mem_alloc_8h.html#ac3d50f134ad24c58df4a934b87847653">D3D12MA_RECOMMENDED_HEAP_FLAGS</a> | D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };</div>
 <div class="line">poolDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#af7284cc51a8ed5b551075584256de23c">BlockSize</a> = 100llu * 1024 * 1024; <span class="comment">// 100 MB. Explicit BlockSize guarantees placed.</span></div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_pool.html">D3D12MA::Pool</a>* pool;</div>
 <div class="line">HRESULT hr = allocator-&gt;CreatePool(&amp;poolDesc, &amp;pool);</div>
 <div class="line"><span class="comment">// Check hr...</span></div>
 <div class="line"> </div>
-<div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::ALLOCATION_DESC</a> allocDesc = {};</div>
-<div class="line">allocDesc.<a class="code hl_variable" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ab06b85f3cf3254f855b29264477e3934">CustomPool</a> = pool;</div>
+<div class="line"><a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a> allocDesc = <a class="code hl_struct" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a>{ pool };</div>
 <div class="line"> </div>
-<div class="line">D3D12_RESOURCE_DESC resDesc = {};</div>
-<div class="line">resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;</div>
-<div class="line">resDesc.Alignment = 0;</div>
-<div class="line">resDesc.Width = 90llu * 1024 * 1024; <span class="comment">// 90 MB</span></div>
-<div class="line">resDesc.Height = 1;</div>
-<div class="line">resDesc.DepthOrArraySize = 1;</div>
-<div class="line">resDesc.MipLevels = 1;</div>
-<div class="line">resDesc.Format = DXGI_FORMAT_UNKNOWN;</div>
-<div class="line">resDesc.SampleDesc.Count = 1;</div>
-<div class="line">resDesc.SampleDesc.Quality = 0;</div>
-<div class="line">resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;</div>
-<div class="line">resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;</div>
+<div class="line">CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(</div>
+<div class="line">    90llu * 1024 * 1024); <span class="comment">// 90 MB</span></div>
 <div class="line"> </div>
 <div class="line"><a class="code hl_class" href="class_d3_d12_m_a_1_1_allocation.html">D3D12MA::Allocation</a>* alloc;</div>
 <div class="line">ID3D12Resource* res;</div>
@@ -327,7 +294,7 @@ Committed versus placed resources</h1>
 <div class="line"><span class="comment">// Even a large buffer like this, filling 90% of the block, was created as placed!</span></div>
 <div class="line">assert(alloc-&gt;<a class="code hl_function" href="class_d3_d12_m_a_1_1_allocation.html#adca8d5a82bed492fe7265fcda6e53da2">GetHeap</a>() != NULL);</div>
 <div class="ttc" id="aclass_d3_d12_m_a_1_1_allocation_html_adca8d5a82bed492fe7265fcda6e53da2"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocation.html#adca8d5a82bed492fe7265fcda6e53da2">D3D12MA::Allocation::GetHeap</a></div><div class="ttdeci">ID3D12Heap * GetHeap() const</div><div class="ttdoc">Returns memory heap that the resource is created in.</div></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html_af7284cc51a8ed5b551075584256de23c"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#af7284cc51a8ed5b551075584256de23c">D3D12MA::POOL_DESC::BlockSize</a></div><div class="ttdeci">UINT64 BlockSize</div><div class="ttdoc">Size of a single heap (memory block) to be allocated as part of this pool, in bytes....</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:891</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c_html_af7284cc51a8ed5b551075584256de23c"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#af7284cc51a8ed5b551075584256de23c">D3D12MA::POOL_DESC::BlockSize</a></div><div class="ttdeci">UINT64 BlockSize</div><div class="ttdoc">Size of a single heap (memory block) to be allocated as part of this pool, in bytes....</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:925</div></div>
 </div><!-- fragment --><p><b>You can request a new resource to be created as placed</b> by using <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea4d6808f27de6d0ae57014ec1f4d54326">D3D12MA::ALLOCATION_FLAG_CAN_ALIAS</a>. This is required especially if you plan to create another resource in the same region of memory, aliasing with your resource - hence the name of this flag.</p>
 <p>Note <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea4d6808f27de6d0ae57014ec1f4d54326">D3D12MA::ALLOCATION_FLAG_CAN_ALIAS</a> can be even combined with <a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645ea661a5472dba3dcecc5a2cc92afd25675">D3D12MA::ALLOCATION_FLAG_COMMITTED</a>. In this case, the resource is not created as committed, but it is also not placed as part of a larger heap. What happens instead is that a new heap is created with the exact size required for the resource, and the resource is created in it, placed at offset 0.</p>
 <h1><a class="anchor" id="optimal_allocation_resource_alignment"></a>

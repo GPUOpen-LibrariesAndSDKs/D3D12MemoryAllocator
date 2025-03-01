@@ -188,10 +188,11 @@ static void FillAllocationsData(const ComPtr<D3D12MA::Allocation>* allocs, size_
 
 static void FillAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D12MA::Allocation>* allocs, size_t allocCount, UINT seed)
 {
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAGS::ALLOCATION_FLAG_COMMITTED;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_UPLOAD,
+        D3D12MA::ALLOCATION_FLAG_COMMITTED,
+        NULL, // privateData
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS }; // extraHeapFlags
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
     std::vector<ComPtr<D3D12MA::Allocation>> uploadAllocs;
@@ -279,10 +280,11 @@ static void ValidateAllocationsData(const ComPtr<D3D12MA::Allocation>* allocs, s
 
 static void ValidateAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D12MA::Allocation>* allocs, size_t allocCount, UINT seed)
 {
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;
-    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAGS::ALLOCATION_FLAG_COMMITTED;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_READBACK,
+        D3D12MA::ALLOCATION_FLAG_COMMITTED,
+        NULL, // privateData
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS }; // extraHeapFlags
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
     std::vector<ComPtr<D3D12MA::Allocation>> downloadAllocs;
@@ -365,8 +367,7 @@ static void TestDebugMargin(const TestContext& ctx)
 
     D3D12_RESOURCE_DESC resDesc = {};
 
-    POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+    CPOOL_DESC poolDesc = CPOOL_DESC{ D3D12_HEAP_TYPE_UPLOAD, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
 
     for(size_t algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
     {
@@ -433,8 +434,7 @@ static void TestDebugMarginNotInVirtualAllocator(const TestContext& ctx)
     constexpr size_t ALLOCATION_COUNT = 10;
     for(size_t algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
     {
-        VIRTUAL_BLOCK_DESC blockDesc = {};
-        blockDesc.Size = ALLOCATION_COUNT * MEGABYTE;
+        CVIRTUAL_BLOCK_DESC blockDesc = CVIRTUAL_BLOCK_DESC{ ALLOCATION_COUNT * MEGABYTE };
         switch(algorithmIndex)
         {
         case 0: blockDesc.Flags = VIRTUAL_BLOCK_FLAG_NONE; break;
@@ -449,8 +449,7 @@ static void TestDebugMarginNotInVirtualAllocator(const TestContext& ctx)
         VirtualAllocation allocs[ALLOCATION_COUNT];
         for(size_t i = 0; i < ALLOCATION_COUNT; ++i)
         {
-            VIRTUAL_ALLOCATION_DESC allocDesc = {};
-            allocDesc.Size = 1 * MEGABYTE;
+            CVIRTUAL_ALLOCATION_DESC allocDesc = CVIRTUAL_ALLOCATION_DESC{ 1 * MEGABYTE, 0 };
             CHECK_HR(block->Allocate(&allocDesc, &allocs[i], nullptr));
         }
 
@@ -663,9 +662,9 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
 
     ResourceWithAllocation resources[count];
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12MA::ALLOCATION_FLAG_COMMITTED };
 
     D3D12_RESOURCE_DESC resourceDesc;
     FillResourceDescForBuffer(resourceDesc, bufSize);
@@ -724,14 +723,13 @@ static void TestSmallBuffers(const TestContext& ctx)
 {
     wprintf(L"Test small buffers\n");
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     D3D12_RESOURCE_DESC resDesc;
     FillResourceDescForBuffer(resDesc, 8 * KILOBYTE);
@@ -797,10 +795,12 @@ static void TestCustomHeapFlags(const TestContext& ctx)
 
     // 1. Just memory heap with custom flags
     {
-        D3D12MA::ALLOCATION_DESC allocDesc = {};
-        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES |
-            D3D12_HEAP_FLAG_SHARED; // Extra flag.
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+            D3D12_HEAP_TYPE_DEFAULT,
+            D3D12MA::ALLOCATION_FLAG_NONE,
+            NULL, // privateData
+            D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES |
+            D3D12_HEAP_FLAG_SHARED }; // Extra flag.
 
         D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = {};
         resAllocInfo.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
@@ -828,9 +828,11 @@ static void TestCustomHeapFlags(const TestContext& ctx)
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER;
 
-        D3D12MA::ALLOCATION_DESC allocDesc = {};
-        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_SHARED | D3D12_HEAP_FLAG_SHARED_CROSS_ADAPTER; // Extra flags.
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+            D3D12_HEAP_TYPE_DEFAULT,
+            D3D12MA::ALLOCATION_FLAG_NONE,
+            NULL, // privateData,
+            D3D12_HEAP_FLAG_SHARED | D3D12_HEAP_FLAG_SHARED_CROSS_ADAPTER };
 
         ResourceWithAllocation res;
         CHECK_HR( ctx.allocator->CreateResource(
@@ -856,8 +858,7 @@ static void TestPlacedResources(const TestContext& ctx)
     const UINT64 bufSize = 64ull * 1024;
     ResourceWithAllocation resources[count];
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
 
     D3D12_RESOURCE_DESC resourceDesc;
     FillResourceDescForBuffer(resourceDesc, bufSize);
@@ -955,8 +956,7 @@ static void TestOtherComInterface(const TestContext& ctx)
 
     for(uint32_t i = 0; i < 2; ++i)
     {
-        D3D12MA::ALLOCATION_DESC allocDesc = {};
-        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
         if(i == 1)
         {
             allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
@@ -989,14 +989,15 @@ static void TestCustomPools(const TestContext& ctx)
     ctx.allocator->CalculateStatistics(&globalStatsBeg);
 
     // # Create pool, 1..2 blocks of 11 MB
-    
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.BlockSize = 11 * MEGABYTE;
-    poolDesc.MinBlockCount = 1;
-    poolDesc.MaxBlockCount = 2;
-    poolDesc.ResidencyPriority = D3D12_RESIDENCY_PRIORITY_HIGH; // Test some residency priority, by the way.
+
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_NONE,
+        11 * MEGABYTE, // blockSize
+        1, // minBlockCount
+        2, // maxBlockCount
+        D3D12_RESIDENCY_PRIORITY_HIGH }; // Test some residency priority, by the way.
 
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &pool) );
@@ -1019,8 +1020,7 @@ static void TestCustomPools(const TestContext& ctx)
 
     // # Create buffers 2x 5 MB
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
     allocDesc.ExtraHeapFlags = (D3D12_HEAP_FLAGS)0xCDCDCDCD; // Should be ignored.
     allocDesc.HeapType = (D3D12_HEAP_TYPE)0xCDCDCDCD; // Should be ignored.
 
@@ -1160,7 +1160,7 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
         }
         else if(poolTypeI == 1)
         {
-            D3D12MA::POOL_DESC poolDesc = {};
+            D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{};
             poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
             poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
             hr = ctx.allocator->CreatePool(&poolDesc, &pool1);
@@ -1169,11 +1169,13 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
         }
         else if(poolTypeI == 2)
         {
-            D3D12MA::POOL_DESC poolDesc = {};
-            poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-            poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-            poolDesc.MaxBlockCount = 1;
-            poolDesc.BlockSize = 2 * MEGABYTE + MEGABYTE / 2; // 2.5 MB
+            D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+                D3D12_HEAP_TYPE_DEFAULT,
+                D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+                D3D12MA::POOL_FLAG_NONE,
+                2 * MEGABYTE + MEGABYTE / 2, // blockSize = 2.5 MB
+                0, // minBlockCount
+                1 }; // maxBlockCount
             hr = ctx.allocator->CreatePool(&poolDesc, &pool2);
             CHECK_HR(hr);
             allocDesc.CustomPool = pool2.Get();
@@ -1264,16 +1266,15 @@ static void TestCustomPool_MinAllocationAlignment(const TestContext& ctx)
     constexpr size_t BUFFER_COUNT = 4;
     const UINT64 MIN_ALIGNMENT = 128 * 1024;
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_UPLOAD,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
     poolDesc.MinAllocationAlignment = MIN_ALIGNMENT;
 
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &pool) );
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     D3D12_RESOURCE_DESC resDesc;
     FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
@@ -1296,16 +1297,15 @@ static void TestCustomPool_Committed(const TestContext& ctx)
 
     const UINT64 BUFFER_SIZE = 32;
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR( ctx.allocator->CreatePool(&poolDesc, &pool) );
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        pool.Get(),
+        D3D12MA::ALLOCATION_FLAG_COMMITTED };
 
     D3D12_RESOURCE_DESC resDesc;
     FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
@@ -1327,16 +1327,14 @@ static void TestCustomPool_AlwaysCommitted(const TestContext& ctx)
 
     const UINT64 BUFFER_SIZE = 256;
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.Flags = D3D12MA::POOL_FLAG_ALWAYS_COMMITTED;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_ALWAYS_COMMITTED };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     D3D12_RESOURCE_DESC resDesc;
     FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
@@ -1372,12 +1370,13 @@ static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIE
     D3D12MA::TotalStatistics globalStatsBeg = {};
     ctx.allocator->CalculateStatistics(&globalStatsBeg);
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties = heapProps;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.BlockSize = 10 * MEGABYTE;
-    poolDesc.MinBlockCount = 1;
-    poolDesc.MaxBlockCount = 1;
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        heapProps,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_NONE,
+        10 * MEGABYTE, // blockSize
+        1, // minBlockCount
+        1 }; // maxBlockCount
 
     const UINT64 BUFFER_SIZE = 1 * MEGABYTE;
 
@@ -1385,8 +1384,7 @@ static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIE
     HRESULT hr = ctx.allocator->CreatePool(&poolDesc, &pool);
     if(SUCCEEDED(hr))
     {
-        D3D12MA::ALLOCATION_DESC allocDesc = {};
-        allocDesc.CustomPool = pool.Get();
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
         D3D12_RESOURCE_DESC resDesc;
         FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
@@ -1453,10 +1451,9 @@ static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
     static const D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
     static const UINT64 bufferSize = 1024;
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = heapType;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        heapType,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
@@ -1568,9 +1565,11 @@ static void TestAliasingMemory(const TestContext& ctx)
     finalAllocInfo.Alignment = std::max(allocInfo1.Alignment, allocInfo2.Alignment);
     finalAllocInfo.SizeInBytes = std::max(allocInfo1.SizeInBytes, allocInfo2.SizeInBytes);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12MA::ALLOCATION_FLAG_NONE,
+        NULL, // privateData
+        D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES };
 
     ComPtr<D3D12MA::Allocation> alloc;
     CHECK_HR( ctx.allocator->AllocateMemory(&allocDesc, &finalAllocInfo, &alloc) );
@@ -1609,9 +1608,9 @@ static void TestAliasingImplicitCommitted(const TestContext& ctx)
     D3D12_RESOURCE_DESC resDesc = {};
     FillResourceDescForBuffer(resDesc, 300 * MEGABYTE);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_CAN_ALIAS;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_UPLOAD,
+        D3D12MA::ALLOCATION_FLAG_CAN_ALIAS };
 
     ComPtr<D3D12MA::Allocation> alloc;
     CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
@@ -1632,16 +1631,14 @@ static void TestPoolMsaaTextureAsCommitted(const TestContext& ctx)
 {
     wprintf(L"Test MSAA texture always as committed in pool\n");
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.Flags = D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES,
+        D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     D3D12_RESOURCE_DESC resDesc = {};
     resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -1669,8 +1666,7 @@ static void TestMapping(const TestContext& ctx)
     const UINT64 bufSize = 32ull * 1024;
     ResourceWithAllocation resources[count];
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
 
     D3D12_RESOURCE_DESC resourceDesc;
     FillResourceDescForBuffer(resourceDesc, bufSize);
@@ -1729,8 +1725,7 @@ static void TestStats(const TestContext& ctx)
     const UINT64 bufSize = 64ull * 1024;
     ResourceWithAllocation resources[count];
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
 
     D3D12_RESOURCE_DESC resourceDesc;
     FillResourceDescForBuffer(resourceDesc, bufSize);
@@ -1813,12 +1808,9 @@ static void TestTransfer(const TestContext& ctx)
     ResourceWithAllocation resourcesDefault[count];
     ResourceWithAllocation resourcesReadback[count];
 
-    D3D12MA::ALLOCATION_DESC allocDescUpload = {};
-    allocDescUpload.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-    D3D12MA::ALLOCATION_DESC allocDescDefault = {};
-    allocDescDefault.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-    D3D12MA::ALLOCATION_DESC allocDescReadback = {};
-    allocDescReadback.HeapType = D3D12_HEAP_TYPE_READBACK;
+    D3D12MA::CALLOCATION_DESC allocDescUpload = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
+    D3D12MA::CALLOCATION_DESC allocDescDefault = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
+    D3D12MA::CALLOCATION_DESC allocDescReadback = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_READBACK };
 
     D3D12_RESOURCE_DESC resourceDesc;
     FillResourceDescForBuffer(resourceDesc, bufSize);
@@ -1913,8 +1905,7 @@ static void TestMultithreading(const TestContext& ctx)
     const UINT bufSizeMin = 1024ull;
     const UINT bufSizeMax = 1024ull * 1024;
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
 
     // Launch threads.
     std::thread threads[threadCount];
@@ -2047,21 +2038,20 @@ static void TestLinearAllocator(const TestContext& ctx)
 
     RandomNumberGenerator rand{ 645332 };
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.Flags = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
-    poolDesc.BlockSize = 64 * KILOBYTE * 300; // Alignment of buffers is always 64KB
-    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_ALGORITHM_LINEAR,
+        64 * KILOBYTE * 300, // blockSize; alignment of buffers is always 64 KB.
+        1, // minBlockCount
+        1 }; // maxBlockCount
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
     D3D12_RESOURCE_DESC buffDesc = {};
     FillResourceDescForBuffer(buffDesc, 0);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     constexpr size_t maxBufCount = 100;
     struct BufferInfo
@@ -2335,19 +2325,17 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
 
     RandomNumberGenerator rand{ 345673 };
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.Flags = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_ALGORITHM_LINEAR };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
     D3D12_RESOURCE_DESC buffDesc = {};
     FillResourceDescForBuffer(buffDesc, 1024 * 1024);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     struct BufferInfo
     {
@@ -2454,21 +2442,20 @@ static void ManuallyTestLinearAllocator(const TestContext& ctx)
     D3D12MA::TotalStatistics origStats;
     ctx.allocator->CalculateStatistics(&origStats);
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.Flags = D3D12MA::POOL_FLAG_ALGORITHM_LINEAR;
-    poolDesc.BlockSize = 6 * 64 * KILOBYTE;
-    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_ALGORITHM_LINEAR,
+        6 * 64 * KILOBYTE, // blockSize
+        1, // minBlockCount
+        1 }; // maxBlockCount
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
     D3D12_RESOURCE_DESC buffDesc = {};
     FillResourceDescForBuffer(buffDesc, 0);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     struct BufferInfo
     {
@@ -2555,21 +2542,20 @@ static void BenchmarkAlgorithmsCase(const TestContext& ctx,
     const size_t maxBufCapacity = 10000;
     const UINT32 iterationCount = 10;
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    poolDesc.BlockSize = bufSize * maxBufCapacity;
-    poolDesc.Flags |= algorithm;
-    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
-
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        algorithm, // flags
+        bufSize * maxBufCapacity, // blockSize
+        1, // minBlockCount
+        1 }; // maxBlockCount
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
     D3D12_RESOURCE_ALLOCATION_INFO allocInfo = {};
     allocInfo.SizeInBytes = bufSize;
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     std::vector<ComPtr<D3D12MA::Allocation>> baseAllocations;
     const size_t allocCount = maxBufCapacity / 3;
@@ -2745,11 +2731,10 @@ static void TestDevice4(const TestContext& ctx)
         return;
     }
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
     poolDesc.pProtectedSession = session.Get();
-    poolDesc.MinAllocationAlignment = 0;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
 
     ComPtr<D3D12MA::Pool> pool;
     hr = ctx.allocator->CreatePool(&poolDesc, &pool);
@@ -2765,8 +2750,7 @@ static void TestDevice4(const TestContext& ctx)
     for(UINT testIndex = 0; testIndex < 2; ++testIndex)
     {
         // Create a buffer
-        D3D12MA::ALLOCATION_DESC allocDesc = {};
-        allocDesc.CustomPool = pool.Get();
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
         if(testIndex == 0)
             allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
         ComPtr<D3D12MA::Allocation> bufAlloc;
@@ -2807,9 +2791,9 @@ static void TestDevice8(const TestContext& ctx)
 
     // Create a committed buffer
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12MA::ALLOCATION_FLAG_COMMITTED };
 
     ComPtr<D3D12MA::Allocation> allocPtr0;
     ComPtr<ID3D12Resource> res0;
@@ -2874,9 +2858,9 @@ static void TestDevice10(const TestContext& ctx)
 
     // Create a committed texture
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12MA::ALLOCATION_FLAG_COMMITTED };
 
     ComPtr<D3D12MA::Allocation> allocPtr0;
     ComPtr<ID3D12Resource> res0;
@@ -2930,8 +2914,7 @@ static void TestGPUUploadHeap(const TestContext& ctx)
     ctx.allocator->CalculateStatistics(&begStats);
 
     // Create a buffer, likely placed.
-    ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_GPU_UPLOAD;
+    CALLOCATION_DESC allocDesc = CALLOCATION_DESC{ D3D12_HEAP_TYPE_GPU_UPLOAD };
     D3D12_RESOURCE_DESC resDesc;
     FillResourceDescForBuffer(resDesc, 64 * KILOBYTE);
 
@@ -2956,7 +2939,7 @@ static void TestGPUUploadHeap(const TestContext& ctx)
     }
 
     // Create a committed one.
-    ALLOCATION_DESC committedAllocDesc = allocDesc;
+    CALLOCATION_DESC committedAllocDesc = allocDesc;
     committedAllocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
     ComPtr<Allocation> committedAlloc;
     CHECK_HR(ctx.allocator->CreateResource(&committedAllocDesc, &resDesc,
@@ -2965,13 +2948,11 @@ static void TestGPUUploadHeap(const TestContext& ctx)
     CHECK_BOOL(committedAlloc->GetHeap() == NULL); // Committed, heap is implicit and inaccessible.
 
     // Create a custom pool and a buffer inside of it.
-    POOL_DESC poolDesc = {};
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_GPU_UPLOAD;
+    CPOOL_DESC poolDesc = CPOOL_DESC{ D3D12_HEAP_TYPE_GPU_UPLOAD, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
     ComPtr<Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
     
-    ALLOCATION_DESC poolAllocDesc = {};
-    poolAllocDesc.CustomPool = pool.Get();
+    CALLOCATION_DESC poolAllocDesc = CALLOCATION_DESC{ pool.Get() };
     ComPtr<Allocation> poolAlloc;
     CHECK_HR(ctx.allocator->CreateResource(&poolAllocDesc, &resDesc,
         D3D12_RESOURCE_STATE_COMMON, NULL, &poolAlloc, IID_NULL, NULL));
@@ -3076,18 +3057,20 @@ static void TestVirtualBlocks(const TestContext& ctx)
     // # Create block 16 MB
 
     ComPtr<D3D12MA::VirtualBlock> block;
-    VIRTUAL_BLOCK_DESC blockDesc = {};
-    blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
-    blockDesc.Size = blockSize;
+    CVIRTUAL_BLOCK_DESC blockDesc = CVIRTUAL_BLOCK_DESC{
+        blockSize,
+        VIRTUAL_BLOCK_FLAG_NONE,
+        ctx.allocationCallbacks };
     CHECK_HR(CreateVirtualBlock(&blockDesc, &block));
     CHECK_BOOL(block);
 
     // # Allocate 8 MB
 
-    VIRTUAL_ALLOCATION_DESC allocDesc = {};
-    allocDesc.Alignment = alignment;
-    allocDesc.pPrivateData = (void*)(uintptr_t)1;
-    allocDesc.Size = 8 * MEGABYTE;
+    CVIRTUAL_ALLOCATION_DESC allocDesc = CVIRTUAL_ALLOCATION_DESC{
+        8 * MEGABYTE, // size
+        alignment,
+        D3D12MA::VIRTUAL_ALLOCATION_FLAG_NONE,
+        (void*)(uintptr_t)1 }; // privateData
     VirtualAllocation alloc0;
     CHECK_HR(block->Allocate(&allocDesc, &alloc0, nullptr));
 
@@ -3196,9 +3179,10 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
     for (size_t algorithmIndex = 0; algorithmIndex < 2; ++algorithmIndex)
     {
         // Create the block
-        D3D12MA::VIRTUAL_BLOCK_DESC blockDesc = {};
-        blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
-        blockDesc.Size = 10'000;
+        D3D12MA::CVIRTUAL_BLOCK_DESC blockDesc = D3D12MA::CVIRTUAL_BLOCK_DESC{
+            10'000,
+            D3D12MA::VIRTUAL_BLOCK_FLAG_NONE,
+            ctx.allocationCallbacks };
         switch (algorithmIndex)
         {
         case 0: blockDesc.Flags = D3D12MA::VIRTUAL_BLOCK_FLAG_NONE; break;
@@ -3217,9 +3201,12 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
         // Make some allocations
         for (size_t i = 0; i < 20; ++i)
         {
-            D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
-            allocDesc.Size = calcRandomAllocSize();
-            allocDesc.pPrivateData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            const UINT64 size = calcRandomAllocSize();
+            D3D12MA::CVIRTUAL_ALLOCATION_DESC allocDesc = D3D12MA::CVIRTUAL_ALLOCATION_DESC{
+                size,
+                0, // alignment
+                D3D12MA::VIRTUAL_ALLOCATION_FLAG_NONE,
+                (void*)(uintptr_t)(size * 10) }; // privateData
             if (i < 10) {}
             else if (i < 20 && algorithmIndex == 1) allocDesc.Flags = D3D12MA::VIRTUAL_ALLOCATION_FLAG_UPPER_ADDRESS;
 
@@ -3247,9 +3234,12 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
         // Allocate some more
         for (size_t i = 0; i < 6; ++i)
         {
-            D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
-            allocDesc.Size = calcRandomAllocSize();
-            allocDesc.pPrivateData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            const UINT64 size = calcRandomAllocSize();
+            D3D12MA::CVIRTUAL_ALLOCATION_DESC allocDesc = D3D12MA::CVIRTUAL_ALLOCATION_DESC{
+                size,
+                0, // alignment
+                D3D12MA::VIRTUAL_ALLOCATION_FLAG_NONE,
+                (void*)(uintptr_t)(size * 10) }; // privateData
 
             AllocData alloc = {};
             alloc.requestedSize = allocDesc.Size;
@@ -3267,10 +3257,12 @@ static void TestVirtualBlocksAlgorithms(const TestContext& ctx)
         // Allocate some with extra alignment
         for (size_t i = 0; i < 3; ++i)
         {
-            D3D12MA::VIRTUAL_ALLOCATION_DESC allocDesc = {};
-            allocDesc.Size = calcRandomAllocSize();
-            allocDesc.Alignment = 16;
-            allocDesc.pPrivateData = (void*)(uintptr_t)(allocDesc.Size * 10);
+            const UINT64 size = calcRandomAllocSize();
+            D3D12MA::CVIRTUAL_ALLOCATION_DESC allocDesc = D3D12MA::CVIRTUAL_ALLOCATION_DESC{
+                size,
+                16, // alignment
+                D3D12MA::VIRTUAL_ALLOCATION_FLAG_NONE,
+                (void*)(uintptr_t)(size * 10) }; // privateData
 
             AllocData alloc = {};
             alloc.requestedSize = allocDesc.Size;
@@ -3345,9 +3337,10 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
     const size_t ALLOCATION_COUNT = 7200;
     const UINT32 MAX_ALLOC_SIZE = 2056;
 
-    D3D12MA::VIRTUAL_BLOCK_DESC blockDesc = {};
-    blockDesc.pAllocationCallbacks = ctx.allocationCallbacks;
-    blockDesc.Size = 0;
+    D3D12MA::CVIRTUAL_BLOCK_DESC blockDesc = D3D12MA::CVIRTUAL_BLOCK_DESC{
+        0,
+        D3D12MA::VIRTUAL_BLOCK_FLAG_NONE,
+        ctx.allocationCallbacks };
 
     RandomNumberGenerator rand{ 20092010 };
 
@@ -3396,9 +3389,9 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
             time_point timeBegin = std::chrono::high_resolution_clock::now();
             for (size_t i = 0; i < ALLOCATION_COUNT; ++i)
             {
-                D3D12MA::VIRTUAL_ALLOCATION_DESC allocCreateInfo = {};
-                allocCreateInfo.Size = allocSizes[i];
-                allocCreateInfo.Alignment = alignment;
+                D3D12MA::CVIRTUAL_ALLOCATION_DESC allocCreateInfo = D3D12MA::CVIRTUAL_ALLOCATION_DESC{
+                    allocSizes[i],
+                    alignment };
 
                 CHECK_HR(block->Allocate(&allocCreateInfo, allocs + i, nullptr));
             }
@@ -3566,15 +3559,15 @@ static void TestDefragmentationSimple(const TestContext& ctx)
         return AlignUp<UINT64>(rand.Generate() % (MAX_BUF_SIZE - MIN_BUF_SIZE + 1) + MIN_BUF_SIZE, 64);
     };
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.BlockSize = BLOCK_SIZE;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_UPLOAD,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_NONE,
+        BLOCK_SIZE };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     D3D12_RESOURCE_DESC resDesc = {};
     FillResourceDescForBuffer(resDesc, BUF_SIZE);
@@ -3785,15 +3778,15 @@ static void TestDefragmentationAlgorithms(const TestContext& ctx)
         return AlignUp<UINT64>(rand.Generate() % (MAX_BUF_SIZE - MIN_BUF_SIZE + 1) + MIN_BUF_SIZE, 64);
     };
 
-    D3D12MA::POOL_DESC poolDesc = {};
-    poolDesc.BlockSize = BLOCK_SIZE;
-    poolDesc.HeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_UPLOAD,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+        D3D12MA::POOL_FLAG_NONE,
+        BLOCK_SIZE };
     ComPtr<D3D12MA::Pool> pool;
     CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.CustomPool = pool.Get();
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
     D3D12_RESOURCE_DESC resDesc = {};
     FillResourceDescForBuffer(resDesc, BUF_SIZE);
@@ -3902,9 +3895,11 @@ static void TestDefragmentationFull(const TestContext& ctx)
     const UINT ALLOC_SEED = 20101220;
     std::vector<ComPtr<D3D12MA::Allocation>> allocations;
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_UPLOAD,
+        D3D12MA::ALLOCATION_FLAG_NONE,
+        NULL, // privateData
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
 
     D3D12_RESOURCE_DESC resDesc = {};
     FillResourceDescForBuffer(resDesc, 0x10000);
@@ -3979,9 +3974,11 @@ static void TestDefragmentationGpu(const TestContext& ctx)
     D3D12_RESOURCE_DESC resDesc = {};
     FillResourceDescForBuffer(resDesc, 0x10000);
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-    allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12MA::ALLOCATION_FLAG_NONE,
+        NULL, // privateData
+        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
 
     // Create all intended buffers.
     for (size_t i = 0; i < bufCount; ++i)
@@ -4051,8 +4048,7 @@ static void TestDefragmentationIncrementalBasic(const TestContext& ctx)
     const size_t percentToLeave = 30;
     RandomNumberGenerator rand = { 234522 };
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
 
     D3D12_RESOURCE_DESC resDesc = {};
     resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -4161,8 +4157,7 @@ void TestDefragmentationIncrementalComplex(const TestContext& ctx)
     const size_t percentToLeave = 30;
     RandomNumberGenerator rand = { 234522 };
 
-    D3D12MA::ALLOCATION_DESC allocDesc = {};
-    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
 
     D3D12_RESOURCE_DESC resDesc = {};
     resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
