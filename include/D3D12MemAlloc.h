@@ -549,7 +549,13 @@ public:
     */
     ID3D12Resource* GetResource() const { return m_Resource; }
 
-    /// Releases the resource currently pointed by the allocation (if any), sets it to new one, incrementing its reference counter (if not null).
+    /** \brief Releases the resource currently pointed by the allocation (if not null), sets it to new one, incrementing its reference counter (if not null).
+    
+    \warning
+    This is an advanced feature that should be used only in special cases, e.g. during \subpage defragmentation.
+    Typically, an allocation object should reference the resource that was created together with it.
+    If you swap it to another resource of different size, \subpage statistics and budgets can be calculated incorrectly.
+    */
     void SetResource(ID3D12Resource* pResource);
 
     /** \brief Returns memory heap that the resource is created in.
