@@ -2380,6 +2380,16 @@ hr = allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON
 // Check hr...
 \endcode
 
+When you have a committed allocation created, you can also set the residency priority of its resource
+using the D3D12 function:
+
+\code
+D3D12MA::Allocation* committedAlloc = ...
+ID3D12Pageable* res = committedAlloc->GetResource();
+D3D12_RESIDENCY_PRIORITY priority = D3D12_RESIDENCY_PRIORITY_HIGH;
+device1->SetResidencyPriority(1, &res, &priority);
+\endcode
+
 Note this is not the same as explicit eviction controlled using `ID3D12Device::Evict` and `MakeResident` functions.
 Resources evicted explicitly are illegal to access until they are made resident again,
 while the demotion described here happens automatically and only slows down the execution.
