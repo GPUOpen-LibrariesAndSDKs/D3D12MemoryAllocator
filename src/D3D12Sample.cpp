@@ -791,8 +791,7 @@ static void InitD3D() // initializes direct3d 12
     depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
     depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
-    D3D12MA::ALLOCATION_DESC depthStencilAllocDesc = {};
-    depthStencilAllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC depthStencilAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC depthStencilResourceDesc = {};
     depthStencilResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     depthStencilResourceDesc.Alignment = 0;
@@ -915,8 +914,7 @@ static void InitD3D() // initializes direct3d 12
 
     for (int i = 0; i < FRAME_BUFFER_COUNT; ++i)
     {
-        D3D12MA::ALLOCATION_DESC constantBufferUploadAllocDesc = {};
-        constantBufferUploadAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        D3D12MA::CALLOCATION_DESC constantBufferUploadAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
         D3D12_RESOURCE_DESC constantBufferResourceDesc = {};
         constantBufferResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         constantBufferResourceDesc.Alignment = 0;
@@ -1039,8 +1037,7 @@ static void InitD3D() // initializes direct3d 12
     // default heap is memory on the GPU. Only the GPU has access to this memory
     // To get data into this heap, we will have to upload the data using
     // an upload heap
-    D3D12MA::ALLOCATION_DESC vertexBufferAllocDesc = {};
-    vertexBufferAllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC vertexBufferAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC vertexBufferResourceDesc = {};
     vertexBufferResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     vertexBufferResourceDesc.Alignment = 0;
@@ -1070,8 +1067,7 @@ static void InitD3D() // initializes direct3d 12
     // create upload heap
     // upload heaps are used to upload data to the GPU. CPU can write to it, GPU can read from it
     // We will upload the vertex buffer using this heap to the default heap
-    D3D12MA::ALLOCATION_DESC vBufferUploadAllocDesc = {};
-    vBufferUploadAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC vBufferUploadAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC vertexBufferUploadResourceDesc = {};
     vertexBufferUploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     vertexBufferUploadResourceDesc.Alignment = 0;
@@ -1152,8 +1148,7 @@ static void InitD3D() // initializes direct3d 12
     size_t iBufferSize = sizeof(iList);
 
     // create default heap to hold index buffer
-    D3D12MA::ALLOCATION_DESC indexBufferAllocDesc = {};
-    indexBufferAllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC indexBufferAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC indexBufferResourceDesc = {};
     indexBufferResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     indexBufferResourceDesc.Alignment = 0;
@@ -1179,8 +1174,7 @@ static void InitD3D() // initializes direct3d 12
     g_IndexBufferAllocation->SetName(L"Index Buffer Resource Heap");
 
     // create upload heap to upload index buffer
-    D3D12MA::ALLOCATION_DESC iBufferUploadAllocDesc = {};
-    iBufferUploadAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC iBufferUploadAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC indexBufferUploadResourceDesc = {};
     indexBufferUploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     indexBufferUploadResourceDesc.Alignment = 0;
@@ -1235,8 +1229,7 @@ static void InitD3D() // initializes direct3d 12
     g_IndexBufferView.Format = DXGI_FORMAT_R16_UINT;
     g_IndexBufferView.SizeInBytes = (UINT)iBufferSize;
 
-    D3D12MA::ALLOCATION_DESC cbPerObjectUploadAllocDesc = {};
-    cbPerObjectUploadAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC cbPerObjectUploadAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC cbPerObjectUploadResourceDesc = {};
     cbPerObjectUploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     cbPerObjectUploadResourceDesc.Alignment = 0;
@@ -1313,8 +1306,7 @@ static void InitD3D() // initializes direct3d 12
         textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
     }
 
-    D3D12MA::ALLOCATION_DESC textureAllocDesc = {};
-    textureAllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12MA::CALLOCATION_DESC textureAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
     CHECK_HR( g_Allocator->CreateResource(
         &textureAllocDesc,
         &textureDesc,
@@ -1336,8 +1328,7 @@ static void InitD3D() // initializes direct3d 12
         nullptr, // pRowSizeInBytes
         &textureUploadBufferSize); // pTotalBytes
 
-    D3D12MA::ALLOCATION_DESC textureUploadAllocDesc = {};
-    textureUploadAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12MA::CALLOCATION_DESC textureUploadAllocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC textureUploadResourceDesc = {};
     textureUploadResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     textureUploadResourceDesc.Alignment = 0;

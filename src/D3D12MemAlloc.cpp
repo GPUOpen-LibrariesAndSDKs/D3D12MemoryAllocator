@@ -144,10 +144,6 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
 
 #define D3D12MA_IID_PPV_ARGS(ppType)   __uuidof(**(ppType)), reinterpret_cast<void**>(ppType)
 
-#ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    #define D3D12MA_CREATE_NOT_ZEROED_AVAILABLE 1
-#endif
-
 namespace D3D12MA
 {
 static constexpr UINT HEAP_TYPE_COUNT = 5;
@@ -5863,6 +5859,7 @@ public:
 
     AllocatorPimpl* GetAllocator() const { return m_Allocator; }
     const POOL_DESC& GetDesc() const { return m_Desc; }
+    bool AlwaysCommitted() const { return (m_Desc.Flags & POOL_FLAG_ALWAYS_COMMITTED) != 0; }
     bool SupportsCommittedAllocations() const { return m_Desc.BlockSize == 0; }
     LPCWSTR GetName() const { return m_Name; }
 
@@ -7436,8 +7433,8 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     outCommittedAllocationParams = CommittedAllocationParameters();
     outPreferCommitted = false;
 
-    D3D12MA_ASSERT((allocDesc.HeapType != D3D12_HEAP_TYPE_GPU_UPLOAD_COPY || IsGPUUploadHeapSupported()) &&
-        "Trying to allocate from D3D12_HEAP_TYPE_GPU_UPLOAD while GPUUploadHeapSupported == FALSE.");
+    if (allocDesc.HeapType == D3D12_HEAP_TYPE_GPU_UPLOAD_COPY && !IsGPUUploadHeapSupported())
+        return E_NOTIMPL;
 
     bool msaaAlwaysCommitted;
     if (allocDesc.CustomPool != NULL)
@@ -7445,7 +7442,8 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
         PoolPimpl* const pool = allocDesc.CustomPool->m_Pimpl;
 
         msaaAlwaysCommitted = pool->GetBlockVector()->DeniesMsaaTextures();
-        outBlockVector = pool->GetBlockVector();
+        if(!pool->AlwaysCommitted())
+            outBlockVector = pool->GetBlockVector();
 
         const auto& desc = pool->GetDesc();
         outCommittedAllocationParams.m_ProtectedSession = desc.pProtectedSession;
@@ -9570,6 +9568,8 @@ HRESULT Pool::BeginDefragmentation(const DEFRAGMENTATION_DESC* pDesc, Defragment
     // Check for support
     if (m_Pimpl->GetBlockVector()->GetAlgorithm() & POOL_FLAG_ALGORITHM_LINEAR)
         return E_NOINTERFACE;
+    if(m_Pimpl->AlwaysCommitted())
+        return E_NOINTERFACE;
 
     AllocatorPimpl* allocator = m_Pimpl->GetAllocator();
     *ppContext = D3D12MA_NEW(allocator->GetAllocs(), DefragmentationContext)(allocator, *pDesc, m_Pimpl->GetBlockVector());
@@ -9796,6 +9796,12 @@ HRESULT Allocator::CreatePool(
         (pPoolDesc->MinAllocationAlignment > 0 && !IsPow2(pPoolDesc->MinAllocationAlignment)))
     {
         D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreatePool.");
+        return E_INVALIDARG;
+    }
+    if ((pPoolDesc->Flags & POOL_FLAG_ALWAYS_COMMITTED) != 0 &&
+        (pPoolDesc->BlockSize != 0 || pPoolDesc->MinBlockCount > 0))
+    {
+        D3D12MA_ASSERT(0 && "Invalid arguments passed to Allocator::CreatePool while POOL_FLAG_ALWAYS_COMMITTED is specified.");
         return E_INVALIDARG;
     }
     if (!m_Pimpl->HeapFlagsFulfillResourceHeapTier(pPoolDesc->HeapFlags))
