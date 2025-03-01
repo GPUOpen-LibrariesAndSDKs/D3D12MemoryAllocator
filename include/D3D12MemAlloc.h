@@ -2435,8 +2435,10 @@ You can check if the tight alignment it is available in the current system by ca
 You can tell the library to not use it by specifying D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT.
 Typically, you don't need to do any of those.
 
+\par Implementation detail
 The library automatically aligns all buffers to at least 256 B, even when the system supports smaller alignment.
 This is the alignment required for constant buffers, expressed by `D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT` constant.
+It is also enough to be aligned to cache line size of conteporary GPUs, which may have positive impact on the performance.
 
 \page defragmentation Defragmentation
 
