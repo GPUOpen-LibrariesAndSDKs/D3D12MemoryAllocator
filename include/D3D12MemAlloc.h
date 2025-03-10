@@ -85,7 +85,7 @@ Documentation of all members: D3D12MemAlloc.h
 
 #ifndef D3D12MA_DXGI_1_4
     #ifdef __IDXGIAdapter3_INTERFACE_DEFINED__
-        /// Define this macro to 0 to disable usage of DXGI 1.4 (which is used for IDXGIAdapter3 and query for memory budget).
+        /// Define this macro to 0 to disable usage of DXGI 1.4 (which is used for `IDXGIAdapter3` and query for memory budget).
         #define D3D12MA_DXGI_1_4 1
     #else
         #define D3D12MA_DXGI_1_4 0
@@ -94,6 +94,7 @@ Documentation of all members: D3D12MemAlloc.h
 
 #ifndef D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
     #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+        /// This macro is defined to 0 or 1 automatically. Define it to 0 to disable support for `D3D12_HEAP_FLAG_CREATE_NOT_ZEROED`.
         #define D3D12MA_CREATE_NOT_ZEROED_AVAILABLE 1
     #else
         #define D3D12MA_CREATE_NOT_ZEROED_AVAILABLE 0
@@ -128,9 +129,9 @@ Documentation of all members: D3D12MemAlloc.h
 
 #ifndef D3D12MA_RECOMMENDED_HEAP_FLAGS
     #if D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
-        /// Set of flags recommended for use in D3D12MA::POOL_DESC::HeapFlags for optimal performance.
         #define D3D12MA_RECOMMENDED_HEAP_FLAGS (D3D12_HEAP_FLAG_CREATE_NOT_ZEROED)
     #else
+        /// Set of flags recommended for use in D3D12MA::POOL_DESC::HeapFlags for optimal performance.
         #define D3D12MA_RECOMMENDED_HEAP_FLAGS (D3D12_HEAP_FLAG_NONE)
     #endif
 #endif
