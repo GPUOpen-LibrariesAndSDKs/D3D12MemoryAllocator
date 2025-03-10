@@ -2663,6 +2663,23 @@ and D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED on the creation of any cus
 With those flags, the alignment of the heaps created by %D3D12MA can be lower, but any MSAA textures are created as committed.
 You should always use these flags in your code unless you really need to create some MSAA textures as placed.
 
+With DirectX 12 Agility SDK 1.716.0-preview, Microsoft added a new feature called **"tight alignment"**.
+Note this is a separate feature than the "small alignment" described earlier.
+When using this new SDK and a compatible graphics driver, the API exposes support for this new feature.
+Then, a new flag `D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT` can be added when creating a resource.
+D3D12 can then return the alignment required for the resource smaller than the default ones described above.
+This library automatically makes use of the tight alignment feature when available and adds that new resource flag.
+When the tight alignment is enabled, the heuristics that creates small buffers as committed described above is deactivated,
+as it is no longer needed.
+
+You can check if the tight alignment it is available in the current system by calling D3D12MA::Allocator::IsTightAlignmentSupported().
+You can tell the library to not use it by specifying D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT.
+Typically, you don't need to do any of those.
+
+The library automatically aligns all buffers to at least 256 B, even when the system supports smaller alignment.
+This is the alignment required for constant buffers, expressed by `D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT` constant.
+You can override this logic for \subpage custom_pools with a specific D3D12MA::POOL_DESC::MinAllocationAlignment.
+
 \page defragmentation Defragmentation
 
 Interleaved allocations and deallocations of many objects of varying size can

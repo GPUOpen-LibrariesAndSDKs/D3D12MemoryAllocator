@@ -146,7 +146,7 @@ Public Attributes</h2></td></tr>
 <p>For each element, you should:</p>
 <ol type="1">
 <li>Create a new resource in the place pointed by <code>pMoves[i].pDstTmpAllocation-&gt;GetHeap()</code> + <code>pMoves[i].pDstTmpAllocation-&gt;GetOffset()</code>.</li>
-<li>Store new resource in <code>pMoves[i].pDstTmpAllocation</code> by using <a class="el" href="class_d3_d12_m_a_1_1_allocation.html#a414a088c22bae0f29b1038f5f9346d14" title="Releases the resource currently pointed by the allocation (if any), sets it to new one,...">Allocation::SetResource()</a>. It will later replace old resource from <code>pMoves[i].pSrcAllocation</code>.</li>
+<li>Store new resource in <code>pMoves[i].pDstTmpAllocation</code> by using <a class="el" href="class_d3_d12_m_a_1_1_allocation.html#a414a088c22bae0f29b1038f5f9346d14" title="Releases the resource currently pointed by the allocation (if not null), sets it to new one,...">Allocation::SetResource()</a>. It will later replace old resource from <code>pMoves[i].pSrcAllocation</code>.</li>
 <li>Copy data from the <code>pMoves[i].pSrcAllocation</code> e.g. using <code>D3D12GraphicsCommandList::CopyResource</code>.</li>
 <li>Make sure these commands finished executing on the GPU.</li>
 </ol>

@@ -166,6 +166,18 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_d3_d12_m_a_1_1_virtual_block.html">D3D12MA::VirtualBlock</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Represents pure allocation algorithm and a data structure with allocations in some memory block, without actually allocating any GPU memory.  <a href="class_d3_d12_m_a_1_1_virtual_block.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper structure that helps with complete and conscise initialization of the <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Parameters of created D3D12MA::Allocation object. To be used with Allocator::CreateResource.">D3D12MA::ALLOCATION_DESC</a> structure.  <a href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html">D3D12MA::CPOOL_DESC</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper structure that helps with complete and conscise initialization of the <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html" title="Parameters of created D3D12MA::Pool object. To be used with D3D12MA::Allocator::CreatePool.">D3D12MA::POOL_DESC</a> structure.  <a href="struct_d3_d12_m_a_1_1_c_p_o_o_l___d_e_s_c.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html">D3D12MA::CVIRTUAL_BLOCK_DESC</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper structure that helps with complete and conscise initialization of the <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html" title="Parameters of created D3D12MA::VirtualBlock object to be passed to CreateVirtualBlock().">D3D12MA::VIRTUAL_BLOCK_DESC</a> structure.  <a href="struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___b_l_o_c_k___d_e_s_c.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CVIRTUAL_ALLOCATION_DESC</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper structure that helps with complete and conscise initialization of the <a class="el" href="struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Parameters of created virtual allocation to be passed to VirtualBlock::Allocate().">D3D12MA::VIRTUAL_ALLOCATION_DESC</a> structure.  <a href="struct_d3_d12_m_a_1_1_c_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="namespaces" name="namespaces"></a>
 Namespaces</h2></td></tr>
@@ -174,11 +186,24 @@ Namespaces</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="define-members" name="define-members"></a>
 Macros</h2></td></tr>
-<tr class="memitem:aa623643886b8481adb32017e5c748b50" id="r_aa623643886b8481adb32017e5c748b50"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa623643886b8481adb32017e5c748b50">D3D12MA_DXGI_1_4</a>&#160;&#160;&#160;0</td></tr>
+<tr class="memitem:aa623643886b8481adb32017e5c748b50" id="r_aa623643886b8481adb32017e5c748b50"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa623643886b8481adb32017e5c748b50">D3D12MA_DXGI_1_4</a>&#160;&#160;&#160;1</td></tr>
+<tr class="memdesc:aa623643886b8481adb32017e5c748b50"><td class="mdescLeft">&#160;</td><td class="mdescRight">Define this macro to 0 to disable usage of DXGI 1.4 (which is used for <code>IDXGIAdapter3</code> and query for memory budget).  <br /></td></tr>
 <tr class="separator:aa623643886b8481adb32017e5c748b50"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6df70df4d9e792713418dd4062b07c3a" id="r_a6df70df4d9e792713418dd4062b07c3a"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a6df70df4d9e792713418dd4062b07c3a">D3D12MA_CREATE_NOT_ZEROED_AVAILABLE</a>&#160;&#160;&#160;1</td></tr>
+<tr class="memdesc:a6df70df4d9e792713418dd4062b07c3a"><td class="mdescLeft">&#160;</td><td class="mdescRight">This macro is defined to 0 or 1 automatically. Define it to 0 to disable support for <code>D3D12_HEAP_FLAG_CREATE_NOT_ZEROED</code>.  <br /></td></tr>
+<tr class="separator:a6df70df4d9e792713418dd4062b07c3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad04069a2e2bbc53b7d65f85a04a2dcbc" id="r_ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ad04069a2e2bbc53b7d65f85a04a2dcbc">D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</a>&#160;&#160;&#160;1</td></tr>
 <tr class="memdesc:ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="mdescLeft">&#160;</td><td class="mdescRight">When defined to value other than 0, the library will try to use <code>D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</code> or <code>D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT</code> for created textures when possible, which can save memory because some small textures may get their alignment 4 KB and their size a multiply of 4 KB instead of 64 KB.  <br /></td></tr>
 <tr class="separator:ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:accfbeae642feeacf353ce695e91a5e73" id="r_accfbeae642feeacf353ce695e91a5e73"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#accfbeae642feeacf353ce695e91a5e73">D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</a>&#160;&#160;&#160;(ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED | ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td></tr>
+<tr class="memdesc:accfbeae642feeacf353ce695e91a5e73"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ad8abad7c80ea0d8df27c85243ce720f3" title="Flags for the entire allocator.">D3D12MA::ALLOCATOR_DESC::Flags</a> for optimal performance.  <br /></td></tr>
+<tr class="separator:accfbeae642feeacf353ce695e91a5e73"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac3d50f134ad24c58df4a934b87847653" id="r_ac3d50f134ad24c58df4a934b87847653"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac3d50f134ad24c58df4a934b87847653">D3D12MA_RECOMMENDED_HEAP_FLAGS</a>&#160;&#160;&#160;(D3D12_HEAP_FLAG_NONE)</td></tr>
+<tr class="memdesc:ac3d50f134ad24c58df4a934b87847653"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3795956e4fbfe7c3a23546e02e5d28dc" title="Heap flags to be used when allocating heaps of this pool.">D3D12MA::POOL_DESC::HeapFlags</a> for optimal performance.  <br /></td></tr>
+<tr class="separator:ac3d50f134ad24c58df4a934b87847653"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2679d8c9f6d900168bb45450bc88998b" id="r_a2679d8c9f6d900168bb45450bc88998b"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2679d8c9f6d900168bb45450bc88998b">D3D12MA_RECOMMENDED_POOL_FLAGS</a>&#160;&#160;&#160;(POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td></tr>
+<tr class="memdesc:a2679d8c9f6d900168bb45450bc88998b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#ac4ed93b0191344d68c0b4ac1a4822ff4" title="Flags for the heap.">D3D12MA::POOL_DESC::Flags</a> for optimal performance.  <br /></td></tr>
+<tr class="separator:a2679d8c9f6d900168bb45450bc88998b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="typedef-members" name="typedef-members"></a>
 Typedefs</h2></td></tr>
@@ -226,10 +251,14 @@ Enumerations</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:a82bb787a69699a877b4166789a30e602"><td class="mdescLeft">&#160;</td><td class="mdescRight">Operation performed on single defragmentation move.  <a href="namespace_d3_d12_m_a.html#a82bb787a69699a877b4166789a30e602">More...</a><br /></td></tr>
 <tr class="separator:a82bb787a69699a877b4166789a30e602"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a919d8545365d6b7209a964f2b99936d1" id="r_a919d8545365d6b7209a964f2b99936d1"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">D3D12MA::POOL_FLAGS</a> { <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02">D3D12MA::POOL_FLAG_NONE</a> = 0
+<tr class="memitem:a919d8545365d6b7209a964f2b99936d1" id="r_a919d8545365d6b7209a964f2b99936d1"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">D3D12MA::POOL_FLAGS</a> { <br />
+&#160;&#160;<a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a5d8dc91add3423140809a550c7224d02">D3D12MA::POOL_FLAG_NONE</a> = 0
 , <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aa37a0103f511954ea42a1d0bba286b6a">D3D12MA::POOL_FLAG_ALGORITHM_LINEAR</a> = 0x1
 , <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a> = 0x2
-, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7">D3D12MA::POOL_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_LINEAR
+, <a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1a15b7a6f8bfb6e4d534143f8adb6ac7ba">D3D12MA::POOL_FLAG_ALWAYS_COMMITTED</a> = 0x4
+, <br />
+&#160;&#160;<a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1aec9d4939b8cc5438545b9df840b5f5f7">D3D12MA::POOL_FLAG_ALGORITHM_MASK</a> = POOL_FLAG_ALGORITHM_LINEAR
+<br />
  }</td></tr>
 <tr class="memdesc:a919d8545365d6b7209a964f2b99936d1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bit flags to be used with POOL_DESC::Flags.  <a href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1">More...</a><br /></td></tr>
 <tr class="separator:a919d8545365d6b7209a964f2b99936d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -275,6 +304,22 @@ Functions</h2></td></tr>
 <tr class="separator:ab024647ae85ee63e2fa2c1c4beac6d98"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Macro Definition Documentation</h2>
+<a id="a6df70df4d9e792713418dd4062b07c3a" name="a6df70df4d9e792713418dd4062b07c3a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6df70df4d9e792713418dd4062b07c3a">&#9670;&#160;</a></span>D3D12MA_CREATE_NOT_ZEROED_AVAILABLE</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define D3D12MA_CREATE_NOT_ZEROED_AVAILABLE&#160;&#160;&#160;1</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>This macro is defined to 0 or 1 automatically. Define it to 0 to disable support for <code>D3D12_HEAP_FLAG_CREATE_NOT_ZEROED</code>. </p>
+
+</div>
+</div>
 <a id="aa623643886b8481adb32017e5c748b50" name="aa623643886b8481adb32017e5c748b50"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aa623643886b8481adb32017e5c748b50">&#9670;&#160;</a></span>D3D12MA_DXGI_1_4</h2>
 
@@ -282,10 +327,60 @@ Functions</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define D3D12MA_DXGI_1_4&#160;&#160;&#160;0</td>
+          <td class="memname">#define D3D12MA_DXGI_1_4&#160;&#160;&#160;1</td>
         </tr>
       </table>
 </div><div class="memdoc">
+
+<p>Define this macro to 0 to disable usage of DXGI 1.4 (which is used for <code>IDXGIAdapter3</code> and query for memory budget). </p>
+
+</div>
+</div>
+<a id="accfbeae642feeacf353ce695e91a5e73" name="accfbeae642feeacf353ce695e91a5e73"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#accfbeae642feeacf353ce695e91a5e73">&#9670;&#160;</a></span>D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS&#160;&#160;&#160;(ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED | ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ad8abad7c80ea0d8df27c85243ce720f3" title="Flags for the entire allocator.">D3D12MA::ALLOCATOR_DESC::Flags</a> for optimal performance. </p>
+
+</div>
+</div>
+<a id="ac3d50f134ad24c58df4a934b87847653" name="ac3d50f134ad24c58df4a934b87847653"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac3d50f134ad24c58df4a934b87847653">&#9670;&#160;</a></span>D3D12MA_RECOMMENDED_HEAP_FLAGS</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define D3D12MA_RECOMMENDED_HEAP_FLAGS&#160;&#160;&#160;(D3D12_HEAP_FLAG_NONE)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3795956e4fbfe7c3a23546e02e5d28dc" title="Heap flags to be used when allocating heaps of this pool.">D3D12MA::POOL_DESC::HeapFlags</a> for optimal performance. </p>
+
+</div>
+</div>
+<a id="a2679d8c9f6d900168bb45450bc88998b" name="a2679d8c9f6d900168bb45450bc88998b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2679d8c9f6d900168bb45450bc88998b">&#9670;&#160;</a></span>D3D12MA_RECOMMENDED_POOL_FLAGS</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define D3D12MA_RECOMMENDED_POOL_FLAGS&#160;&#160;&#160;(POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#ac4ed93b0191344d68c0b4ac1a4822ff4" title="Flags for the heap.">D3D12MA::POOL_DESC::Flags</a> for optimal performance. </p>
 
 </div>
 </div>

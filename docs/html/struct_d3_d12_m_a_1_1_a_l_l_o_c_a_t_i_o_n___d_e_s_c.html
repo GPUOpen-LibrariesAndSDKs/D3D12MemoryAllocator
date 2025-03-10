@@ -99,11 +99,20 @@ $(function(){ initResizable(false); });
  <a href="#details">More...</a></p>
 
 <p><code>#include &lt;D3D12MemAlloc.h&gt;</code></p>
+<div class="dynheader">
+Inheritance diagram for D3D12MA::ALLOCATION_DESC:</div>
+<div class="dyncontent">
+ <div class="center">
+  <img src="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.png" usemap="#D3D12MA::ALLOCATION_5FDESC_map" alt=""/>
+  <map id="D3D12MA::ALLOCATION_5FDESC_map" name="D3D12MA::ALLOCATION_5FDESC_map">
+<area href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html" title="Helper structure that helps with complete and conscise initialization of the D3D12MA::ALLOCATION_DESC..." alt="D3D12MA::CALLOCATION_DESC" shape="rect" coords="0,56,207,80"/>
+  </map>
+</div></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:a92dec49b788a334fc91c55340dfbace6" id="r_a92dec49b788a334fc91c55340dfbace6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespace_d3_d12_m_a.html#abbad31a7e0b3d09d77f3fb704b77645e">ALLOCATION_FLAGS</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a92dec49b788a334fc91c55340dfbace6">Flags</a></td></tr>
-<tr class="memdesc:a92dec49b788a334fc91c55340dfbace6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Flags.  <br /></td></tr>
+<tr class="memdesc:a92dec49b788a334fc91c55340dfbace6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Flags for the allocation.  <br /></td></tr>
 <tr class="separator:a92dec49b788a334fc91c55340dfbace6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa46b3c0456e5a23edef3328607ebf4d7" id="r_aa46b3c0456e5a23edef3328607ebf4d7"><td class="memItemLeft" align="right" valign="top">D3D12_HEAP_TYPE&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa46b3c0456e5a23edef3328607ebf4d7">HeapType</a></td></tr>
 <tr class="memdesc:aa46b3c0456e5a23edef3328607ebf4d7"><td class="mdescLeft">&#160;</td><td class="mdescRight">The type of memory heap where the new allocation should be placed.  <br /></td></tr>
@@ -134,7 +143,7 @@ Public Attributes</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Custom pool to place the new resource in. Optional. </p>
-<p>When not NULL, the resource will be created inside specified custom pool. </p>
+<p>When not null, the resource will be created inside specified custom pool. Members <code>HeapType</code>, <code>ExtraHeapFlags</code> are then ignored. </p>
 
 </div>
 </div>
@@ -173,7 +182,7 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Flags. </p>
+<p>Flags for the allocation. </p>
 
 </div>
 </div>

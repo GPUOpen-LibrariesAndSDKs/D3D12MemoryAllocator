@@ -74,6 +74,14 @@
     #endif
 #endif
 
+#ifndef D3D12MA_DEFAULT_ALIGNMENT
+    /*
+    Default alignment of allocations in default pools and custom pools with MinAllocationAlignment == 0.
+    Can be lowered for custom pools by specifying custom MinAllocationAlignment > 0.
+    */
+    #define D3D12MA_DEFAULT_ALIGNMENT D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
+#endif
+
 #ifndef D3D12MA_DEBUG_ALIGNMENT
     /*
     Minimum alignment of all allocations, in bytes.
@@ -6240,7 +6248,7 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
             0, // minBlockCount
             SIZE_MAX, // maxBlockCount
             false, // explicitBlockSize
-            D3D12MA_DEBUG_ALIGNMENT, // minAllocationAlignment
+            (UINT64)D3D12MA_DEFAULT_ALIGNMENT, // minAllocationAlignment
             0, // Default algorithm,
             m_MsaaAlwaysCommitted,
             NULL, // pProtectedSession
@@ -7718,15 +7726,7 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
     }
 #endif // #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
 
-    D3D12_RESOURCE_ALLOCATION_INFO resAllocInfo = GetResourceAllocationInfoNative(inOutResourceDesc);
-
-    // Align up to 256 B because this is the alignment required for constant buffers.
-    if (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-    {
-        resAllocInfo.Alignment = D3D12MA_MAX(resAllocInfo.Alignment, (UINT64)D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-    }
-
-    return resAllocInfo;
+    return GetResourceAllocationInfoNative(inOutResourceDesc);
 }
 
 bool AllocatorPimpl::NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size)
@@ -8007,7 +8007,7 @@ BlockVector::BlockVector(
     m_MinBlockCount(minBlockCount),
     m_MaxBlockCount(maxBlockCount),
     m_ExplicitBlockSize(explicitBlockSize),
-    m_MinAllocationAlignment(minAllocationAlignment),
+    m_MinAllocationAlignment(D3D12MA_MAX(minAllocationAlignment, (UINT64)D3D12MA_DEBUG_ALIGNMENT)),
     m_Algorithm(algorithm),
     m_DenyMsaaTextures(denyMsaaTextures),
     m_ProtectedSession(pProtectedSession),
@@ -9145,12 +9145,14 @@ PoolPimpl::PoolPimpl(AllocatorPimpl* allocator, const POOL_DESC& desc)
     D3D12MA_ASSERT(m_Desc.pProtectedSession == NULL);
 #endif
 
+    const UINT64 minAlignment = desc.MinAllocationAlignment > 0 ? desc.MinAllocationAlignment : D3D12MA_DEFAULT_ALIGNMENT;
+
     m_BlockVector = D3D12MA_NEW(allocator->GetAllocs(), BlockVector)(
         allocator, desc.HeapProperties, desc.HeapFlags,
         preferredBlockSize,
         desc.MinBlockCount, maxBlockCount,
         explicitBlockSize,
-        D3D12MA_MAX(desc.MinAllocationAlignment, (UINT64)D3D12MA_DEBUG_ALIGNMENT),
+        minAlignment,
         (desc.Flags & POOL_FLAG_ALGORITHM_MASK) != 0,
         (desc.Flags & POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) != 0,
         desc.pProtectedSession,

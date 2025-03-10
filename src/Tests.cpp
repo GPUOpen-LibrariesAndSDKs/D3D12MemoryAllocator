@@ -3065,36 +3065,44 @@ static void TestTightAlignment(const TestContext& ctx)
 
     // Use a custom heap to make sure our small buffers are not created as committed.
     POOL_DESC poolDesc = {};
-    poolDesc.BlockSize = 1024 * 1024;
+    poolDesc.BlockSize = MEGABYTE;
     poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
 
     D3D12_RESOURCE_DESC resDesc;
-    FillResourceDescForBuffer(resDesc, 16);
+    FillResourceDescForBuffer(resDesc, 4);
 
     const D3D12_HEAP_TYPE heapTypes[] = { D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_TYPE_UPLOAD };
     for (auto heapType : heapTypes)
     {
         poolDesc.HeapProperties.Type = heapType;
-        ComPtr<Pool> pool;
-        CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
-
-        ALLOCATION_DESC allocDesc = {};
-        allocDesc.CustomPool = pool.Get();
-
-        ComPtr<Allocation> allocs[2] = {};
-
-        for (size_t i = 0; i < _countof(allocs); ++i)
+        for (uint32_t minAlignmentTestIndex = 0; minAlignmentTestIndex < 2; ++minAlignmentTestIndex)
         {
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
-                D3D12_RESOURCE_STATE_COMMON, NULL, &allocs[i], IID_NULL, NULL));
-            CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
+            // MinAllocationAlignment == 0 - default alignment.
+            // MinAllocationAlignment == 1 - minimum possible alignment.
+            poolDesc.MinAllocationAlignment = minAlignmentTestIndex;
+
+            ComPtr<Pool> pool;
+            CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+            ALLOCATION_DESC allocDesc = {};
+            allocDesc.CustomPool = pool.Get();
+
+            ComPtr<Allocation> allocs[2] = {};
+
+            for (size_t i = 0; i < _countof(allocs); ++i)
+            {
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+                    D3D12_RESOURCE_STATE_COMMON, NULL, &allocs[i], IID_NULL, NULL));
+                CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
+            }
+
+            // Print the offset of the 2nd buffer.
+            wprintf(L"    In D3D12_HEAP_TYPE_%s, with MinAllocationAlignment=%llu, a %llu B buffer was aligned to %llu B.\n",
+                HEAP_TYPE_NAMES[(size_t)heapType],
+                poolDesc.MinAllocationAlignment,
+                resDesc.Width,
+                allocs[1]->GetOffset());
         }
-        
-        // Print the offset of the 2nd buffer.
-        wprintf(L"    In D3D12_HEAP_TYPE_%s, a %llu B buffer was aligned to %llu B.\n",
-            HEAP_TYPE_NAMES[(size_t)heapType],
-            resDesc.Width,
-            allocs[1]->GetOffset());
     }
 }
 

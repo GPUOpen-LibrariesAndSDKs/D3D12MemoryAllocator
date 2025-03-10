@@ -121,7 +121,7 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:a3f3fd1e88cf2cd02257fe272e08a273c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if GPU Upload Heaps are supported on the current system.  <br /></td></tr>
 <tr class="separator:a3f3fd1e88cf2cd02257fe272e08a273c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3f5aa191cebdca7c1932da4723cfc03e" id="r_a3f5aa191cebdca7c1932da4723cfc03e"><td class="memItemLeft" align="right" valign="top">BOOL&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a3f5aa191cebdca7c1932da4723cfc03e">IsTightAlignmentSupported</a> () const</td></tr>
-<tr class="memdesc:a3f5aa191cebdca7c1932da4723cfc03e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if resource tight alignment is supported on the current system. When supported, it is automatically used by the library, unless <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> flag was specified on allocator creation.  <br /></td></tr>
+<tr class="memdesc:a3f5aa191cebdca7c1932da4723cfc03e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns true if resource tight alignment is supported on the current system. When supported, it is automatically used by the library, unless <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> flag was specified on allocator creation. This flag is fetched from <code>D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier</code>.  <br /></td></tr>
 <tr class="separator:a3f5aa191cebdca7c1932da4723cfc03e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a434ae3147209953253da26687bfd62dc" id="r_a434ae3147209953253da26687bfd62dc"><td class="memItemLeft" align="right" valign="top">UINT64&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a434ae3147209953253da26687bfd62dc">GetMemoryCapacity</a> (UINT memorySegmentGroup) const</td></tr>
 <tr class="memdesc:a434ae3147209953253da26687bfd62dc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns total amount of memory of specific segment group, in bytes.  <br /></td></tr>
@@ -837,8 +837,7 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Returns true if resource tight alignment is supported on the current system. When supported, it is automatically used by the library, unless <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> flag was specified on allocator creation. </p>
-<p>This flag is fetched from <code>D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier</code>. </p>
+<p>Returns true if resource tight alignment is supported on the current system. When supported, it is automatically used by the library, unless <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916af13bc700d7b799c856c6516acac12fed">ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT</a> flag was specified on allocator creation. This flag is fetched from <code>D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier</code>. </p>
 
 </div>
 </div>

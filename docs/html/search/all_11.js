@@ -14,6 +14,7 @@ var searchData=
   ['statistics_11',['Statistics',['../struct_d3_d12_m_a_1_1_statistics.html',1,'D3D12MA::Statistics'],['../statistics.html',1,'Statistics'],['../virtual_allocator.html#virtual_allocator_statistics',1,'Statistics']]],
   ['statistics_12',['Numeric statistics',['../statistics.html#statistics_numeric_statistics',1,'']]],
   ['stats_13',['Stats',['../struct_d3_d12_m_a_1_1_detailed_statistics.html#a2490d4a08a5d47c87a699001dfc8737f',1,'D3D12MA::DetailedStatistics::Stats'],['../struct_d3_d12_m_a_1_1_budget.html#a1255508930766db238cfb1312b15f1cf',1,'D3D12MA::Budget::Stats']]],
-  ['sub_20allocating_20buffers_14',['Sub-allocating buffers',['../optimal_allocation.html#optimal_allocation_suballocating_buffers',1,'']]],
-  ['supported_15',['Features not supported',['../general_considerations.html#general_considerations_features_not_supported',1,'']]]
+  ['structures_14',['Helper structures',['../quick_start.html#quick_start_helper_structures',1,'']]],
+  ['sub_20allocating_20buffers_15',['Sub-allocating buffers',['../optimal_allocation.html#optimal_allocation_suballocating_buffers',1,'']]],
+  ['supported_16',['Features not supported',['../general_considerations.html#general_considerations_features_not_supported',1,'']]]
 ];
