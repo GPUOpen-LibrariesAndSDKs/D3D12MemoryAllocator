@@ -733,6 +733,12 @@ static void TestSmallBuffers(const TestContext& ctx)
 {
     wprintf(L"Test small buffers\n");
 
+    const bool isTightAlignmentEnabled = ctx.allocator->IsTightAlignmentSupported() &&
+        (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT) == 0;
+    const bool expectSmallBuffersCommitted = !isTightAlignmentEnabled &&
+        (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED) == 0;
+        
+
     D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
         D3D12_HEAP_TYPE_DEFAULT,
         D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
@@ -778,9 +784,9 @@ static void TestSmallBuffers(const TestContext& ctx)
         CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
         CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        // Expected to be committed unless tight alignment is supported.
+        // Expected to be committed?
         const bool isCommitted = resWithAlloc.allocation->GetHeap() == NULL;
-        CHECK_BOOL(isCommitted != (ctx.allocator->IsTightAlignmentSupported() != FALSE));
+        CHECK_BOOL(isCommitted == expectSmallBuffersCommitted);
     }
 
     // Test 3: NEVER_ALLOCATE.
@@ -3057,13 +3063,10 @@ static void TestTightAlignment(const TestContext& ctx)
 
     wprintf(L"Test resource tight alignment\n");
 
-    if(!ctx.allocator->IsTightAlignmentSupported())
-    {
-        wprintf(L"    Skipped due to tight alignment not supported.\n");
-        return;
-    }
+    const bool isTightAlignmentEnabled = ctx.allocator->IsTightAlignmentSupported() &&
+        (ctx.allocatorFlags & ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT) == 0;
 
-    // Use a custom heap to make sure our small buffers are not created as committed.
+    // Use a custom pool to make sure our small buffers are not created as committed.
     POOL_DESC poolDesc = {};
     poolDesc.BlockSize = MEGABYTE;
     poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
@@ -3096,12 +3099,24 @@ static void TestTightAlignment(const TestContext& ctx)
                 CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
             }
 
+            const UINT64 secondAllocOffset = allocs[1]->GetOffset();
+
             // Print the offset of the 2nd buffer.
             wprintf(L"    In D3D12_HEAP_TYPE_%s, with MinAllocationAlignment=%llu, a %llu B buffer was aligned to %llu B.\n",
                 HEAP_TYPE_NAMES[(size_t)heapType],
                 poolDesc.MinAllocationAlignment,
                 resDesc.Width,
-                allocs[1]->GetOffset());
+                secondAllocOffset);
+
+            UINT64 expectedMinAlignment = 1;
+            if (isTightAlignmentEnabled)
+            {
+                if (minAlignmentTestIndex == 0)
+                    expectedMinAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+            }
+            else
+                expectedMinAlignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+            CHECK_BOOL(secondAllocOffset % expectedMinAlignment == 0);
         }
     }
 }
