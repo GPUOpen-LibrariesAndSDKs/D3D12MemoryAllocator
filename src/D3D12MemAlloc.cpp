@@ -7490,12 +7490,6 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
                 outPreferCommitted = true;
             }
         }
-
-        const D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
-        if (outBlockVector != NULL && extraHeapFlags != 0)
-        {
-            outBlockVector = NULL;
-        }
     }
 
     if ((allocDesc.Flags & ALLOCATION_FLAG_COMMITTED) != 0 ||
@@ -7525,12 +7519,7 @@ UINT AllocatorPimpl::CalcDefaultPoolIndex(const ALLOCATION_DESC& allocDesc, Reso
     D3D12_HEAP_FLAGS extraHeapFlags = allocDesc.ExtraHeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS;
 
 #if D3D12MA_CREATE_NOT_ZEROED_AVAILABLE
-    // If allocator was created with ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED, also ignore
-    // D3D12_HEAP_FLAG_CREATE_NOT_ZEROED.
-    if(m_DefaultPoolsNotZeroed)
-    {
-        extraHeapFlags &= ~D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
-    }
+    extraHeapFlags &= ~D3D12_HEAP_FLAG_CREATE_NOT_ZEROED;
 #endif
 
     if (extraHeapFlags != 0)
