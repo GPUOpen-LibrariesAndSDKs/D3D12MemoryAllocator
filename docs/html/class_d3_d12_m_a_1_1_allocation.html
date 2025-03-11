@@ -121,7 +121,7 @@ Public Member Functions</h2></td></tr>
 <tr class="memdesc:ad00308118252f82d8f803c623c67bf18"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns D3D12 resource associated with this object.  <br /></td></tr>
 <tr class="separator:ad00308118252f82d8f803c623c67bf18"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a414a088c22bae0f29b1038f5f9346d14" id="r_a414a088c22bae0f29b1038f5f9346d14"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a414a088c22bae0f29b1038f5f9346d14">SetResource</a> (ID3D12Resource *pResource)</td></tr>
-<tr class="memdesc:a414a088c22bae0f29b1038f5f9346d14"><td class="mdescLeft">&#160;</td><td class="mdescRight">Releases the resource currently pointed by the allocation (if any), sets it to new one, incrementing its reference counter (if not null).  <br /></td></tr>
+<tr class="memdesc:a414a088c22bae0f29b1038f5f9346d14"><td class="mdescLeft">&#160;</td><td class="mdescRight">Releases the resource currently pointed by the allocation (if not null), sets it to new one, incrementing its reference counter (if not null).  <br /></td></tr>
 <tr class="separator:a414a088c22bae0f29b1038f5f9346d14"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adca8d5a82bed492fe7265fcda6e53da2" id="r_adca8d5a82bed492fe7265fcda6e53da2"><td class="memItemLeft" align="right" valign="top">ID3D12Heap *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#adca8d5a82bed492fe7265fcda6e53da2">GetHeap</a> () const</td></tr>
 <tr class="memdesc:adca8d5a82bed492fe7265fcda6e53da2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns memory heap that the resource is created in.  <br /></td></tr>
@@ -393,7 +393,8 @@ Public Member Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p>Releases the resource currently pointed by the allocation (if any), sets it to new one, incrementing its reference counter (if not null). </p>
+<p>Releases the resource currently pointed by the allocation (if not null), sets it to new one, incrementing its reference counter (if not null). </p>
+<dl class="section warning"><dt>Warning</dt><dd>This is an advanced feature that should be used only in special cases, e.g. during <a class="el" href="defragmentation.html">Defragmentation</a>. Typically, an allocation object should reference the resource that was created together with it. If you swap it to another resource of different size, <a class="el" href="statistics.html">Statistics</a> and budgets can be calculated incorrectly. </dd></dl>
 
 </div>
 </div>

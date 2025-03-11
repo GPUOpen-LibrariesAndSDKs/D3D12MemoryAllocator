@@ -1676,7 +1676,7 @@ struct CALLOCATION_DESC : public ALLOCATION_DESC
     explicit CALLOCATION_DESC(D3D12_HEAP_TYPE heapType,
         ALLOCATION_FLAGS flags = ALLOCATION_FLAG_NONE,
         void* privateData = NULL,
-        D3D12_HEAP_FLAGS extraHeapFlags = D3D12_HEAP_FLAG_NONE) noexcept
+        D3D12_HEAP_FLAGS extraHeapFlags = D3D12MA_RECOMMENDED_HEAP_FLAGS) noexcept
     {
         Flags = flags;
         HeapType = heapType;

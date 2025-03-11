@@ -144,7 +144,7 @@ Public Attributes</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Temporary allocation pointing to destination memory that will replace <code>pSrcAllocation</code>. </p>
-<p>Use it to retrieve new <code>ID3D12Heap</code> and offset to create new <code>ID3D12Resource</code> and then store it here via <a class="el" href="class_d3_d12_m_a_1_1_allocation.html#a414a088c22bae0f29b1038f5f9346d14" title="Releases the resource currently pointed by the allocation (if any), sets it to new one,...">Allocation::SetResource()</a>.</p>
+<p>Use it to retrieve new <code>ID3D12Heap</code> and offset to create new <code>ID3D12Resource</code> and then store it here via <a class="el" href="class_d3_d12_m_a_1_1_allocation.html#a414a088c22bae0f29b1038f5f9346d14" title="Releases the resource currently pointed by the allocation (if not null), sets it to new one,...">Allocation::SetResource()</a>.</p>
 <dl class="section warning"><dt>Warning</dt><dd>Do not store this allocation in your data structures! It exists only temporarily, for the duration of the defragmentation pass, to be used for storing newly created resource. <a class="el" href="class_d3_d12_m_a_1_1_defragmentation_context.html#aad502ba70d6dadaeee37703fd8bf90ae" title="Ends single defragmentation pass.">DefragmentationContext::EndPass()</a> will destroy it and make <code>pSrcAllocation</code> point to this memory. </dd></dl>
 
 </div>
