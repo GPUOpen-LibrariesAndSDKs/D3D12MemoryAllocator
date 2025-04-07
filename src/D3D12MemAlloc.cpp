@@ -2795,7 +2795,7 @@ class AllocationObjectAllocator
     D3D12MA_CLASS_NO_COPY(AllocationObjectAllocator);
 public:
     AllocationObjectAllocator(const ALLOCATION_CALLBACKS& allocationCallbacks, bool useMutex)
-        : m_Allocator(allocationCallbacks, 1024), m_UseMutex(useMutex) {}
+		: m_UseMutex(useMutex), m_Allocator(allocationCallbacks, 1024) {}
 
     template<typename... Types>
     Allocation* Allocate(Types... args);
