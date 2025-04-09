@@ -33,10 +33,11 @@
     #include <shared_mutex>
 #endif
 
-#if !defined(_MSC_VER)
-#include <guiddef.h>
-// guiddef.h must be included first.
-#include <dxguids.h>
+// Includes needed for MinGW - see #71.
+#ifndef _MSC_VER
+    #include <guiddef.h>
+    // guiddef.h must be included first.
+    #include <dxguids.h>
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
