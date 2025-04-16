@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['virtual_20allocator_0',['Virtual allocator',['../virtual_allocator.html',1,'optimal_allocation']]]
+  ['start_0',['Quick start',['../quick_start.html',1,'index']]],
+  ['statistics_1',['Statistics',['../statistics.html',1,'optimal_allocation']]]
 ];

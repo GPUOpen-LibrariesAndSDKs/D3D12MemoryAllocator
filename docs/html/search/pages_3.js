@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['general_20considerations_0',['General considerations',['../general_considerations.html',1,'index']]]
+  ['frequenty_20asked_20questions_0',['Frequenty asked questions',['../faq.html',1,'index']]]
 ];

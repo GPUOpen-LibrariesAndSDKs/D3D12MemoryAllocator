@@ -1,5 +1,4 @@
 var searchData=
 [
-  ['memory_20allocator_0',['D3D12 Memory Allocator',['../index.html',1,'']]],
-  ['memory_20pools_1',['Custom memory pools',['../custom_pools.html',1,'optimal_allocation']]]
+  ['linear_20allocation_20algorithm_0',['Linear allocation algorithm',['../linear_algorithm.html',1,'index']]]
 ];

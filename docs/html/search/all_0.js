@@ -52,6 +52,7 @@ var searchData=
   ['and_20compatibility_49',['Versioning and compatibility',['../general_considerations.html#general_considerations_versioning_and_compatibility',1,'']]],
   ['and_20initialization_50',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
   ['and_20units_51',['Alignment and units',['../virtual_allocator.html#virtual_allocator_alignment_and_units',1,'']]],
-  ['at_20once_52',['Free-at-once',['../linear_algorithm.html#linear_algorithm_free_at_once',1,'']]],
-  ['avoiding_20running_20out_20of_20memory_53',['Avoiding running out of memory',['../optimal_allocation.html#optimal_allocation_avoiding_running_out_of_memory',1,'']]]
+  ['asked_20questions_52',['Frequenty asked questions',['../faq.html',1,'index']]],
+  ['at_20once_53',['Free-at-once',['../linear_algorithm.html#linear_algorithm_free_at_once',1,'']]],
+  ['avoiding_20running_20out_20of_20memory_54',['Avoiding running out of memory',['../optimal_allocation.html#optimal_allocation_avoiding_running_out_of_memory',1,'']]]
 ];
