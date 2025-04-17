@@ -6,7 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
 env:
-  FOO: "BAR"
+  DX_AGILITY_SDK_URL: "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.615.1"
 
 jobs:
   windows:
@@ -35,6 +35,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download DirectX 12 Agility SDK
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri $env:DX_AGILITY_SDK_URL -OutFile "d3d12.zip"
+          Expand-Archive -Path "d3d12.zip" -DestinationPath "d3d12_sdk"
+
       - name: Configure CMake
         shell: pwsh
         run: |
@@ -44,6 +51,7 @@ jobs:
             -Bbuild `
             -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} `
             -DD3D12MA_BUILD_SAMPLE=ON `
+            -DD3D12MA_AGILITY_SDK_DIRECTORY=INVALID `
             ${{ matrix.config.cmake_configure_options }}
 
       - name: Build
