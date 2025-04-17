@@ -51,7 +51,7 @@ jobs:
             -Bbuild `
             -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} `
             -DD3D12MA_BUILD_SAMPLE=ON `
-            -DD3D12MA_AGILITY_SDK_DIRECTORY=$env:GITHUB_WORKSPACE/agility_sdk `
+            -DD3D12MA_AGILITY_SDK_DIRECTORY=${$env:GITHUB_WORKSPACE}/agility_sdk `
             ${{ matrix.config.cmake_configure_options }}
 
       - name: Build
