@@ -47,11 +47,13 @@ jobs:
         run: |
           $env:CC="${{ matrix.config.cc }}"
           $env:CXX="${{ matrix.config.cxx }}"
+          $AGILITY_SDK_PATH = "$env:GITHUB_WORKSPACE/agility_sdk"
+          echo $AGILITY_SDK_PATH
           cmake . `
             -Bbuild `
             -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} `
             -DD3D12MA_BUILD_SAMPLE=ON `
-            -DD3D12MA_AGILITY_SDK_DIRECTORY=${$env:GITHUB_WORKSPACE}/agility_sdk `
+            -DD3D12MA_AGILITY_SDK_DIRECTORY="$AGILITY_SDK_PATH" `
             ${{ matrix.config.cmake_configure_options }}
 
       - name: Build
