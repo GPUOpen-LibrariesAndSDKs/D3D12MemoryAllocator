@@ -2971,7 +2971,7 @@ static void TestGPUUploadHeap(const TestContext& ctx)
         res->Unmap(0, NULL); // NULL - written everything.
 
         CHECK_HR(res->Map(0, NULL, (void**)&mappedData)); // NULL - reading everything.
-        CHECK_BOOL(mappedData[100] = 300);
+        CHECK_BOOL(mappedData[100] == 300);
         res->Unmap(0, &EMPTY_RANGE); // {0, 0} - not written anything.
 
     }
@@ -3344,7 +3344,7 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
 
     RandomNumberGenerator rand{ 20092010 };
 
-    UINT32 allocSizes[ALLOCATION_COUNT];
+    std::vector<UINT32> allocSizes(ALLOCATION_COUNT);
     for (size_t i = 0; i < ALLOCATION_COUNT; ++i)
     {
         allocSizes[i] = rand.Generate() % MAX_ALLOC_SIZE + 1;
@@ -3379,7 +3379,7 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
                 assert(0);
             }
 
-            D3D12MA::VirtualAllocation allocs[ALLOCATION_COUNT];
+            std::vector <D3D12MA::VirtualAllocation> allocs(ALLOCATION_COUNT);
             ComPtr<D3D12MA::VirtualBlock> block;
             CHECK_HR(D3D12MA::CreateVirtualBlock(&blockDesc, &block));
             duration allocDuration = duration::zero();
@@ -3393,7 +3393,7 @@ static void TestVirtualBlocksAlgorithmsBenchmark(const TestContext& ctx)
                     allocSizes[i],
                     alignment };
 
-                CHECK_HR(block->Allocate(&allocCreateInfo, allocs + i, nullptr));
+                CHECK_HR(block->Allocate(&allocCreateInfo, &allocs[i], nullptr));
             }
             allocDuration += std::chrono::high_resolution_clock::now() - timeBegin;
 
