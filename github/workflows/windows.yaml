@@ -1,0 +1,52 @@
+name: Build code
+
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  FOO: "BAR"
+
+jobs:
+  windows:
+    name: ${{ matrix.config.name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+            name: "Windows MSVC (Debug)",
+            compiler: "msvc",
+            cc: "cl", cxx: "cl",
+            cmake_configure_options: '-G "Visual Studio 17 2022" -A x64',
+            build_type: "Debug",
+          }
+          #- {
+          #  name: "Windows MSVC (Release)",
+          #  compiler: "msvc",
+          #  cc: "cl", cxx: "cl",
+          #  cmake_configure_options: '-G "Visual Studio 17 2022" -A x64',
+          #  build_type: "Release",
+          #}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          $env:CC="${{ matrix.config.cc }}"
+          $env:CXX="${{ matrix.config.cxx }}"
+          cmake . `
+            -Bbuild `
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} `
+            -DD3D12MA_BUILD_SAMPLE=ON `
+            ${{ matrix.config.cmake_configure_options }}
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build --config ${{ matrix.config.build_type }}
