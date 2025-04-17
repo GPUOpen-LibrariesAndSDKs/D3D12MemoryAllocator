@@ -49,6 +49,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 #ifndef _D3D12MA_CONFIGURATION
 
+#if !defined(D3D12MA_CPP20)
+    #if __cplusplus >= 202002L || _MSVC_LANG >= 202002L // C++20
+        #define D3D12MA_CPP20 1
+    #else
+        #define D3D12MA_CPP20 0
+    #endif
+#endif
+
 #ifdef _WIN32
     #if !defined(WINVER) || WINVER < 0x0600
         #error Required at least WinAPI version supporting: client = Windows Vista, server = Windows Server 2008.
@@ -69,6 +77,10 @@
 #ifndef D3D12MA_ASSERT
     #include <cassert>
     #define D3D12MA_ASSERT(cond) assert(cond)
+#endif
+
+#if D3D12MA_CPP20
+    #include <bit>
 #endif
 
 // Assert that will be called very often, like inside data structures e.g. operator[].
@@ -303,6 +315,10 @@ static UINT8 BitScanLSB(UINT64 mask)
     if (_BitScanForward64(&pos, mask))
         return static_cast<UINT8>(pos);
     return UINT8_MAX;
+#elif D3D12MA_CPP20
+    if (mask != 0)
+        return static_cast<uint8_t>(std::countr_zero(mask));
+    return UINT8_MAX;
 #elif defined __GNUC__ || defined __clang__
     return static_cast<UINT8>(__builtin_ffsll(mask)) - 1U;
 #else
@@ -324,6 +340,10 @@ static UINT8 BitScanLSB(UINT32 mask)
     unsigned long pos;
     if (_BitScanForward(&pos, mask))
         return static_cast<UINT8>(pos);
+    return UINT8_MAX;
+#elif D3D12MA_CPP20
+    if (mask != 0)
+        return static_cast<uint8_t>(std::countr_zero(mask));
     return UINT8_MAX;
 #elif defined __GNUC__ || defined __clang__
     return static_cast<UINT8>(__builtin_ffs(mask)) - 1U;
@@ -347,6 +367,9 @@ static UINT8 BitScanMSB(UINT64 mask)
     unsigned long pos;
     if (_BitScanReverse64(&pos, mask))
         return static_cast<UINT8>(pos);
+#elif D3D12MA_CPP20
+    if (mask != 0)
+        return 63 - static_cast<uint8_t>(std::countl_zero(mask));
 #elif defined __GNUC__ || defined __clang__
     if (mask)
         return 63 - static_cast<UINT8>(__builtin_clzll(mask));
@@ -369,6 +392,9 @@ static UINT8 BitScanMSB(UINT32 mask)
     unsigned long pos;
     if (_BitScanReverse(&pos, mask))
         return static_cast<UINT8>(pos);
+#elif D3D12MA_CPP20
+    if (mask != 0)
+        return 31 - static_cast<uint8_t>(std::countl_zero(mask));
 #elif defined __GNUC__ || defined __clang__
     if (mask)
         return 31 - static_cast<UINT8>(__builtin_clz(mask));
