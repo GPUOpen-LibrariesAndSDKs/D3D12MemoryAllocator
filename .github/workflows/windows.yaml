@@ -1,0 +1,62 @@
+name: Build code
+
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  DX_AGILITY_SDK_URL: "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.615.1"
+
+jobs:
+  windows:
+    name: ${{ matrix.config.name }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+            name: "Windows MSVC (Debug)",
+            compiler: "msvc",
+            cc: "cl", cxx: "cl",
+            cmake_configure_options: '-G "Visual Studio 17 2022" -A x64',
+            build_type: "Debug",
+          }
+          - {
+            name: "Windows MSVC (Release)",
+            compiler: "msvc",
+            cc: "cl", cxx: "cl",
+            cmake_configure_options: '-G "Visual Studio 17 2022" -A x64',
+            build_type: "Release",
+          }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download DirectX 12 Agility SDK
+        shell: pwsh
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest -Uri $env:DX_AGILITY_SDK_URL -OutFile "agility_sdk.zip"
+          Expand-Archive -Path "agility_sdk.zip" -DestinationPath "agility_sdk"
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          $env:CC="${{ matrix.config.cc }}"
+          $env:CXX="${{ matrix.config.cxx }}"
+          $AGILITY_SDK_PATH = "$env:GITHUB_WORKSPACE/agility_sdk"
+          echo $AGILITY_SDK_PATH
+          cmake . `
+            -Bbuild `
+            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} `
+            -DD3D12MA_BUILD_SAMPLE=ON `
+            -DD3D12MA_AGILITY_SDK_DIRECTORY="$AGILITY_SDK_PATH" `
+            ${{ matrix.config.cmake_configure_options }}
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build --config ${{ matrix.config.build_type }}
