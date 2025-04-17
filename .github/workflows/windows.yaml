@@ -41,6 +41,7 @@ jobs:
           $ProgressPreference = 'SilentlyContinue'
           Invoke-WebRequest -Uri $env:DX_AGILITY_SDK_URL -OutFile "d3d12.zip"
           Expand-Archive -Path "d3d12.zip" -DestinationPath "d3d12_sdk"
+          echo "DX_AGILITY_SDK_PATH=$env:GITHUB_WORKSPACE/d3d12_sdk" >> $env:GITHUB_ENV
 
       - name: Configure CMake
         shell: pwsh
@@ -51,7 +52,7 @@ jobs:
             -Bbuild `
             -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} `
             -DD3D12MA_BUILD_SAMPLE=ON `
-            -DD3D12MA_AGILITY_SDK_DIRECTORY=$env:DX_AGILITY_SDK_URL `
+            -DD3D12MA_AGILITY_SDK_DIRECTORY=$env:DX_AGILITY_SDK_PATH `
             ${{ matrix.config.cmake_configure_options }}
 
       - name: Build
