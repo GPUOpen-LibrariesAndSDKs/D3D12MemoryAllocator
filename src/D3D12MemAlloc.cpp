@@ -5406,8 +5406,8 @@ struct CREATE_RESOURCE_PARAMS
 {
     CREATE_RESOURCE_PARAMS() = delete;
     CREATE_RESOURCE_PARAMS(
-        const D3D12_RESOURCE_DESC* pResourceDesc, 
-        D3D12_RESOURCE_STATES InitialResourceState, 
+        const D3D12_RESOURCE_DESC* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
         const D3D12_CLEAR_VALUE* pOptimizedClearValue)
         : Variant(VARIANT_WITH_STATE)
         , pResourceDesc(pResourceDesc)
@@ -5417,8 +5417,8 @@ struct CREATE_RESOURCE_PARAMS
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     CREATE_RESOURCE_PARAMS(
-        const D3D12_RESOURCE_DESC1* pResourceDesc, 
-        D3D12_RESOURCE_STATES InitialResourceState, 
+        const D3D12_RESOURCE_DESC1* pResourceDesc,
+        D3D12_RESOURCE_STATES InitialResourceState,
         const D3D12_CLEAR_VALUE* pOptimizedClearValue)
         : Variant(VARIANT_WITH_STATE_AND_DESC1)
         , pResourceDesc1(pResourceDesc)
@@ -5433,7 +5433,7 @@ struct CREATE_RESOURCE_PARAMS
         D3D12_BARRIER_LAYOUT InitialLayout,
         const D3D12_CLEAR_VALUE* pOptimizedClearValue,
         UINT32 NumCastableFormats,
-        DXGI_FORMAT* pCastableFormats)
+        const DXGI_FORMAT* pCastableFormats)
         : Variant(VARIANT_WITH_LAYOUT)
         , pResourceDesc1(pResourceDesc)
         , InitialLayout(InitialLayout)
@@ -5503,7 +5503,7 @@ struct CREATE_RESOURCE_PARAMS
         D3D12MA_ASSERT(Variant >= VARIANT_WITH_LAYOUT);
         return NumCastableFormats;
     }
-    DXGI_FORMAT* GetCastableFormats() const
+    const DXGI_FORMAT* GetCastableFormats() const
     {
         D3D12MA_ASSERT(Variant >= VARIANT_WITH_LAYOUT);
         return pCastableFormats;
@@ -5528,7 +5528,7 @@ private:
     const D3D12_CLEAR_VALUE* pOptimizedClearValue;
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     UINT32 NumCastableFormats;
-    DXGI_FORMAT* pCastableFormats;
+    const DXGI_FORMAT* pCastableFormats;
 #endif
 };
 
@@ -5942,6 +5942,12 @@ public:
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     ID3D12Device8* GetDevice8() const { return m_Device8; }
 #endif
+#ifdef __ID3D12Device10_INTERFACE_DEFINED__
+    ID3D12Device10* GetDevice10() const { return m_Device10; }
+#endif
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+    ID3D12Device12* GetDevice12() const { return m_Device12; }
+#endif
     // Shortcut for "Allocation Callbacks", because this function is called so often.
     const ALLOCATION_CALLBACKS& GetAllocs() const { return m_AllocationCallbacks; }
     const D3D12_FEATURE_DATA_D3D12_OPTIONS& GetD3D12Options() const { return m_D3D12Options; }
@@ -6050,6 +6056,9 @@ private:
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     ID3D12Device10* m_Device10 = NULL;  // AddRef, optional
 #endif
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+    ID3D12Device12* m_Device12 = NULL;  // AddRef, optional
+#endif
     IDXGIAdapter* m_Adapter; // AddRef
 #if D3D12MA_DXGI_1_4
     IDXGIAdapter3* m_Adapter3 = NULL; // AddRef, optional
@@ -6109,12 +6118,26 @@ private:
     HRESULT UpdateD3D12Budget();
     
     D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC& resourceDesc) const;
+    HRESULT GetResourceAllocationInfoMiddle(D3D12_RESOURCE_DESC& inOutResourceDesc,
+        UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
+        D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const;
+
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC1& resourceDesc) const;
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo2Native(const D3D12_RESOURCE_DESC1& resourceDesc) const;
+    HRESULT GetResourceAllocationInfoMiddle(D3D12_RESOURCE_DESC1& inOutResourceDesc,
+        UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
+        D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const;
+#endif
+
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo3Native(const D3D12_RESOURCE_DESC1& resourceDesc,
+        UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats) const;
 #endif
 
     template<typename D3D12_RESOURCE_DESC_T>
-    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const;
+    HRESULT GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc,
+        UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
+        D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const;
 
     bool NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size);
 
@@ -6184,6 +6207,10 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device10));
+#endif
+
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+    m_Device->QueryInterface(D3D12MA_IID_PPV_ARGS(&m_Device12));
 #endif
 
     HRESULT hr = m_Adapter->GetDesc(&m_AdapterDesc);
@@ -6258,6 +6285,9 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
 
 AllocatorPimpl::~AllocatorPimpl()
 {
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+    SAFE_RELEASE(m_Device12);
+#endif
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     SAFE_RELEASE(m_Device10);
 #endif
@@ -6354,12 +6384,15 @@ HRESULT AllocatorPimpl::CreatePlacedResourceWrap(
         {
             return E_NOINTERFACE;
         }
+        // Microsoft defined pCastableFormats parameter as pointer to non-const and only fixed it in later Agility SDK,
+        // thus we need const_cast.
         return m_Device10->CreatePlacedResource2(pHeap, HeapOffset,
             createParams.GetResourceDesc1(), createParams.GetInitialLayout(),
             createParams.GetOptimizedClearValue(), createParams.GetNumCastableFormats(),
-            createParams.GetCastableFormats(), riidResource, ppvResource);
-    } else
+            const_cast<DXGI_FORMAT*>(createParams.GetCastableFormats()), riidResource, ppvResource);
+    }
 #endif
+
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
@@ -6370,21 +6403,19 @@ HRESULT AllocatorPimpl::CreatePlacedResourceWrap(
         return m_Device8->CreatePlacedResource1(pHeap, HeapOffset,
             createParams.GetResourceDesc1(), createParams.GetInitialResourceState(),
             createParams.GetOptimizedClearValue(), riidResource, ppvResource);
-    } else 
+    }
 #endif
+
     if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE)
     {
         return m_Device->CreatePlacedResource(pHeap, HeapOffset,
             createParams.GetResourceDesc(), createParams.GetInitialResourceState(),
             createParams.GetOptimizedClearValue(), riidResource, ppvResource);
     }
-    else
-    {
-        D3D12MA_ASSERT(0);
-        return E_INVALIDARG;
-    }
-}
 
+    D3D12MA_ASSERT(0);
+    return E_INVALIDARG;
+}
 
 HRESULT AllocatorPimpl::CreateResource(
     const ALLOCATION_DESC* pAllocDesc,
@@ -6401,6 +6432,7 @@ HRESULT AllocatorPimpl::CreateResource(
         *ppvResource = NULL;
     }
 
+    HRESULT hr = E_NOINTERFACE;
     CREATE_RESOURCE_PARAMS finalCreateParams = createParams;
     D3D12_RESOURCE_DESC finalResourceDesc;
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
@@ -6411,45 +6443,49 @@ HRESULT AllocatorPimpl::CreateResource(
     {
         finalResourceDesc = *createParams.GetResourceDesc();
         finalCreateParams.AccessResourceDesc() = &finalResourceDesc;
-        resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
+        hr = GetResourceAllocationInfo(finalResourceDesc, 0, NULL, resAllocInfo);
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
-        if (!m_Device8)
+        if (m_Device8 != NULL)
         {
-            return E_NOINTERFACE;
+            finalResourceDesc1 = *createParams.GetResourceDesc1();
+            finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
+            hr = GetResourceAllocationInfo(finalResourceDesc1, 0, NULL, resAllocInfo);
         }
-        finalResourceDesc1 = *createParams.GetResourceDesc1();
-        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
-        resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
     {
-        if (!m_Device10)
+        if (m_Device10 != NULL)
         {
-            return E_NOINTERFACE;
+            finalResourceDesc1 = *createParams.GetResourceDesc1();
+            finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
+            hr = GetResourceAllocationInfo(finalResourceDesc1,
+                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(), resAllocInfo);
         }
-        finalResourceDesc1 = *createParams.GetResourceDesc1();
-        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
-        resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
     else
     {
         D3D12MA_ASSERT(0);
-        return E_INVALIDARG;
+        hr = E_INVALIDARG;
     }
+
+    if (FAILED(hr))
+        return hr;
+
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
+    // We've seen UINT64_MAX returned when the call to GetResourceAllocationInfo was invalid.
+    D3D12MA_ASSERT(resAllocInfo.SizeInBytes != UINT64_MAX);
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
     BlockVector* blockVector = NULL;
     CommittedAllocationParameters committedAllocationParams = {};
     bool preferCommitted = false;
     
-    HRESULT hr;
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     if (createParams.Variant >= CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
@@ -6545,6 +6581,7 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
 {
     *ppvResource = NULL;
 
+    HRESULT hr = E_NOINTERFACE;
     CREATE_RESOURCE_PARAMS finalCreateParams = createParams;
     D3D12_RESOURCE_DESC finalResourceDesc;
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
@@ -6555,37 +6592,40 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
     {
         finalResourceDesc = *createParams.GetResourceDesc();
         finalCreateParams.AccessResourceDesc() = &finalResourceDesc;
-        resAllocInfo = GetResourceAllocationInfo(finalResourceDesc);
+        hr = GetResourceAllocationInfo(finalResourceDesc, 0, NULL, resAllocInfo);
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
-        if (!m_Device8)
+        if (m_Device8 != NULL)
         {
-            return E_NOINTERFACE;
+            finalResourceDesc1 = *createParams.GetResourceDesc1();
+            finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
+            hr = GetResourceAllocationInfo(finalResourceDesc1, 0, NULL, resAllocInfo);
         }
-        finalResourceDesc1 = *createParams.GetResourceDesc1();
-        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
-        resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_LAYOUT)
     {
-        if (!m_Device10)
+        if (m_Device10 != NULL)
         {
-            return E_NOINTERFACE;
+            finalResourceDesc1 = *createParams.GetResourceDesc1();
+            finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
+            hr = GetResourceAllocationInfo(finalResourceDesc1,
+                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(), resAllocInfo);
         }
-        finalResourceDesc1 = *createParams.GetResourceDesc1();
-        finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
-        resAllocInfo = GetResourceAllocationInfo(finalResourceDesc1);
     }
 #endif
     else
     {
         D3D12MA_ASSERT(0);
-        return E_INVALIDARG;
+        hr = E_INVALIDARG;
     }
+
+    if (FAILED(hr))
+        return hr;
+
     D3D12MA_ASSERT(IsPow2(resAllocInfo.Alignment));
     D3D12MA_ASSERT(resAllocInfo.SizeInBytes > 0);
 
@@ -7283,12 +7323,15 @@ HRESULT AllocatorPimpl::AllocateCommittedResource(
         {
             return E_NOINTERFACE;
         }
+
+        // Microsoft defined pCastableFormats parameter as pointer to non-const and only fixed it in later Agility SDK,
+        // thus we need const_cast.
         hr = m_Device10->CreateCommittedResource3(
                 &committedAllocParams.m_HeapProperties,
                 committedAllocParams.m_HeapFlags & ~RESOURCE_CLASS_HEAP_FLAGS,
                 createParams.GetResourceDesc1(), createParams.GetInitialLayout(),
                 createParams.GetOptimizedClearValue(), committedAllocParams.m_ProtectedSession,
-                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(),
+                createParams.GetNumCastableFormats(), const_cast<DXGI_FORMAT*>(createParams.GetCastableFormats()),
                 D3D12MA_IID_PPV_ARGS(&res));
     } else
 #endif
@@ -7628,7 +7671,7 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(c
 }
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
-D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(const D3D12_RESOURCE_DESC1& resourceDesc) const
+D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo2Native(const D3D12_RESOURCE_DESC1& resourceDesc) const
 {
     D3D12MA_ASSERT(m_Device8 != NULL);
     D3D12_RESOURCE_ALLOCATION_INFO1 info1Unused;
@@ -7644,8 +7687,71 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfoNative(c
 }
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
 
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo3Native(const D3D12_RESOURCE_DESC1& resourceDesc,
+    UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats) const
+{
+    D3D12MA_ASSERT(m_Device12 != NULL);
+    D3D12_RESOURCE_ALLOCATION_INFO1 info1Unused;
+
+    // This is how new D3D12 headers define GetResourceAllocationInfo function -
+    // different signature depending on these macros.
+#if defined(_MSC_VER) || !defined(_WIN32)
+    return m_Device12->GetResourceAllocationInfo3(0, 1, &resourceDesc,
+        &NumCastableFormats, &pCastableFormats, &info1Unused);
+#else
+    D3D12_RESOURCE_ALLOCATION_INFO retVal;
+    return *m_Device12->GetResourceAllocationInfo3(&retVal, 0, 1, &resourceDesc,
+        &NumCastableFormats, &pCastableFormats, &info1Unused);
+#endif
+}
+#endif // #ifdef __ID3D12Device12_INTERFACE_DEFINED__
+
+HRESULT AllocatorPimpl::GetResourceAllocationInfoMiddle(
+    D3D12_RESOURCE_DESC& inOutResourceDesc,
+    UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
+    D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const
+{
+    if (NumCastableFormats > 0)
+    {
+        return E_NOTIMPL;
+    }
+    
+    outAllocInfo = GetResourceAllocationInfoNative(inOutResourceDesc);
+    return S_OK;
+}
+
+#ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
+HRESULT AllocatorPimpl::GetResourceAllocationInfoMiddle(
+    D3D12_RESOURCE_DESC1& inOutResourceDesc,
+    UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
+    D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const
+{
+    if (NumCastableFormats > 0)
+    {
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+        if (m_Device12 != NULL)
+        {
+            outAllocInfo = GetResourceAllocationInfo3Native(inOutResourceDesc, NumCastableFormats, pCastableFormats);
+            return S_OK;
+        }
+#else
+        return E_NOTIMPL;
+#endif
+    }
+
+    outAllocInfo = GetResourceAllocationInfo2Native(inOutResourceDesc);
+    return S_OK;
+}
+
+#endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
+
 template<typename D3D12_RESOURCE_DESC_T>
-D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc) const
+HRESULT AllocatorPimpl::GetResourceAllocationInfo(
+    D3D12_RESOURCE_DESC_T& inOutResourceDesc,
+    UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
+    D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const
 {
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
     /* Optional optimization: Microsoft documentation says:
@@ -7659,11 +7765,14 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
     if (inOutResourceDesc.Alignment == 0 &&
         inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
     {
-        return {
+        outAllocInfo = {
             AlignUp<UINT64>(inOutResourceDesc.Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT), // SizeInBytes
             D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT }; // Alignment
+        return S_OK;
     }
 #endif // #ifdef __ID3D12Device1_INTERFACE_DEFINED__
+
+    HRESULT hr = S_OK;
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
     if (inOutResourceDesc.Alignment == 0 &&
@@ -7682,17 +7791,19 @@ D3D12_RESOURCE_ALLOCATION_INFO AllocatorPimpl::GetResourceAllocationInfo(D3D12_R
             D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT :
             D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
         inOutResourceDesc.Alignment = smallAlignmentToTry;
-        const D3D12_RESOURCE_ALLOCATION_INFO smallAllocInfo = GetResourceAllocationInfoNative(inOutResourceDesc);
+        hr = GetResourceAllocationInfoMiddle(
+            inOutResourceDesc, NumCastableFormats, pCastableFormats, outAllocInfo);
         // Check if alignment requested has been granted.
-        if (smallAllocInfo.Alignment == smallAlignmentToTry)
+        if (SUCCEEDED(hr) && outAllocInfo.Alignment == smallAlignmentToTry)
         {
-            return smallAllocInfo;
+            return S_OK;
         }
         inOutResourceDesc.Alignment = 0; // Restore original
     }
 #endif // #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
 
-    return GetResourceAllocationInfoNative(inOutResourceDesc);
+    return GetResourceAllocationInfoMiddle(
+        inOutResourceDesc, NumCastableFormats, pCastableFormats, outAllocInfo);
 }
 
 bool AllocatorPimpl::NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size)
@@ -9639,7 +9750,7 @@ HRESULT Allocator::CreateResource3(
     D3D12_BARRIER_LAYOUT InitialLayout,
     const D3D12_CLEAR_VALUE* pOptimizedClearValue,
     UINT32 NumCastableFormats,
-    DXGI_FORMAT* pCastableFormats,
+    const DXGI_FORMAT* pCastableFormats,
     Allocation** ppAllocation,
     REFIID riidResource,
     void** ppvResource)
@@ -9729,7 +9840,7 @@ HRESULT Allocator::CreateAliasingResource2(
     D3D12_BARRIER_LAYOUT InitialLayout,
     const D3D12_CLEAR_VALUE* pOptimizedClearValue,
     UINT32 NumCastableFormats,
-    DXGI_FORMAT* pCastableFormats,
+    const DXGI_FORMAT* pCastableFormats,
     REFIID riidResource,
     void** ppvResource)
 {

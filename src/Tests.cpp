@@ -2899,6 +2899,44 @@ static void TestDevice10(const TestContext& ctx)
 }
 #endif // #ifdef __ID3D12Device10_INTERFACE_DEFINED__
 
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+static void TestDevice12(const TestContext& ctx)
+{
+    wprintf(L"Test ID3D12Device12\n");
+
+    ComPtr<ID3D12Device12> dev12;
+    if (FAILED(ctx.device->QueryInterface(IID_PPV_ARGS(&dev12))))
+    {
+        wprintf(L"QueryInterface for ID3D12Device12 failed!\n");
+        return;
+    }
+
+    // Texture based on Issue #62.
+    D3D12_RESOURCE_DESC1 resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Width = 1920;
+    resourceDesc.Height = 1080;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_BC3_UNORM;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+    const DXGI_FORMAT castableFormats[] = { DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_FORMAT_BC3_UNORM_SRGB };
+
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
+
+    ComPtr<D3D12MA::Allocation> alloc0;
+    ComPtr<ID3D12Resource> res0;
+    CHECK_HR(ctx.allocator->CreateResource3(&allocDesc, &resourceDesc,
+        D3D12_BARRIER_LAYOUT_UNDEFINED, NULL,
+        _countof(castableFormats), castableFormats,
+        &alloc0, IID_PPV_ARGS(&res0)));
+    CHECK_BOOL(alloc0 && res0);
+}
+#endif // #ifdef __ID3D12Device12_INTERFACE_DEFINED__
+
 static void TestGPUUploadHeap(const TestContext& ctx)
 {
 #if D3D12_SDK_VERSION >= 610
@@ -4324,6 +4362,9 @@ static void TestGroupBasics(const TestContext& ctx)
 #endif
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     TestDevice10(ctx);
+#endif
+#ifdef __ID3D12Device12_INTERFACE_DEFINED__
+    TestDevice12(ctx);
 #endif
 
     TestGPUUploadHeap(ctx);

@@ -1268,13 +1268,14 @@ public:
     It internally uses `ID3D12Device10::CreateCommittedResource3` or `ID3D12Device10::CreatePlacedResource2`.
 
     To work correctly, `ID3D12Device10` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    If you use `pCastableFormats`, `ID3D12Device12` must albo be available.
     */
     HRESULT CreateResource3(const ALLOCATION_DESC* pAllocDesc,
         const D3D12_RESOURCE_DESC1* pResourceDesc,
         D3D12_BARRIER_LAYOUT InitialLayout,
         const D3D12_CLEAR_VALUE* pOptimizedClearValue,
         UINT32 NumCastableFormats,
-        DXGI_FORMAT* pCastableFormats,
+        const DXGI_FORMAT* pCastableFormats,
         Allocation** ppAllocation,
         REFIID riidResource,
         void** ppvResource);
@@ -1353,11 +1354,12 @@ public:
 
 #ifdef __ID3D12Device10_INTERFACE_DEFINED__
     /** \brief Similar to Allocator::CreateAliasingResource1, but there are initial layout instead of state and 
-    castable formats list
+    castable formats list.
 
     It internally uses `ID3D12Device10::CreatePlacedResource2`.
 
     To work correctly, `ID3D12Device10` interface must be available in the current system. Otherwise, `E_NOINTERFACE` is returned.
+    If you use `pCastableFormats`, `ID3D12Device12` must albo be available.
     */
     HRESULT CreateAliasingResource2(Allocation* pAllocation,
         UINT64 AllocationLocalOffset,
@@ -1365,7 +1367,7 @@ public:
         D3D12_BARRIER_LAYOUT InitialLayout,
         const D3D12_CLEAR_VALUE* pOptimizedClearValue,
         UINT32 NumCastableFormats,
-        DXGI_FORMAT* pCastableFormats,
+        const DXGI_FORMAT* pCastableFormats,
         REFIID riidResource,
         void** ppvResource);
 #endif  // #ifdef __ID3D12Device10_INTERFACE_DEFINED__
