@@ -5746,29 +5746,31 @@ HRESULT CurrentBudgetData::UpdateBudget(IDXGIAdapter3* adapter3, bool useMutex)
     DXGI_QUERY_VIDEO_MEMORY_INFO infoLocal = {};
     DXGI_QUERY_VIDEO_MEMORY_INFO infoNonLocal = {};
     const HRESULT hrLocal = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &infoLocal);
+    if (FAILED(hrLocal))
+    {
+        return hrLocal;
+    }
     const HRESULT hrNonLocal = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &infoNonLocal);
+    if (FAILED(hrNonLocal))
+    {
+        return hrNonLocal;
+    }
 
-    if (SUCCEEDED(hrLocal) || SUCCEEDED(hrNonLocal))
     {
         MutexLockWrite lockWrite(m_BudgetMutex, useMutex);
 
-        if (SUCCEEDED(hrLocal))
-        {
-            m_D3D12Usage[0] = infoLocal.CurrentUsage;
-            m_D3D12Budget[0] = infoLocal.Budget;
-        }
-        if (SUCCEEDED(hrNonLocal))
-        {
-            m_D3D12Usage[1] = infoNonLocal.CurrentUsage;
-            m_D3D12Budget[1] = infoNonLocal.Budget;
-        }
+        m_D3D12Usage[0] = infoLocal.CurrentUsage;
+        m_D3D12Budget[0] = infoLocal.Budget;
+
+        m_D3D12Usage[1] = infoNonLocal.CurrentUsage;
+        m_D3D12Budget[1] = infoNonLocal.Budget;
 
         m_BlockBytesAtD3D12Fetch[0] = m_BlockBytes[0];
         m_BlockBytesAtD3D12Fetch[1] = m_BlockBytes[1];
         m_OperationsSinceBudgetFetch = 0;
     }
 
-    return FAILED(hrLocal) ? hrLocal : hrNonLocal;
+    return S_OK;
 }
 #endif // #if D3D12MA_DXGI_1_4
 
@@ -6851,26 +6853,27 @@ void AllocatorPimpl::GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget
                 outLocalBudget ? &outLocalBudget->BudgetBytes : NULL,
                 outNonLocalBudget ? &outNonLocalBudget->UsageBytes : NULL,
                 outNonLocalBudget ? &outNonLocalBudget->BudgetBytes : NULL);
+            return;
         }
-        else
+
+        if (SUCCEEDED(UpdateD3D12Budget()))
         {
-            UpdateD3D12Budget();
-            GetBudget(outLocalBudget, outNonLocalBudget); // Recursion
+            GetBudget(outLocalBudget, outNonLocalBudget); // Recursion.
+            return;
         }
     }
-    else
 #endif
+
+    // Fallback path - manual calculation, not real budget.
+    if (outLocalBudget)
     {
-        if (outLocalBudget)
-        {
-            outLocalBudget->UsageBytes = outLocalBudget->Stats.BlockBytes;
-            outLocalBudget->BudgetBytes = GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY) * 8 / 10; // 80% heuristics.
-        }
-        if (outNonLocalBudget)
-        {
-            outNonLocalBudget->UsageBytes = outNonLocalBudget->Stats.BlockBytes;
-            outNonLocalBudget->BudgetBytes = GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY) * 8 / 10; // 80% heuristics.
-        }
+        outLocalBudget->UsageBytes = outLocalBudget->Stats.BlockBytes;
+        outLocalBudget->BudgetBytes = GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY) * 8 / 10; // 80% heuristics.
+    }
+    if (outNonLocalBudget)
+    {
+        outNonLocalBudget->UsageBytes = outNonLocalBudget->Stats.BlockBytes;
+        outNonLocalBudget->BudgetBytes = GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL_COPY) * 8 / 10; // 80% heuristics.
     }
 }
 
