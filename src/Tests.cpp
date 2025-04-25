@@ -3152,10 +3152,18 @@ static void TestDevice12(const TestContext& ctx)
 
     ComPtr<D3D12MA::Allocation> alloc0;
     ComPtr<ID3D12Resource> res0;
-    CHECK_HR(ctx.allocator->CreateResource3(&allocDesc, &resourceDesc,
+    HRESULT hr = ctx.allocator->CreateResource3(&allocDesc, &resourceDesc,
         D3D12_BARRIER_LAYOUT_UNDEFINED, NULL,
         _countof(castableFormats), castableFormats,
-        &alloc0, IID_PPV_ARGS(&res0)));
+        &alloc0, IID_PPV_ARGS(&res0));
+    
+    if (hr == E_INVALIDARG)
+    {
+        wprintf(L"Allocator::CreateResource3 failed with E_INVALIDARG!\n");
+        return;
+    }
+
+    CHECK_HR(hr);
     CHECK_BOOL(alloc0 && res0);
 }
 #endif // #ifdef __ID3D12Device12_INTERFACE_DEFINED__

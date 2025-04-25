@@ -7722,7 +7722,7 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfoMiddle(
     }
     
     outAllocInfo = GetResourceAllocationInfoNative(inOutResourceDesc);
-    return S_OK;
+    return outAllocInfo.SizeInBytes != UINT64_MAX ? S_OK : E_INVALIDARG;
 }
 
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
@@ -7738,7 +7738,7 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfoMiddle(
         if (m_Device12 != NULL)
         {
             outAllocInfo = GetResourceAllocationInfo3Native(inOutResourceDesc, NumCastableFormats, pCastableFormats);
-            return S_OK;
+            return outAllocInfo.SizeInBytes != UINT64_MAX ? S_OK : E_INVALIDARG;
         }
 #else
         return E_NOTIMPL;
@@ -7746,7 +7746,7 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfoMiddle(
     }
 
     outAllocInfo = GetResourceAllocationInfo2Native(inOutResourceDesc);
-    return S_OK;
+    return outAllocInfo.SizeInBytes != UINT64_MAX ? S_OK : E_INVALIDARG;
 }
 
 #endif // #ifdef __ID3D12Device8_INTERFACE_DEFINED__
