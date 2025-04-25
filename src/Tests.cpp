@@ -1365,83 +1365,193 @@ static void TestCustomPool_AlwaysCommitted(const TestContext& ctx)
     CHECK_BOOL(detailedStats.UnusedRangeSizeMax == 0);
 }
 
-static HRESULT TestCustomHeap(const TestContext& ctx, const D3D12_HEAP_PROPERTIES& heapProps)
+static void CheckBudgetBasics(const TestContext& ctx,
+    const D3D12MA::Budget& localBudget, const D3D12MA::Budget& nonLocalBudget)
 {
-    D3D12MA::TotalStatistics globalStatsBeg = {};
-    ctx.allocator->CalculateStatistics(&globalStatsBeg);
+    CHECK_BOOL(localBudget.BudgetBytes > 0);
+    CHECK_BOOL(localBudget.BudgetBytes <= ctx.allocator->GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL));
+    CHECK_BOOL(localBudget.Stats.AllocationBytes <= localBudget.Stats.BlockBytes);
 
-    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
-        heapProps,
-        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
-        D3D12MA::POOL_FLAG_NONE,
-        10 * MEGABYTE, // blockSize
-        1, // minBlockCount
-        1 }; // maxBlockCount
-
-    const UINT64 BUFFER_SIZE = 1 * MEGABYTE;
-
-    ComPtr<D3D12MA::Pool> pool;
-    HRESULT hr = ctx.allocator->CreatePool(&poolDesc, &pool);
-    if(SUCCEEDED(hr))
+    // Discrete graphics card with separate video memory.
+    if (!ctx.allocator->IsUMA())
     {
-        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
-
-        D3D12_RESOURCE_DESC resDesc;
-        FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
-
-        // Pool already allocated a block. We don't expect CreatePlacedResource to fail.
-        ComPtr<D3D12MA::Allocation> alloc;
-        CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            NULL, // pOptimizedClearValue
-            &alloc,
-            __uuidof(ID3D12Resource), NULL) ); // riidResource, ppvResource
-
-        D3D12MA::TotalStatistics globalStatsCurr = {};
-        ctx.allocator->CalculateStatistics(&globalStatsCurr);
-
-        // Make sure it is accounted only in CUSTOM heap not any of the standard heaps.
-        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[0], &globalStatsBeg.HeapType[0], sizeof(D3D12MA::DetailedStatistics)) == 0);
-        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[1], &globalStatsBeg.HeapType[1], sizeof(D3D12MA::DetailedStatistics)) == 0);
-        CHECK_BOOL(memcmp(&globalStatsCurr.HeapType[2], &globalStatsBeg.HeapType[2], sizeof(D3D12MA::DetailedStatistics)) == 0);
-        CHECK_BOOL( globalStatsCurr.HeapType[3].Stats.AllocationCount == globalStatsBeg.HeapType[3].Stats.AllocationCount + 1 );
-        CHECK_BOOL( globalStatsCurr.HeapType[3].Stats.BlockCount == globalStatsBeg.HeapType[3].Stats.BlockCount + 1 );
-        CHECK_BOOL( globalStatsCurr.HeapType[3].Stats.AllocationBytes == globalStatsBeg.HeapType[3].Stats.AllocationBytes + BUFFER_SIZE );
-        CHECK_BOOL( globalStatsCurr.Total.Stats.AllocationCount == globalStatsBeg.Total.Stats.AllocationCount + 1 );
-        CHECK_BOOL( globalStatsCurr.Total.Stats.BlockCount == globalStatsBeg.Total.Stats.BlockCount + 1 );
-        CHECK_BOOL( globalStatsCurr.Total.Stats.AllocationBytes == globalStatsBeg.Total.Stats.AllocationBytes + BUFFER_SIZE );
-
-        // Map and write some data.
-        if(heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE ||
-            heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_BACK)
-        {
-            ID3D12Resource* const res = alloc->GetResource();
-
-            UINT* mappedPtr = nullptr;
-            const D3D12_RANGE readRange = {0, 0};
-            CHECK_HR(res->Map(0, &readRange, (void**)&mappedPtr));
-            
-            *mappedPtr = 0xDEADC0DE;
-            
-            res->Unmap(0, nullptr);
-        }
+        CHECK_BOOL(nonLocalBudget.BudgetBytes > 0);
+        CHECK_BOOL(nonLocalBudget.BudgetBytes <= ctx.allocator->GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL));
+        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes <= nonLocalBudget.Stats.BlockBytes);
     }
+}
 
-    return hr;
+static D3D12MA::DetailedStatistics GetEmptyDetailedStatistics()
+{
+    D3D12MA::DetailedStatistics out = {};
+    out.AllocationSizeMin = UINT64_MAX;
+    out.UnusedRangeSizeMin = UINT64_MAX;
+    return out;
+}
+
+static void AddDetailedStatistics(D3D12MA::DetailedStatistics& inoutSum, const D3D12MA::DetailedStatistics& stats)
+{
+    inoutSum.Stats.AllocationBytes += stats.Stats.AllocationBytes;
+    inoutSum.Stats.AllocationCount += stats.Stats.AllocationCount;
+    inoutSum.Stats.BlockBytes += stats.Stats.BlockBytes;
+    inoutSum.Stats.BlockCount += stats.Stats.BlockCount;
+    inoutSum.UnusedRangeCount += stats.UnusedRangeCount;
+    inoutSum.AllocationSizeMax = std::max(inoutSum.AllocationSizeMax, stats.AllocationSizeMax);
+    inoutSum.AllocationSizeMin = std::min(inoutSum.AllocationSizeMin, stats.AllocationSizeMin);
+    inoutSum.UnusedRangeSizeMax = std::max(inoutSum.UnusedRangeSizeMax, stats.UnusedRangeSizeMax);
+    inoutSum.UnusedRangeSizeMin = std::min(inoutSum.UnusedRangeSizeMin, stats.UnusedRangeSizeMin);
+}
+
+static inline bool StatisticsEqual(const D3D12MA::DetailedStatistics& lhs, const D3D12MA::DetailedStatistics& rhs)
+{
+    return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
+}
+
+static inline bool StatisticsEqual(const D3D12MA::Statistics& lhs, const D3D12MA::Statistics& rhs)
+{
+    return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
+}
+
+static void CheckStatistics(const D3D12MA::DetailedStatistics& stats)
+{
+    CHECK_BOOL(stats.Stats.AllocationBytes <= stats.Stats.BlockBytes);
+    if (stats.Stats.AllocationBytes > 0)
+    {
+        CHECK_BOOL(stats.Stats.AllocationCount > 0);
+        CHECK_BOOL(stats.AllocationSizeMin <= stats.AllocationSizeMax);
+    }
+    if (stats.UnusedRangeCount > 0)
+    {
+        CHECK_BOOL(stats.UnusedRangeSizeMax > 0);
+        CHECK_BOOL(stats.UnusedRangeSizeMin <= stats.UnusedRangeSizeMax);
+    }
+}
+
+static void CheckTotalStatistics(const D3D12MA::TotalStatistics& stats)
+{
+    D3D12MA::DetailedStatistics sum = GetEmptyDetailedStatistics();
+    for (size_t i = 0; i < _countof(stats.HeapType); ++i)
+    {
+        AddDetailedStatistics(sum, stats.HeapType[i]);
+    }
+    CHECK_BOOL(StatisticsEqual(sum, stats.Total));
+
+    sum = GetEmptyDetailedStatistics();
+    for (size_t i = 0; i < _countof(stats.MemorySegmentGroup); ++i)
+    {
+        AddDetailedStatistics(sum, stats.MemorySegmentGroup[i]);
+    }
+    CHECK_BOOL(StatisticsEqual(sum, stats.Total));
 }
 
 static void TestCustomHeaps(const TestContext& ctx)
 {
+    using namespace D3D12MA;
+
     wprintf(L"Test custom heap\n");
 
-    D3D12_HEAP_PROPERTIES heapProps = {};
-
     // Use custom pool but the same as READBACK, which should be always available.
+    D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = D3D12_HEAP_TYPE_CUSTOM;
     heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
     heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_L0; // System memory
-    HRESULT hr = TestCustomHeap(ctx, heapProps);
-    CHECK_HR(hr);
+
+    const UINT64 BUFFER_SIZE = 1 * MEGABYTE;
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, BUFFER_SIZE);
+
+    Budget localBudgetBeg = {}, nonLocalBudgetBeg = {};
+    ctx.allocator->GetBudget(&localBudgetBeg, &nonLocalBudgetBeg);
+    CheckBudgetBasics(ctx, localBudgetBeg, nonLocalBudgetBeg);
+
+    TotalStatistics globalStatsBeg = {};
+    ctx.allocator->CalculateStatistics(&globalStatsBeg);
+    CheckTotalStatistics(globalStatsBeg);
+
+    // Test 0: Custom pool with fixed block size (it must end up as placed).
+    // Test 1: Custom pool, requested committed.
+
+    for (size_t testIndex = 0; testIndex < 2; ++testIndex)
+    {
+        const bool requestCommitted = testIndex == 1;
+
+        POOL_DESC poolDesc = CPOOL_DESC{ heapProps, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
+        if (testIndex == 0)
+        {
+            poolDesc.BlockSize = 10 * MEGABYTE;
+            poolDesc.MinBlockCount = 1;
+            poolDesc.MaxBlockCount = 1;
+        }
+        ComPtr<Pool> pool;
+        CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+        ALLOCATION_DESC allocDesc = CALLOCATION_DESC{ pool.Get() };
+        if (requestCommitted)
+        {
+            allocDesc.Flags = ALLOCATION_FLAG_COMMITTED;
+        }
+
+        ComPtr<Allocation> alloc;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+            D3D12_RESOURCE_STATE_COMMON, NULL, &alloc, IID_NULL, NULL));
+
+        const bool isCommitted = alloc->GetHeap() == NULL;
+        CHECK_BOOL(isCommitted == requestCommitted);
+
+        Budget localBudgetEnd = {}, nonLocalBudgetEnd = {};
+        ctx.allocator->GetBudget(&localBudgetEnd, &nonLocalBudgetEnd);
+        CheckBudgetBasics(ctx, localBudgetEnd, nonLocalBudgetEnd);
+
+        D3D12MA::TotalStatistics globalStatsEnd = {};
+        ctx.allocator->CalculateStatistics(&globalStatsEnd);
+        CheckTotalStatistics(globalStatsEnd);
+
+        // Make sure it is accounted only in CUSTOM heap not any of the standard heaps.
+        
+        const UINT thisMemSegmentGroupIndex = ctx.allocator->IsUMA() ? 0 : 1;
+        const UINT otherMemSegmentGroupIndex = 1 - thisMemSegmentGroupIndex;
+
+        CHECK_BOOL(globalStatsEnd.Total.Stats.AllocationCount == globalStatsBeg.Total.Stats.AllocationCount + 1);
+        CHECK_BOOL(globalStatsEnd.Total.Stats.BlockCount == globalStatsBeg.Total.Stats.BlockCount + 1);
+        CHECK_BOOL(globalStatsEnd.Total.Stats.AllocationBytes == globalStatsBeg.Total.Stats.AllocationBytes + BUFFER_SIZE);
+
+        CHECK_BOOL(memcmp(&globalStatsEnd.HeapType[0], &globalStatsBeg.HeapType[0], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsEnd.HeapType[1], &globalStatsBeg.HeapType[1], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsEnd.HeapType[2], &globalStatsBeg.HeapType[2], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        CHECK_BOOL(memcmp(&globalStatsEnd.HeapType[4], &globalStatsBeg.HeapType[4], sizeof(D3D12MA::DetailedStatistics)) == 0);
+        
+        CHECK_BOOL(globalStatsEnd.HeapType[3].Stats.AllocationCount == globalStatsBeg.HeapType[3].Stats.AllocationCount + 1);
+        CHECK_BOOL(globalStatsEnd.HeapType[3].Stats.BlockCount == globalStatsBeg.HeapType[3].Stats.BlockCount + 1);
+        CHECK_BOOL(globalStatsEnd.HeapType[3].Stats.AllocationBytes == globalStatsBeg.HeapType[3].Stats.AllocationBytes + BUFFER_SIZE);
+        
+        CHECK_BOOL(globalStatsEnd.MemorySegmentGroup[thisMemSegmentGroupIndex].Stats.AllocationCount ==
+            globalStatsBeg.MemorySegmentGroup[thisMemSegmentGroupIndex].Stats.AllocationCount + 1);
+        CHECK_BOOL(globalStatsEnd.MemorySegmentGroup[thisMemSegmentGroupIndex].Stats.BlockCount ==
+            globalStatsBeg.MemorySegmentGroup[thisMemSegmentGroupIndex].Stats.BlockCount + 1);
+        CHECK_BOOL(globalStatsEnd.MemorySegmentGroup[thisMemSegmentGroupIndex].Stats.AllocationBytes ==
+            globalStatsBeg.MemorySegmentGroup[thisMemSegmentGroupIndex].Stats.AllocationBytes + BUFFER_SIZE);
+
+        CHECK_BOOL(memcmp(&globalStatsEnd.MemorySegmentGroup[otherMemSegmentGroupIndex],
+            &globalStatsBeg.MemorySegmentGroup[otherMemSegmentGroupIndex], sizeof(D3D12MA::DetailedStatistics)) == 0);
+
+        const Budget& thisBudgetBeg = ctx.allocator->IsUMA() ? localBudgetBeg : nonLocalBudgetBeg;
+        const Budget& thisBudgetEnd = ctx.allocator->IsUMA() ? localBudgetEnd : nonLocalBudgetEnd;
+
+        CHECK_BOOL(thisBudgetEnd.Stats.AllocationCount == thisBudgetBeg.Stats.AllocationCount + 1);
+        CHECK_BOOL(thisBudgetEnd.Stats.BlockCount == thisBudgetBeg.Stats.BlockCount + 1);
+        CHECK_BOOL(thisBudgetEnd.Stats.AllocationBytes == thisBudgetBeg.Stats.AllocationBytes + BUFFER_SIZE);
+
+        // Map and write some data.
+        if (heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE ||
+            heapProps.CPUPageProperty == D3D12_CPU_PAGE_PROPERTY_WRITE_BACK)
+        {
+            ID3D12Resource* const res = alloc->GetResource();
+            UINT* mappedPtr = nullptr;
+            CHECK_HR(res->Map(0, &EMPTY_RANGE, (void**)&mappedPtr));
+            *mappedPtr = 0xDEADC0DE;
+            res->Unmap(0, nullptr);
+        }
+    }
 }
 
 static void TestStandardCustomCommittedPlaced(const TestContext& ctx)
@@ -1692,85 +1802,6 @@ static void TestMapping(const TestContext& ctx)
             resources[i].resource->Unmap(0, NULL);
         }
     }
-}
-
-static inline bool StatisticsEqual(const D3D12MA::DetailedStatistics& lhs, const D3D12MA::DetailedStatistics& rhs)
-{
-    return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
-}
-
-static inline bool StatisticsEqual(const D3D12MA::Statistics& lhs, const D3D12MA::Statistics& rhs)
-{
-    return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
-}
-
-static void CheckStatistics(const D3D12MA::DetailedStatistics& stats)
-{
-    CHECK_BOOL(stats.Stats.AllocationBytes <= stats.Stats.BlockBytes);
-    if(stats.Stats.AllocationBytes > 0)
-    {
-        CHECK_BOOL(stats.Stats.AllocationCount > 0);
-        CHECK_BOOL(stats.AllocationSizeMin <= stats.AllocationSizeMax);
-    }
-    if(stats.UnusedRangeCount > 0)
-    {
-        CHECK_BOOL(stats.UnusedRangeSizeMax > 0);
-        CHECK_BOOL(stats.UnusedRangeSizeMin <= stats.UnusedRangeSizeMax);
-    }
-}
-
-static void CheckBudgetBasics(const TestContext& ctx,
-    const D3D12MA::Budget& localBudget, const D3D12MA::Budget& nonLocalBudget)
-{
-    CHECK_BOOL(localBudget.BudgetBytes > 0);
-    CHECK_BOOL(localBudget.BudgetBytes <= ctx.allocator->GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL));
-    CHECK_BOOL(localBudget.Stats.AllocationBytes <= localBudget.Stats.BlockBytes);
-
-    // Discrete graphics card with separate video memory.
-    if (!ctx.allocator->IsUMA())
-    {
-        CHECK_BOOL(nonLocalBudget.BudgetBytes > 0);
-        CHECK_BOOL(nonLocalBudget.BudgetBytes <= ctx.allocator->GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL));
-        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes <= nonLocalBudget.Stats.BlockBytes);
-    }
-}
-
-static D3D12MA::DetailedStatistics GetEmptyDetailedStatistics()
-{
-    D3D12MA::DetailedStatistics out = {};
-    out.AllocationSizeMin = UINT64_MAX;
-    out.UnusedRangeSizeMin = UINT64_MAX;
-    return out;
-}
-
-static void AddDetailedStatistics(D3D12MA::DetailedStatistics& inoutSum, const D3D12MA::DetailedStatistics& stats)
-{
-    inoutSum.Stats.AllocationBytes += stats.Stats.AllocationBytes;
-    inoutSum.Stats.AllocationCount += stats.Stats.AllocationCount;
-    inoutSum.Stats.BlockBytes += stats.Stats.BlockBytes;
-    inoutSum.Stats.BlockCount += stats.Stats.BlockCount;
-    inoutSum.UnusedRangeCount += stats.UnusedRangeCount;
-    inoutSum.AllocationSizeMax = std::max(inoutSum.AllocationSizeMax, stats.AllocationSizeMax);
-    inoutSum.AllocationSizeMin = std::min(inoutSum.AllocationSizeMin, stats.AllocationSizeMin);
-    inoutSum.UnusedRangeSizeMax = std::max(inoutSum.UnusedRangeSizeMax, stats.UnusedRangeSizeMax);
-    inoutSum.UnusedRangeSizeMin = std::min(inoutSum.UnusedRangeSizeMin, stats.UnusedRangeSizeMin);
-}
-
-static void CheckTotalStatistics(const D3D12MA::TotalStatistics& stats)
-{
-    D3D12MA::DetailedStatistics sum = GetEmptyDetailedStatistics();
-    for (size_t i = 0; i < _countof(stats.HeapType); ++i)
-    {
-        AddDetailedStatistics(sum, stats.HeapType[i]);
-    }
-    CHECK_BOOL(StatisticsEqual(sum, stats.Total));
-
-    sum = GetEmptyDetailedStatistics();
-    for (size_t i = 0; i < _countof(stats.MemorySegmentGroup); ++i)
-    {
-        AddDetailedStatistics(sum, stats.MemorySegmentGroup[i]);
-    }
-    CHECK_BOOL(StatisticsEqual(sum, stats.Total));
 }
 
 static void TestStats(const TestContext& ctx)
