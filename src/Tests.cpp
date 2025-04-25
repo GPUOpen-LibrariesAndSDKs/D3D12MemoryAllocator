@@ -1699,6 +1699,11 @@ static inline bool StatisticsEqual(const D3D12MA::DetailedStatistics& lhs, const
     return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
 }
 
+static inline bool StatisticsEqual(const D3D12MA::Statistics& lhs, const D3D12MA::Statistics& rhs)
+{
+    return memcmp(&lhs, &rhs, sizeof(lhs)) == 0;
+}
+
 static void CheckStatistics(const D3D12MA::DetailedStatistics& stats)
 {
     CHECK_BOOL(stats.Stats.AllocationBytes <= stats.Stats.BlockBytes);
@@ -1714,86 +1719,304 @@ static void CheckStatistics(const D3D12MA::DetailedStatistics& stats)
     }
 }
 
+static void CheckBudgetBasics(const TestContext& ctx,
+    const D3D12MA::Budget& localBudget, const D3D12MA::Budget& nonLocalBudget)
+{
+    CHECK_BOOL(localBudget.BudgetBytes > 0);
+    CHECK_BOOL(localBudget.BudgetBytes <= ctx.allocator->GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_LOCAL));
+    CHECK_BOOL(localBudget.Stats.AllocationBytes <= localBudget.Stats.BlockBytes);
+
+    // Discrete graphics card with separate video memory.
+    if (!ctx.allocator->IsUMA())
+    {
+        CHECK_BOOL(nonLocalBudget.BudgetBytes > 0);
+        CHECK_BOOL(nonLocalBudget.BudgetBytes <= ctx.allocator->GetMemoryCapacity(DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL));
+        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes <= nonLocalBudget.Stats.BlockBytes);
+    }
+}
+
+static D3D12MA::DetailedStatistics GetEmptyDetailedStatistics()
+{
+    D3D12MA::DetailedStatistics out = {};
+    out.AllocationSizeMin = UINT64_MAX;
+    out.UnusedRangeSizeMin = UINT64_MAX;
+    return out;
+}
+
+static void AddDetailedStatistics(D3D12MA::DetailedStatistics& inoutSum, const D3D12MA::DetailedStatistics& stats)
+{
+    inoutSum.Stats.AllocationBytes += stats.Stats.AllocationBytes;
+    inoutSum.Stats.AllocationCount += stats.Stats.AllocationCount;
+    inoutSum.Stats.BlockBytes += stats.Stats.BlockBytes;
+    inoutSum.Stats.BlockCount += stats.Stats.BlockCount;
+    inoutSum.UnusedRangeCount += stats.UnusedRangeCount;
+    inoutSum.AllocationSizeMax = std::max(inoutSum.AllocationSizeMax, stats.AllocationSizeMax);
+    inoutSum.AllocationSizeMin = std::min(inoutSum.AllocationSizeMin, stats.AllocationSizeMin);
+    inoutSum.UnusedRangeSizeMax = std::max(inoutSum.UnusedRangeSizeMax, stats.UnusedRangeSizeMax);
+    inoutSum.UnusedRangeSizeMin = std::min(inoutSum.UnusedRangeSizeMin, stats.UnusedRangeSizeMin);
+}
+
+static void CheckTotalStatistics(const D3D12MA::TotalStatistics& stats)
+{
+    D3D12MA::DetailedStatistics sum = GetEmptyDetailedStatistics();
+    for (size_t i = 0; i < _countof(stats.HeapType); ++i)
+    {
+        AddDetailedStatistics(sum, stats.HeapType[i]);
+    }
+    CHECK_BOOL(StatisticsEqual(sum, stats.Total));
+
+    sum = GetEmptyDetailedStatistics();
+    for (size_t i = 0; i < _countof(stats.MemorySegmentGroup); ++i)
+    {
+        AddDetailedStatistics(sum, stats.MemorySegmentGroup[i]);
+    }
+    CHECK_BOOL(StatisticsEqual(sum, stats.Total));
+}
+
 static void TestStats(const TestContext& ctx)
 {
+    using namespace D3D12MA;
+
     wprintf(L"Test stats\n");
 
-    D3D12MA::TotalStatistics begStats = {};
-    ctx.allocator->CalculateStatistics(&begStats);
+    constexpr UINT64 BUF_SIZE = 10 * MEGABYTE;
+    constexpr UINT32 BUF_COUNT = 4;
+    constexpr UINT64 PREALLOCATED_BLOCK_SIZE = BUF_SIZE * (BUF_COUNT + 1);
 
-    const UINT count = 10;
-    const UINT64 bufSize = 64ull * 1024;
-    ResourceWithAllocation resources[count];
-
-    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_UPLOAD };
-
-    D3D12_RESOURCE_DESC resourceDesc;
-    FillResourceDescForBuffer(resourceDesc, bufSize);
-
-    for(UINT i = 0; i < count; ++i)
+    /*
+    Test 0: ALLOCATION_FLAG_COMMITTED.
+    Test 1: normal allocations.
+    Test 2: allocations in a custom pool.
+    Test 3: allocations in a custom pool, COMMITTED.
+    Test 4: allocations in a custom pool with preallocated memory.
+    */
+    for (uint32_t testIndex = 0; testIndex < 5; ++testIndex)
     {
-        if(i == count / 2)
-            allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_COMMITTED;
-        CHECK_HR( ctx.allocator->CreateResource(
-            &allocDesc,
-            &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            NULL,
-            &resources[i].allocation,
-            IID_PPV_ARGS(&resources[i].resource)) );
-    }
+        const bool usePool = testIndex >= 2;
+        const bool useCommitted = testIndex == 0 || testIndex == 3;
+        const bool usePreallocated = testIndex == 4;
 
-    D3D12MA::TotalStatistics endStats = {};
-    ctx.allocator->CalculateStatistics(&endStats);
+        // Get stats "Beg".
+        Budget localBudgetBeg = {};
+        Budget nonLocalBudgetBeg = {};
+        ctx.allocator->GetBudget(&localBudgetBeg, &nonLocalBudgetBeg);
+        CheckBudgetBasics(ctx, localBudgetBeg, nonLocalBudgetBeg);
 
-    CHECK_BOOL(endStats.Total.Stats.BlockCount >= begStats.Total.Stats.BlockCount);
-    CHECK_BOOL(endStats.Total.Stats.AllocationCount == begStats.Total.Stats.AllocationCount + count);
-    CHECK_BOOL(endStats.Total.Stats.AllocationBytes == begStats.Total.Stats.AllocationBytes + count * bufSize);
-    CHECK_BOOL(endStats.Total.AllocationSizeMin <= bufSize);
-    CHECK_BOOL(endStats.Total.AllocationSizeMax >= bufSize);
+        TotalStatistics statsBeg = {};
+        ctx.allocator->CalculateStatistics(&statsBeg);
+        CheckTotalStatistics(statsBeg);
 
-    CHECK_BOOL(endStats.HeapType[1].Stats.BlockCount >= begStats.HeapType[1].Stats.BlockCount);
-    CHECK_BOOL(endStats.HeapType[1].Stats.AllocationCount >= begStats.HeapType[1].Stats.AllocationCount + count);
-    CHECK_BOOL(endStats.HeapType[1].Stats.AllocationBytes >= begStats.HeapType[1].Stats.AllocationBytes + count * bufSize);
-    CHECK_BOOL(endStats.HeapType[1].AllocationSizeMin <= bufSize);
-    CHECK_BOOL(endStats.HeapType[1].AllocationSizeMax >= bufSize);
+        // Create pool.
+        ComPtr<Pool> pool;
+        if (usePool)
+        {
+            POOL_DESC poolDesc = CPOOL_DESC(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS);
+            if (usePreallocated)
+            {
+                poolDesc.BlockSize = PREALLOCATED_BLOCK_SIZE;
+                poolDesc.MinBlockCount = 1;
+                poolDesc.MaxBlockCount = 1;
+            }
+            CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+        }
 
-    CHECK_BOOL(StatisticsEqual(begStats.HeapType[0], endStats.HeapType[0]));
-    CHECK_BOOL(StatisticsEqual(begStats.HeapType[2], endStats.HeapType[2]));
+        // Get pool stats "Beg".
+        Statistics poolStatsBeg = {};
+        DetailedStatistics detailedPoolStatsBeg = {};
+        if (usePool)
+        {
+            pool->GetStatistics(&poolStatsBeg);
+            pool->CalculateStatistics(&detailedPoolStatsBeg);
+            CheckStatistics(detailedPoolStatsBeg);
+        }
 
-    CheckStatistics(endStats.Total);
-    CheckStatistics(endStats.HeapType[0]);
-    CheckStatistics(endStats.HeapType[1]);
-    CheckStatistics(endStats.HeapType[2]);
+        // Create buffers.
+        D3D12_RESOURCE_DESC resDesc;
+        FillResourceDescForBuffer(resDesc, BUF_SIZE);
 
-    D3D12MA::Budget localBudget = {}, nonLocalBudget = {};
-    ctx.allocator->GetBudget(&localBudget, &nonLocalBudget);
+        ALLOCATION_DESC allocDesc = {};
+        if (usePool)
+            allocDesc = CALLOCATION_DESC(pool.Get());
+        else
+            allocDesc = CALLOCATION_DESC(D3D12_HEAP_TYPE_DEFAULT);
+        if (useCommitted)
+            allocDesc.Flags |= ALLOCATION_FLAG_COMMITTED;
 
-    CHECK_BOOL(localBudget.Stats.AllocationBytes <= localBudget.Stats.BlockBytes);
-    CHECK_BOOL(endStats.HeapType[3].Stats.BlockCount == 0); // No allocation from D3D12_HEAP_TYPE_CUSTOM in this test.
-    if(!ctx.allocator->IsUMA())
-    {
-        // Discrete GPU
-        CHECK_BOOL(localBudget.Stats.AllocationBytes == endStats.HeapType[0].Stats.AllocationBytes);
-        CHECK_BOOL(localBudget.Stats.BlockBytes == endStats.HeapType[0].Stats.BlockBytes);
-    
-        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes <= nonLocalBudget.Stats.BlockBytes);
-        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes == endStats.HeapType[1].Stats.AllocationBytes + endStats.HeapType[2].Stats.AllocationBytes);
-        CHECK_BOOL(nonLocalBudget.Stats.BlockBytes ==
-            endStats.HeapType[1].Stats.BlockBytes + endStats.HeapType[2].Stats.BlockBytes);
-    }
-    else
-    {
-        // Integrated GPU - all memory is local
-        CHECK_BOOL(localBudget.Stats.AllocationBytes == endStats.HeapType[0].Stats.AllocationBytes +
-            endStats.HeapType[1].Stats.AllocationBytes +
-            endStats.HeapType[2].Stats.AllocationBytes);
-        CHECK_BOOL(localBudget.Stats.BlockBytes == endStats.HeapType[0].Stats.BlockBytes +
-            endStats.HeapType[1].Stats.BlockBytes +
-            endStats.HeapType[2].Stats.BlockBytes);
+        ComPtr<Allocation> allocs[BUF_COUNT];
+        for (UINT i = 0; i < BUF_COUNT; ++i)
+        {
+            CHECK_HR(ctx.allocator->CreateResource(
+                &allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+                NULL, &allocs[i], IID_NULL, NULL));
+        }
 
-        CHECK_BOOL(nonLocalBudget.Stats.AllocationBytes == 0);
-        CHECK_BOOL(nonLocalBudget.Stats.BlockBytes == 0);
+        // Get stats "WithBufs".
+        Budget localBudgetWithBufs = {};
+        Budget nonLocalBudgetWithBufs = {};
+        ctx.allocator->GetBudget(&localBudgetWithBufs, &nonLocalBudgetWithBufs);
+        CheckBudgetBasics(ctx, localBudgetWithBufs, nonLocalBudgetWithBufs);
+
+        TotalStatistics statsWithBufs = {};
+        ctx.allocator->CalculateStatistics(&statsWithBufs);
+        CheckTotalStatistics(statsWithBufs);
+
+        Statistics poolStatsWithBufs = {};
+        DetailedStatistics detailedPoolStatsWithBufs = {};
+        if (usePool)
+        {
+            pool->GetStatistics(&poolStatsWithBufs);
+            pool->CalculateStatistics(&detailedPoolStatsWithBufs);
+            CheckStatistics(detailedPoolStatsWithBufs);
+        }
+
+        // Destroy buffers.
+        for (size_t i = BUF_COUNT; i--; )
+        {
+            allocs[i].Reset();
+        }
+
+        // Get pool stats "End".
+        Statistics poolStatsEnd = {};
+        DetailedStatistics detailedPoolStatsEnd = {};
+        if (usePool)
+        {
+            pool->GetStatistics(&poolStatsEnd);
+            pool->CalculateStatistics(&detailedPoolStatsEnd);
+            CheckStatistics(detailedPoolStatsEnd);
+        }
+
+        // Destroy the pool.
+        pool.Reset();
+
+        // Get stats "End".
+        Budget localBudgetEnd = {};
+        Budget nonLocalBudgetEnd = {};
+        ctx.allocator->GetBudget(&localBudgetEnd, &nonLocalBudgetEnd);
+        CheckBudgetBasics(ctx, localBudgetEnd, nonLocalBudgetEnd);
+
+        TotalStatistics statsEnd = {};
+        ctx.allocator->CalculateStatistics(&statsEnd);
+        CheckTotalStatistics(statsEnd);
+
+        // CHECK THE STATS: Local.
+        {
+            CHECK_BOOL(localBudgetBeg.Stats.AllocationBytes <= localBudgetEnd.Stats.AllocationBytes);
+
+            // Budget::UsageBytes.
+            CHECK_BOOL(localBudgetWithBufs.UsageBytes >= localBudgetBeg.UsageBytes);
+            CHECK_BOOL(localBudgetEnd.UsageBytes <= localBudgetWithBufs.UsageBytes);
+
+            // Budget - Statistics::AllocationBytes.
+            CHECK_BOOL(localBudgetEnd.Stats.AllocationBytes == localBudgetBeg.Stats.AllocationBytes);
+            CHECK_BOOL(localBudgetWithBufs.Stats.AllocationBytes == localBudgetBeg.Stats.AllocationBytes + BUF_SIZE * BUF_COUNT);
+
+            // Budget - Statistics::BlockBytes.
+            if (usePool)
+            {
+                CHECK_BOOL(localBudgetEnd.Stats.BlockBytes == localBudgetBeg.Stats.BlockBytes);
+                CHECK_BOOL(localBudgetWithBufs.Stats.BlockBytes > localBudgetBeg.Stats.BlockBytes);
+            }
+            else
+            {
+                CHECK_BOOL(localBudgetWithBufs.Stats.BlockBytes >= localBudgetBeg.Stats.BlockBytes);
+            }
+
+            // Budget - Statistics::AllocationCount.
+            CHECK_BOOL(localBudgetEnd.Stats.AllocationCount == localBudgetBeg.Stats.AllocationCount);
+            CHECK_BOOL(localBudgetWithBufs.Stats.AllocationCount == localBudgetBeg.Stats.AllocationCount + BUF_COUNT);
+
+            // Budget - Statistics::BlockCount.
+            if (useCommitted)
+            {
+                CHECK_BOOL(localBudgetEnd.Stats.BlockCount == localBudgetBeg.Stats.BlockCount);
+                CHECK_BOOL(localBudgetWithBufs.Stats.BlockCount == localBudgetBeg.Stats.BlockCount + BUF_COUNT);
+            }
+            else if (usePool)
+            {
+                CHECK_BOOL(localBudgetEnd.Stats.BlockCount == localBudgetBeg.Stats.BlockCount);
+                if (usePreallocated)
+                {
+                    CHECK_BOOL(localBudgetWithBufs.Stats.BlockCount == localBudgetBeg.Stats.BlockCount + 1);
+                }
+                else
+                {
+                    CHECK_BOOL(localBudgetWithBufs.Stats.BlockCount > localBudgetBeg.Stats.BlockCount);
+                }
+            }
+
+            // Compare CalculateStatistics per memory segment group with GetBudget.
+            CHECK_BOOL(StatisticsEqual(statsBeg.MemorySegmentGroup[0].Stats, localBudgetBeg.Stats));
+            CHECK_BOOL(StatisticsEqual(statsWithBufs.MemorySegmentGroup[0].Stats, localBudgetWithBufs.Stats));
+            CHECK_BOOL(StatisticsEqual(statsEnd.MemorySegmentGroup[0].Stats, localBudgetEnd.Stats));
+        }
+
+        // CHECK THE STATS: Non-local.
+        {
+            CHECK_BOOL(nonLocalBudgetEnd.Stats.AllocationBytes == nonLocalBudgetBeg.Stats.AllocationBytes &&
+                nonLocalBudgetEnd.Stats.AllocationBytes == nonLocalBudgetWithBufs.Stats.AllocationBytes);
+            CHECK_BOOL(nonLocalBudgetEnd.Stats.BlockBytes == nonLocalBudgetBeg.Stats.BlockBytes &&
+                nonLocalBudgetEnd.Stats.BlockBytes == nonLocalBudgetWithBufs.Stats.BlockBytes);
+            CHECK_BOOL(nonLocalBudgetEnd.Stats.AllocationCount == nonLocalBudgetBeg.Stats.AllocationCount &&
+                nonLocalBudgetEnd.Stats.AllocationCount == nonLocalBudgetWithBufs.Stats.AllocationCount);
+            CHECK_BOOL(nonLocalBudgetEnd.Stats.BlockCount == nonLocalBudgetBeg.Stats.BlockCount &&
+                nonLocalBudgetEnd.Stats.BlockCount == nonLocalBudgetWithBufs.Stats.BlockCount);
+
+            // Compare CalculateStatistics per memory segment group with GetBudget.
+            CHECK_BOOL(StatisticsEqual(statsBeg.MemorySegmentGroup[1].Stats, nonLocalBudgetBeg.Stats));
+            CHECK_BOOL(StatisticsEqual(statsWithBufs.MemorySegmentGroup[1].Stats, nonLocalBudgetWithBufs.Stats));
+            CHECK_BOOL(StatisticsEqual(statsEnd.MemorySegmentGroup[1].Stats, nonLocalBudgetEnd.Stats));
+        }
+
+        if (usePool)
+        {
+            // Compare simple stats with calculated stats to make sure they are identical.
+            CHECK_BOOL(StatisticsEqual(poolStatsBeg, detailedPoolStatsBeg.Stats));
+            CHECK_BOOL(StatisticsEqual(poolStatsWithBufs, detailedPoolStatsWithBufs.Stats));
+            CHECK_BOOL(StatisticsEqual(poolStatsEnd, detailedPoolStatsEnd.Stats));
+
+            // Validate stats of an empty pool.
+            CHECK_BOOL(detailedPoolStatsBeg.AllocationSizeMax == 0);
+            CHECK_BOOL(detailedPoolStatsEnd.AllocationSizeMax == 0);
+            CHECK_BOOL(detailedPoolStatsBeg.AllocationSizeMin == UINT64_MAX);
+            CHECK_BOOL(detailedPoolStatsEnd.AllocationSizeMin == UINT64_MAX);
+            CHECK_BOOL(poolStatsBeg.AllocationCount == 0);
+            CHECK_BOOL(poolStatsBeg.AllocationBytes == 0);
+            CHECK_BOOL(poolStatsEnd.AllocationCount == 0);
+            CHECK_BOOL(poolStatsEnd.AllocationBytes == 0);
+            if (usePreallocated)
+            {
+                CHECK_BOOL(poolStatsBeg.BlockCount == 1);
+                CHECK_BOOL(poolStatsEnd.BlockCount == 1);
+                CHECK_BOOL(poolStatsBeg.BlockBytes == PREALLOCATED_BLOCK_SIZE);
+                CHECK_BOOL(poolStatsEnd.BlockBytes == PREALLOCATED_BLOCK_SIZE);
+            }
+            else
+            {
+                CHECK_BOOL(poolStatsBeg.BlockCount == 0);
+                CHECK_BOOL(poolStatsBeg.BlockBytes == 0);
+                // Not checking poolStatsEnd.blockCount, blockBytes, because an empty block may stay allocated.
+            }
+
+            // Validate stats of a pool with buffers.
+            CHECK_BOOL(detailedPoolStatsWithBufs.AllocationSizeMin == BUF_SIZE);
+            CHECK_BOOL(detailedPoolStatsWithBufs.AllocationSizeMax == BUF_SIZE);
+            CHECK_BOOL(poolStatsWithBufs.AllocationCount == BUF_COUNT);
+            CHECK_BOOL(poolStatsWithBufs.AllocationBytes == BUF_COUNT * BUF_SIZE);
+            if (usePreallocated)
+            {
+                CHECK_BOOL(poolStatsWithBufs.BlockCount == 1);
+                CHECK_BOOL(poolStatsWithBufs.BlockBytes == PREALLOCATED_BLOCK_SIZE);
+            }
+            else
+            {
+                CHECK_BOOL(poolStatsWithBufs.BlockCount > 0);
+                CHECK_BOOL(poolStatsWithBufs.BlockBytes >= poolStatsWithBufs.AllocationBytes);
+            }
+        }
+
+        // No allocation from D3D12_HEAP_TYPE_CUSTOM or GPU_UPLOAD in this test.
+        CHECK_BOOL(statsEnd.HeapType[3].Stats.BlockCount == 0);
+        CHECK_BOOL(statsEnd.HeapType[4].Stats.BlockCount == 0);
     }
 }
 
