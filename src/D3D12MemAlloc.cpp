@@ -5578,6 +5578,7 @@ public:
         UINT64 size,
         UINT64 alignment,
         const ALLOCATION_DESC& allocDesc,
+        bool committedAllowed,
         size_t allocationCount,
         Allocation** pAllocations);
 
@@ -5588,6 +5589,7 @@ public:
         UINT64 alignment,
         const ALLOCATION_DESC& allocDesc,
         const CREATE_RESOURCE_PARAMS& createParams,
+        bool committedAllowed,
         Allocation** ppAllocation,
         REFIID riidResource,
         void** ppvResource);
@@ -5638,6 +5640,7 @@ private:
         UINT64 size,
         UINT64 alignment,
         const ALLOCATION_DESC& allocDesc,
+        bool committedAllowed,
         Allocation** pAllocation);
 
     HRESULT AllocateFromBlock(
@@ -6516,7 +6519,7 @@ HRESULT AllocatorPimpl::CreateResource(
     if (blockVector != NULL)
     {
         hr = blockVector->CreateResource(resAllocInfo.SizeInBytes, resAllocInfo.Alignment,
-            *pAllocDesc, finalCreateParams,
+            *pAllocDesc, finalCreateParams, committedAllocationParams.IsValid(),
             ppAllocation, riidResource, ppvResource);
         if (SUCCEEDED(hr))
             return hr;
@@ -6559,7 +6562,7 @@ HRESULT AllocatorPimpl::AllocateMemory(
     if (blockVector != NULL)
     {
         hr = blockVector->Allocate(pAllocInfo->SizeInBytes, pAllocInfo->Alignment,
-            *pAllocDesc, 1, (Allocation**)ppAllocation);
+            *pAllocDesc, committedAllocationParams.IsValid(), 1, (Allocation**)ppAllocation);
         if (SUCCEEDED(hr))
             return hr;
     }
@@ -6873,17 +6876,15 @@ void AllocatorPimpl::GetBudget(Budget* outLocalBudget, Budget* outNonLocalBudget
 
 void AllocatorPimpl::GetBudgetForHeapType(Budget& outBudget, D3D12_HEAP_TYPE heapType)
 {
-    switch (heapType)
+    const bool isLocal = StandardHeapTypeToMemorySegmentGroup(heapType) ==
+        DXGI_MEMORY_SEGMENT_GROUP_LOCAL_COPY;
+    if (isLocal)
     {
-    case D3D12_HEAP_TYPE_DEFAULT:
-    case D3D12_HEAP_TYPE_GPU_UPLOAD_COPY:
         GetBudget(&outBudget, NULL);
-        break;
-    case D3D12_HEAP_TYPE_UPLOAD:
-    case D3D12_HEAP_TYPE_READBACK:
+    }
+    else
+    {
         GetBudget(NULL, &outBudget);
-        break;
-    default: D3D12MA_ASSERT(0);
     }
 }
 
@@ -8124,6 +8125,7 @@ HRESULT BlockVector::Allocate(
     UINT64 size,
     UINT64 alignment,
     const ALLOCATION_DESC& allocDesc,
+    bool committedAllowed,
     size_t allocationCount,
     Allocation** pAllocations)
 {
@@ -8138,6 +8140,7 @@ HRESULT BlockVector::Allocate(
                 size,
                 alignment,
                 allocDesc,
+                committedAllowed,
                 pAllocations + allocIndex);
             if (FAILED(hr))
             {
@@ -8226,39 +8229,42 @@ HRESULT BlockVector::CreateResource(
     UINT64 alignment,
     const ALLOCATION_DESC& allocDesc,
     const CREATE_RESOURCE_PARAMS& createParams,
+    bool committedAllowed,
     Allocation** ppAllocation,
     REFIID riidResource,
     void** ppvResource)
 {
-    HRESULT hr = Allocate(size, alignment, allocDesc, 1, ppAllocation);
+    HRESULT hr = Allocate(size, alignment, allocDesc, committedAllowed, 1, ppAllocation);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    ID3D12Resource* res = NULL;
+    hr = m_hAllocator->CreatePlacedResourceWrap(
+        (*ppAllocation)->m_Placed.block->GetHeap(),
+        (*ppAllocation)->GetOffset(),
+        createParams,
+        D3D12MA_IID_PPV_ARGS(&res));
     if (SUCCEEDED(hr))
     {
-        ID3D12Resource* res = NULL;
-        hr = m_hAllocator->CreatePlacedResourceWrap(
-            (*ppAllocation)->m_Placed.block->GetHeap(),
-            (*ppAllocation)->GetOffset(),
-            createParams,
-            D3D12MA_IID_PPV_ARGS(&res));
+        if (ppvResource != NULL)
+        {
+            hr = res->QueryInterface(riidResource, ppvResource);
+        }
         if (SUCCEEDED(hr))
         {
-            if (ppvResource != NULL)
-            {
-                hr = res->QueryInterface(riidResource, ppvResource);
-            }
-            if (SUCCEEDED(hr))
-            {
-                (*ppAllocation)->SetResourcePointer(res, createParams.GetBaseResourceDesc());
-            }
-            else
-            {
-                res->Release();
-                SAFE_RELEASE(*ppAllocation);
-            }
+            (*ppAllocation)->SetResourcePointer(res, createParams.GetBaseResourceDesc());
         }
         else
         {
+            res->Release();
             SAFE_RELEASE(*ppAllocation);
         }
+    }
+    else
+    {
+        SAFE_RELEASE(*ppAllocation);
     }
     return hr;
 }
@@ -8377,6 +8383,7 @@ HRESULT BlockVector::AllocatePage(
     UINT64 size,
     UINT64 alignment,
     const ALLOCATION_DESC& allocDesc,
+    bool committedAllowed,
     Allocation** pAllocation)
 {
     // Early reject: requested allocation size is larger that maximum block size for this block vector.
@@ -8393,13 +8400,19 @@ HRESULT BlockVector::AllocatePage(
         freeMemory = (budget.UsageBytes < budget.BudgetBytes) ? (budget.BudgetBytes - budget.UsageBytes) : 0;
     }
 
-    const bool canCreateNewBlock =
+    const bool canExceedFreeMemory = !committedAllowed;
+
+    bool canCreateNewBlock =
         ((allocDesc.Flags & ALLOCATION_FLAG_NEVER_ALLOCATE) == 0) &&
-        (m_Blocks.size() < m_MaxBlockCount) &&
-        // Even if we don't have to stay within budget with this allocation, when the
-        // budget would be exceeded, we don't want to allocate new blocks, but always
-        // create resources as committed.
-        freeMemory >= size;
+        (m_Blocks.size() < m_MaxBlockCount);
+
+    // Even if we don't have to stay within budget with this allocation, when the
+    // budget would be exceeded, we don't want to allocate new blocks, but always
+    // create resources as committed.
+    if (freeMemory < size && !canExceedFreeMemory)
+    {
+        canCreateNewBlock = false;
+    }
 
     // 1. Search existing allocations
     {
@@ -8449,25 +8462,28 @@ HRESULT BlockVector::AllocatePage(
             }
         }
 
-        size_t newBlockIndex = 0;
-        HRESULT hr = newBlockSize <= freeMemory ?
-            CreateBlock(newBlockSize, &newBlockIndex) : E_OUTOFMEMORY;
+        size_t newBlockIndex = SIZE_MAX;
+        HRESULT hr = E_OUTOFMEMORY;
+        if (newBlockSize <= freeMemory || canExceedFreeMemory)
+        {
+            hr = CreateBlock(newBlockSize, &newBlockIndex);
+        }
         // Allocation of this size failed? Try 1/2, 1/4, 1/8 of m_PreferredBlockSize.
         if (!m_ExplicitBlockSize)
         {
             while (FAILED(hr) && newBlockSizeShift < NEW_BLOCK_SIZE_SHIFT_MAX)
             {
                 const UINT64 smallerNewBlockSize = newBlockSize / 2;
-                if (smallerNewBlockSize >= size)
-                {
-                    newBlockSize = smallerNewBlockSize;
-                    ++newBlockSizeShift;
-                    hr = newBlockSize <= freeMemory ?
-                        CreateBlock(newBlockSize, &newBlockIndex) : E_OUTOFMEMORY;
-                }
-                else
+                if (smallerNewBlockSize < size)
                 {
                     break;
+                }
+
+                newBlockSize = smallerNewBlockSize;
+                ++newBlockSizeShift;
+                if (newBlockSize <= freeMemory || canExceedFreeMemory)
+                {
+                    hr = CreateBlock(newBlockSize, &newBlockIndex);
                 }
             }
         }
