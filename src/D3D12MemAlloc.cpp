@@ -3019,7 +3019,7 @@ void BlockMetadata::DebugLogAllocation(UINT64 offset, UINT64 size, void* private
         LPCWSTR name = allocation->GetName();
 
         D3D12MA_DEBUG_LOG(L"UNFREED ALLOCATION; Offset: %llu; Size: %llu; PrivateData: %p; Name: %s",
-            offset, size, privateData, name ? name : L"D3D12MA_Empty");
+            offset, size, privateData, name ? name : L"");
     }
 }
 
