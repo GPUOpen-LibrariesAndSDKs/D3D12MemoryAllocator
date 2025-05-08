@@ -195,13 +195,13 @@ Macros</h2></td></tr>
 <tr class="memitem:ad04069a2e2bbc53b7d65f85a04a2dcbc" id="r_ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ad04069a2e2bbc53b7d65f85a04a2dcbc">D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</a>&#160;&#160;&#160;1</td></tr>
 <tr class="memdesc:ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="mdescLeft">&#160;</td><td class="mdescRight">When defined to value other than 0, the library will try to use <code>D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT</code> or <code>D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT</code> for created textures when possible, which can save memory because some small textures may get their alignment 4 KB and their size a multiply of 4 KB instead of 64 KB.  <br /></td></tr>
 <tr class="separator:ad04069a2e2bbc53b7d65f85a04a2dcbc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:accfbeae642feeacf353ce695e91a5e73" id="r_accfbeae642feeacf353ce695e91a5e73"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#accfbeae642feeacf353ce695e91a5e73">D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</a>&#160;&#160;&#160;(ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED | ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td></tr>
+<tr class="memitem:accfbeae642feeacf353ce695e91a5e73" id="r_accfbeae642feeacf353ce695e91a5e73"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#accfbeae642feeacf353ce695e91a5e73">D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</a>&#160;&#160;&#160;(<a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335">D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED</a> | <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e">D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a>)</td></tr>
 <tr class="memdesc:accfbeae642feeacf353ce695e91a5e73"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#ad8abad7c80ea0d8df27c85243ce720f3" title="Flags for the entire allocator.">D3D12MA::ALLOCATOR_DESC::Flags</a> for optimal performance.  <br /></td></tr>
 <tr class="separator:accfbeae642feeacf353ce695e91a5e73"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac3d50f134ad24c58df4a934b87847653" id="r_ac3d50f134ad24c58df4a934b87847653"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac3d50f134ad24c58df4a934b87847653">D3D12MA_RECOMMENDED_HEAP_FLAGS</a>&#160;&#160;&#160;(D3D12_HEAP_FLAG_NONE)</td></tr>
 <tr class="memdesc:ac3d50f134ad24c58df4a934b87847653"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a3795956e4fbfe7c3a23546e02e5d28dc" title="Heap flags to be used when allocating heaps of this pool.">D3D12MA::POOL_DESC::HeapFlags</a> for optimal performance.  <br /></td></tr>
 <tr class="separator:ac3d50f134ad24c58df4a934b87847653"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2679d8c9f6d900168bb45450bc88998b" id="r_a2679d8c9f6d900168bb45450bc88998b"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2679d8c9f6d900168bb45450bc88998b">D3D12MA_RECOMMENDED_POOL_FLAGS</a>&#160;&#160;&#160;(POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td></tr>
+<tr class="memitem:a2679d8c9f6d900168bb45450bc88998b" id="r_a2679d8c9f6d900168bb45450bc88998b"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a2679d8c9f6d900168bb45450bc88998b">D3D12MA_RECOMMENDED_POOL_FLAGS</a>&#160;&#160;&#160;(<a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a>)</td></tr>
 <tr class="memdesc:a2679d8c9f6d900168bb45450bc88998b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set of flags recommended for use in <a class="el" href="struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#ac4ed93b0191344d68c0b4ac1a4822ff4" title="Flags for the heap.">D3D12MA::POOL_DESC::Flags</a> for optimal performance.  <br /></td></tr>
 <tr class="separator:a2679d8c9f6d900168bb45450bc88998b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
@@ -342,7 +342,7 @@ Functions</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS&#160;&#160;&#160;(ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED | ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td>
+          <td class="memname">#define D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS&#160;&#160;&#160;(<a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916ae7dc7ab9168148281ebfe1586f554335">D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED</a> | <a class="el" href="namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916adfbfd20d716f2a46f74d6226056fef1e">D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a>)</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -374,7 +374,7 @@ Functions</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define D3D12MA_RECOMMENDED_POOL_FLAGS&#160;&#160;&#160;(POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED)</td>
+          <td class="memname">#define D3D12MA_RECOMMENDED_POOL_FLAGS&#160;&#160;&#160;(<a class="el" href="namespace_d3_d12_m_a.html#a919d8545365d6b7209a964f2b99936d1acc379a89755438c0f76667783b778baa">D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED</a>)</td>
         </tr>
       </table>
 </div><div class="memdoc">
