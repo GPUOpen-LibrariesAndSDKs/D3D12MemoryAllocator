@@ -1800,7 +1800,7 @@ DEFINE_ENUM_FLAG_OPERATORS(D3D12MA::VIRTUAL_ALLOCATION_FLAGS);
 /// \endcond
 
 /**
-\page faq Frequenty asked questions
+\page faq Frequently asked questions
 
 <b>What is %D3D12MA?</b>
 

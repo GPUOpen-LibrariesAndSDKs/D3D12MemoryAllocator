@@ -7,5 +7,5 @@ var searchData=
   ['free_5ffunc_5fptr_4',['FREE_FUNC_PTR',['../namespace_d3_d12_m_a.html#a7c61f55eeb64451cb0c08c0461bbe1a3',1,'D3D12MA']]],
   ['freeallocation_5',['FreeAllocation',['../class_d3_d12_m_a_1_1_virtual_block.html#aab44e46bd122054c894fc84740f1e8fb',1,'D3D12MA::VirtualBlock']]],
   ['freestatsstring_6',['FreeStatsString',['../class_d3_d12_m_a_1_1_allocator.html#a8392663494384c16d8bfa12b827b4f9c',1,'D3D12MA::Allocator::FreeStatsString()'],['../class_d3_d12_m_a_1_1_virtual_block.html#a6f78ddaa7da194e239089e52093e68a9',1,'D3D12MA::VirtualBlock::FreeStatsString()']]],
-  ['frequenty_20asked_20questions_7',['Frequenty asked questions',['../faq.html',1,'index']]]
+  ['frequently_20asked_20questions_7',['Frequently asked questions',['../faq.html',1,'index']]]
 ];

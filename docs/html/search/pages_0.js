@@ -6,5 +6,5 @@ var searchData=
   ['allocation_20algorithm_3',['Linear allocation algorithm',['../linear_algorithm.html',1,'index']]],
   ['allocator_4',['D3D12 Memory Allocator',['../index.html',1,'']]],
   ['allocator_5',['Virtual allocator',['../virtual_allocator.html',1,'optimal_allocation']]],
-  ['asked_20questions_6',['Frequenty asked questions',['../faq.html',1,'index']]]
+  ['asked_20questions_6',['Frequently asked questions',['../faq.html',1,'index']]]
 ];
