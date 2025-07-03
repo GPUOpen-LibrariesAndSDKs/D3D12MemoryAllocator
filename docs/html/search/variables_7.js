@@ -1,8 +1,8 @@
 var searchData=
 [
-  ['m_5fcommitted_0',['m_Committed',['../class_d3_d12_m_a_1_1_allocation.html#a1bee33a7ad0294d5879b178e0608e495',1,'D3D12MA::Allocation']]],
-  ['m_5fheap_1',['m_Heap',['../class_d3_d12_m_a_1_1_allocation.html#ae677cecc5479143c670287a1fe62008e',1,'D3D12MA::Allocation']]],
-  ['m_5fplaced_2',['m_Placed',['../class_d3_d12_m_a_1_1_allocation.html#ac8a15647f4825f0cf2daa1533e89509d',1,'D3D12MA::Allocation']]],
+  ['m_5fcommitted_0',['m_Committed',['../class_d3_d12_m_a_1_1_allocation.html#a38cff302aed26fbdc608f3e427976406',1,'D3D12MA::Allocation']]],
+  ['m_5fheap_1',['m_Heap',['../class_d3_d12_m_a_1_1_allocation.html#a305c5d36e2e332b74639818e5e2c3953',1,'D3D12MA::Allocation']]],
+  ['m_5fplaced_2',['m_Placed',['../class_d3_d12_m_a_1_1_allocation.html#a22e7a16d3d430109affa474d23964c80',1,'D3D12MA::Allocation']]],
   ['maxallocationsperpass_3',['MaxAllocationsPerPass',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___d_e_s_c.html#a83bfb404f387863eafdd6703483aed89',1,'D3D12MA::DEFRAGMENTATION_DESC']]],
   ['maxblockcount_4',['MaxBlockCount',['../struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#abbce3a99f253928f9c3c09fa16015f9e',1,'D3D12MA::POOL_DESC']]],
   ['maxbytesperpass_5',['MaxBytesPerPass',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___d_e_s_c.html#ad8d224e0687a35898970d0a5688c6343',1,'D3D12MA::DEFRAGMENTATION_DESC']]],

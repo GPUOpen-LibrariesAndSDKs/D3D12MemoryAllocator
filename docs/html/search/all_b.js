@@ -1,8 +1,8 @@
 var searchData=
 [
-  ['m_5fcommitted_0',['m_Committed',['../class_d3_d12_m_a_1_1_allocation.html#a1bee33a7ad0294d5879b178e0608e495',1,'D3D12MA::Allocation']]],
-  ['m_5fheap_1',['m_Heap',['../class_d3_d12_m_a_1_1_allocation.html#ae677cecc5479143c670287a1fe62008e',1,'D3D12MA::Allocation']]],
-  ['m_5fplaced_2',['m_Placed',['../class_d3_d12_m_a_1_1_allocation.html#ac8a15647f4825f0cf2daa1533e89509d',1,'D3D12MA::Allocation']]],
+  ['m_5fcommitted_0',['m_Committed',['../class_d3_d12_m_a_1_1_allocation.html#a38cff302aed26fbdc608f3e427976406',1,'D3D12MA::Allocation']]],
+  ['m_5fheap_1',['m_Heap',['../class_d3_d12_m_a_1_1_allocation.html#a305c5d36e2e332b74639818e5e2c3953',1,'D3D12MA::Allocation']]],
+  ['m_5fplaced_2',['m_Placed',['../class_d3_d12_m_a_1_1_allocation.html#a22e7a16d3d430109affa474d23964c80',1,'D3D12MA::Allocation']]],
   ['making_20virtual_20allocations_3',['Making virtual allocations',['../virtual_allocator.html#virtual_allocator_making_virtual_allocations',1,'']]],
   ['mapping_20memory_4',['Mapping memory',['../quick_start.html#quick_start_mapping_memory',1,'']]],
   ['margins_5',['Debug margins',['../configuration.html#debug_margins',1,'']]],
