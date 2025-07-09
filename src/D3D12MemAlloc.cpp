@@ -34,10 +34,25 @@
 #endif
 
 // Includes needed for MinGW - see #71.
-#ifndef _MSC_VER
-    #include <guiddef.h>
-    // guiddef.h must be included first.
-    #include <dxguids.h>
+// On older mingw versions, using the Agility SDK will cause linker errors unless dxguids.h is included.
+// But on newer mingw versions, the includes aren't necessary thus no need to grab DirectX-Headers.
+// Release cycles are slow for LTS distros on Linux, so this codeblock will need to stay for a few years.
+#if defined( __MINGW64_VERSION_MAJOR ) && defined( __MINGW64_VERSION_MINOR ) && \
+	defined( __MINGW64_VERSION_BUGFIX ) && defined( __ID3D12Device8_INTERFACE_DEFINED__ )
+#	define D12MA_MAKE_MINGW_VERSION( x, y, z ) ( ( x << 20u ) | ( y << 10u ) | ( z ) )
+#	if D12MA_MAKE_MINGW_VERSION( __MINGW64_VERSION_MAJOR, __MINGW64_VERSION_MINOR, \
+								  __MINGW64_VERSION_BUGFIX ) <= D12MA_MAKE_MINGW_VERSION( 11, 0, 1 )
+#		if defined( __has_include )
+#			if !__has_include( <dxguids.h>)
+#				error \
+					"mingw or gcc detected. dxguids.h is needed. You can grab it from https://github.com/microsoft/DirectX-Headers or if you're on Ubuntu just run sudo apt install directx-headers-dev"
+#			endif
+#		endif
+#		include <guiddef.h>
+
+#		include <dxguids.h>
+#	endif
+#	undef D12MA_MAKE_MINGW_VERSION
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
