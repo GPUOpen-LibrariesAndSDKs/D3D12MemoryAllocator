@@ -3558,7 +3558,7 @@ Features deliberately excluded from the scope of this library:
 - **Descriptor allocation.** Although also called "heaps", objects that represent
   descriptors are separate part of the D3D12 API from buffers and textures.
   You can still use \ref virtual_allocator to manage descriptors and their ranges inside a descriptor heap.
-- **Support for reserved (tiled) resources.** We don't recommend using them.
+- **Support for reserved (tiled) resources.** We don't recommend using them. For more information, see [1].
 - Support for `ID3D12Device::Evict` and `MakeResident`. We don't recommend using them.
   You can call them on the D3D12 objects manually.
   Plese keep in mind, however, that eviction happens on the level of entire `ID3D12Heap` memory blocks
@@ -3575,4 +3575,6 @@ Features deliberately excluded from the scope of this library:
   It is recommended to disable such warnings instead.
 - This is a C++ library. **Bindings or ports to any other programming languages** are welcome as external projects but
   are not going to be included into this repository.
+
+[1] Antoine Richermoz, Fabrice Neyret. The Sad State of Hardware Virtual Textures. UGA - Universite Grenoble Alpes; INRIA Grenoble - Rhone-Alpes. 2025, pp.13. hal-05138369
 */
