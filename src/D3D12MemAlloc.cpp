@@ -7793,7 +7793,9 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
     if (inOutResourceDesc.Alignment == 0 &&
-        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D || 
+            inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D || 
+            inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) &&
         (inOutResourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT == 1
         && CanUseSmallAlignment(inOutResourceDesc)
