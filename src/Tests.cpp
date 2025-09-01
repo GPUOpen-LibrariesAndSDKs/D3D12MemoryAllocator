@@ -481,32 +481,27 @@ static void TestJson(const TestContext& ctx)
         // Select different heaps
         for (UINT8 heapType = 0; heapType < 5; ++heapType)
         {
-            D3D12_RESOURCE_STATES state;
+            D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON;
             D3D12_CPU_PAGE_PROPERTY cpuPageType = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
             D3D12_MEMORY_POOL memoryPool = D3D12_MEMORY_POOL_UNKNOWN;
             switch (heapType)
             {
             case 0:
                 allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-                state = D3D12_RESOURCE_STATE_COMMON;
                 break;
             case 1:
                 allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-                state = D3D12_RESOURCE_STATE_GENERIC_READ;
                 break;
             case 2:
                 allocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;
-                state = D3D12_RESOURCE_STATE_COPY_DEST;
                 break;
             case 3:
                 allocDesc.HeapType = D3D12_HEAP_TYPE_CUSTOM;
-                state = D3D12_RESOURCE_STATE_COMMON;
                 cpuPageType = D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE;
                 memoryPool = ctx.allocator->IsUMA() ? D3D12_MEMORY_POOL_L0 : D3D12_MEMORY_POOL_L1;
                 break;
             case 4:
                 allocDesc.HeapType = D3D12_HEAP_TYPE_CUSTOM;
-                state = D3D12_RESOURCE_STATE_GENERIC_READ;
                 cpuPageType = D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE;
                 memoryPool = D3D12_MEMORY_POOL_L0;
                 break;
@@ -676,7 +671,7 @@ static void TestCommittedResourcesAndJson(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDesc,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL,
             &resources[i].allocation,
             __uuidof(ID3D12Resource),
@@ -1187,7 +1182,7 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
 
         // Default parameters
         allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
-        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, &alloc, IID_NULL, nullptr);
         CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
         ID3D12Heap* const defaultAllocHeap = alloc->GetHeap();
         const UINT64 defaultAllocOffset = alloc->GetOffset();
@@ -1198,7 +1193,7 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
         if(poolTypeI != 2)
         {
             allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
-            hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+            hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, &alloc, IID_NULL, nullptr);
             CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
             CHECK_BOOL(alloc->GetOffset() == 0); // Committed
             CHECK_BOOL(alloc->GetHeap() == nullptr); // Committed
@@ -1208,7 +1203,7 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
 
         // NEVER_ALLOCATE #1
         allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
-        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, &alloc, IID_NULL, nullptr);
         CHECK_BOOL(SUCCEEDED(hr) && alloc && alloc->GetResource());
         CHECK_BOOL(alloc->GetHeap() == defaultAllocHeap); // Same memory block as default one.
         CHECK_BOOL(alloc->GetOffset() != defaultAllocOffset);
@@ -1217,7 +1212,7 @@ static void TestPoolsAndAllocationParameters(const TestContext& ctx)
 
         // NEVER_ALLOCATE #2. Should fail in pool2 as it has no space.
         allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
-        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, &alloc, IID_NULL, nullptr);
+        hr = ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, &alloc, IID_NULL, nullptr);
         if(poolTypeI == 2)
             CHECK_BOOL(FAILED(hr));
         else
@@ -2075,7 +2070,7 @@ static void TestTransfer(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDescUpload,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL,
             &resourcesUpload[i].allocation,
             IID_PPV_ARGS(&resourcesUpload[i].resource)) );
@@ -2083,7 +2078,7 @@ static void TestTransfer(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDescDefault,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL,
             &resourcesDefault[i].allocation,
             IID_PPV_ARGS(&resourcesDefault[i].resource)) );
@@ -2091,7 +2086,7 @@ static void TestTransfer(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDescReadback,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL,
             &resourcesReadback[i].allocation,
             IID_PPV_ARGS(&resourcesReadback[i].resource)) );
