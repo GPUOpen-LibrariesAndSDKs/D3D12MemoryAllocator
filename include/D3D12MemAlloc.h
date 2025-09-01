@@ -64,7 +64,7 @@ Documentation of all members: D3D12MemAlloc.h
         
 \section main_see_also Web links
 
-- [Direct3D 12 Memory Allocator at GPUOpen.com](https://gpuopen.com/gaming-product/d3d12-memory-allocator/) - product page
+- [Direct3D 12 Memory Allocator at GPUOpen.com](https://gpuopen.com/d3d12-memory-allocator/) - product page
 - [GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator at GitHub.com](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator) - source code repository
 */
 
