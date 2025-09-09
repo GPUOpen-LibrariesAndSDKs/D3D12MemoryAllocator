@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['start_0',['Quick start',['../quick_start.html',1,'index']]],
-  ['statistics_1',['Statistics',['../statistics.html',1,'optimal_allocation']]]
+  ['not_20supported_0',['Features not supported',['../general_considerations.html#general_considerations_features_not_supported',1,'']]],
+  ['numeric_20statistics_1',['Numeric statistics',['../statistics.html#statistics_numeric_statistics',1,'']]]
 ];

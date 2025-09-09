@@ -1,6 +1,7 @@
 var searchData=
 [
-  ['configuration_0',['Configuration',['../configuration.html',1,'index']]],
-  ['considerations_1',['General considerations',['../general_considerations.html',1,'index']]],
-  ['custom_20memory_20pools_2',['Custom memory pools',['../custom_pools.html',1,'optimal_allocation']]]
+  ['benefits_0',['Features and benefits',['../custom_pools.html#custom_pools_features_and_benefits',1,'']]],
+  ['block_1',['Creating virtual block',['../virtual_allocator.html#virtual_allocator_creating_virtual_block',1,'']]],
+  ['buffer_2',['Ring buffer',['../linear_algorithm.html#linear_algorithm_ring_buffer',1,'']]],
+  ['buffers_3',['Sub-allocating buffers',['../optimal_allocation.html#optimal_allocation_suballocating_buffers',1,'']]]
 ];

@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['pools_0',['Custom memory pools',['../custom_pools.html',1,'optimal_allocation']]]
+  ['json_20dump_0',['JSON dump',['../statistics.html#statistics_json_dump',1,'']]]
 ];
