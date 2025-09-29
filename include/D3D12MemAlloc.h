@@ -24,7 +24,7 @@
 
 /** \mainpage D3D12 Memory Allocator
 
-<b>Version 3.0.2</b> (2025-XX-XX)
+<b>Version 3.1.0-development</b> (2025-XX-XX)
 
 Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All rights reserved. \n
 License: MIT
@@ -1112,8 +1112,19 @@ enum ALLOCATOR_FLAGS
     which may take longer than creating placed resources in existing heaps.
     Passing this flag will disable this committed preference globally for the allocator.
     It can also be disabled for a single allocation by using #ALLOCATION_FLAG_STRATEGY_MIN_TIME.
+
+    If the tight resource alignment feature is used by the library (which happens automatically whenever supported,
+    unless you use flag #ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT), then small buffers are not preferred as committed.
+    Long story short, you don't need to specify any of these flags.
+    The library chooses the most optimal method automatically.
     */
     ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED = 0x10,
+    /** Disables the use of the tight alignment feature even when it is supported on the current system.
+    By default, the feature is used whenever available.
+
+    Support can be checked by D3D12MA::Allocator::IsTightAlignmentSupported() regardless of using this flag.
+    */
+    ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT = 0x20,
 };
 
 /// \brief Parameters of created Allocator object. To be used with CreateAllocator().
@@ -1189,6 +1200,12 @@ public:
     This flag is fetched from `D3D12_FEATURE_D3D12_OPTIONS16::GPUUploadHeapSupported`.
     */
     BOOL IsGPUUploadHeapSupported() const;
+    /** \brief Returns true if resource tight alignment is supported on the current system.
+    When supported, it is automatically used by the library, unless
+    #ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT flag was specified on allocator creation.
+    This flag is fetched from `D3D12_FEATURE_DATA_TIGHT_ALIGNMENT::SupportTier`.
+    */
+    BOOL IsTightAlignmentSupported() const;
     /** \brief Returns total amount of memory of specific segment group, in bytes.
     
     \param memorySegmentGroup use `DXGI_MEMORY_SEGMENT_GROUP_LOCAL` or `DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL`.
@@ -2863,6 +2880,23 @@ This problem can be overcome by passing D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_AL
 and D3D12MA::POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED on the creation of any custom heap that supports textures, not only buffers.
 With those flags, the alignment of the heaps created by %D3D12MA can be lower, but any MSAA textures are created as committed.
 You should always use these flags in your code unless you really need to create some MSAA textures as placed.
+
+With DirectX 12 Agility SDK 1.618.1, Microsoft added a new feature called **"tight alignment"**.
+Note this is a separate feature than the "small alignment" described earlier.
+When using this new SDK and a compatible graphics driver, the API exposes support for this new feature.
+Then, a new flag `D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT` can be added when creating a resource.
+D3D12 can then return the alignment required for the resource smaller than the default ones described above.
+This library automatically makes use of the tight alignment feature when available and adds that new resource flag.
+When the tight alignment is enabled, the heuristics that creates small buffers as committed described above is deactivated,
+as it is no longer needed.
+
+You can check if the tight alignment it is available in the current system by calling D3D12MA::Allocator::IsTightAlignmentSupported().
+You can tell the library to not use it by specifying D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT.
+Typically, you don't need to do any of those.
+
+The library automatically aligns all buffers to at least 256 B, even when the system supports smaller alignment.
+This is the alignment required for constant buffers, expressed by `D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT` constant.
+You can override this logic for \subpage custom_pools with a specific D3D12MA::POOL_DESC::MinAllocationAlignment.
 
 \page defragmentation Defragmentation
 

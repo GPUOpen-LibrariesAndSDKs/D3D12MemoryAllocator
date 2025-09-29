@@ -51,6 +51,8 @@ static constexpr UINT64 MEGABYTE = 1024 * KILOBYTE;
 static constexpr CONFIG_TYPE ConfigType = CONFIG_TYPE_AVERAGE;
 static const char* FREE_ORDER_NAMES[] = { "FORWARD", "BACKWARD", "RANDOM", };
 
+constexpr D3D12_RESOURCE_FLAGS D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY = (D3D12_RESOURCE_FLAGS)0x400;
+
 // Indexes match enum D3D12_HEAP_TYPE.
 static const WCHAR* const HEAP_TYPE_NAMES[] =
 {
@@ -213,6 +215,10 @@ static void FillAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D12MA:
             D3D12_RESOURCE_DESC resDesc = alloc->GetResource()->GetDesc();
             if (resDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
             {
+                // Fix for D3D12 ERROR: ID3D12Device::CreatePlacedResource: D3D12_RESOURCE_DESC::Alignment is invalid. The value is 8. When D3D12_RESOURCE_DESC::Flag bit for D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT is set, Alignment must be 0. [ STATE_CREATION ERROR #721: CREATERESOURCE_INVALIDALIGNMENT]
+                if ((resDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) != 0)
+                    resDesc.Alignment = 0;
+
                 ComPtr<D3D12MA::Allocation> uploadAlloc;
                 CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
                     nullptr, &uploadAlloc, IID_NULL, nullptr));
@@ -306,6 +312,10 @@ static void ValidateAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D1
             D3D12_RESOURCE_DESC resDesc = alloc->GetResource()->GetDesc();
             if (resDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
             {
+                // Fix for D3D12 ERROR: ID3D12Device::CreatePlacedResource: D3D12_RESOURCE_DESC::Alignment is invalid. The value is 8. When D3D12_RESOURCE_DESC::Flag bit for D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT is set, Alignment must be 0. [ STATE_CREATION ERROR #721: CREATERESOURCE_INVALIDALIGNMENT]
+                if ((resDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) != 0)
+                    resDesc.Alignment = 0;
+
                 ComPtr<D3D12MA::Allocation> downloadAlloc;
                 CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
                     nullptr, &downloadAlloc, IID_NULL, nullptr));
@@ -718,6 +728,12 @@ static void TestSmallBuffers(const TestContext& ctx)
 {
     wprintf(L"Test small buffers\n");
 
+    const bool isTightAlignmentEnabled = ctx.allocator->IsTightAlignmentSupported() &&
+        (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT) == 0;
+    const bool expectSmallBuffersCommitted = !isTightAlignmentEnabled &&
+        (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED) == 0;
+        
+
     D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
         D3D12_HEAP_TYPE_DEFAULT,
         D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
@@ -763,13 +779,9 @@ static void TestSmallBuffers(const TestContext& ctx)
         CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
         CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        // May or may not be committed, depending on the PREFER_SMALL_BUFFERS_COMMITTED
-        // and TIGHT_ALIGNMENT settings.
+        // Expected to be committed?
         const bool isCommitted = resWithAlloc.allocation->GetHeap() == NULL;
-        if (isCommitted)
-            wprintf(L"    Small buffer %llu B inside a custom pool was created as committed.\n", resDesc.Width);
-        else
-            wprintf(L"    Small buffer %llu B inside a custom pool was created as placed.\n", resDesc.Width);
+        CHECK_BOOL(isCommitted == expectSmallBuffersCommitted);
     }
 
     // Test 3: NEVER_ALLOCATE.
@@ -3340,6 +3352,70 @@ static void TestGPUUploadHeap(const TestContext& ctx)
 #endif
 }
 
+static void TestTightAlignment(const TestContext& ctx)
+{
+    using namespace D3D12MA;
+
+    wprintf(L"Test resource tight alignment\n");
+
+    const bool isTightAlignmentEnabled = ctx.allocator->IsTightAlignmentSupported() &&
+        (ctx.allocatorFlags & ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT) == 0;
+
+    // Use a custom pool to make sure our small buffers are not created as committed.
+    POOL_DESC poolDesc = {};
+    poolDesc.BlockSize = MEGABYTE;
+    poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
+
+    D3D12_RESOURCE_DESC resDesc;
+    FillResourceDescForBuffer(resDesc, 4);
+
+    const D3D12_HEAP_TYPE heapTypes[] = { D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_TYPE_UPLOAD };
+    for (auto heapType : heapTypes)
+    {
+        poolDesc.HeapProperties.Type = heapType;
+        for (uint32_t minAlignmentTestIndex = 0; minAlignmentTestIndex < 2; ++minAlignmentTestIndex)
+        {
+            // MinAllocationAlignment == 0 - default alignment.
+            // MinAllocationAlignment == 1 - minimum possible alignment.
+            poolDesc.MinAllocationAlignment = minAlignmentTestIndex;
+
+            ComPtr<Pool> pool;
+            CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+            ALLOCATION_DESC allocDesc = {};
+            allocDesc.CustomPool = pool.Get();
+
+            ComPtr<Allocation> allocs[2] = {};
+
+            for (size_t i = 0; i < _countof(allocs); ++i)
+            {
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+                    D3D12_RESOURCE_STATE_COMMON, NULL, &allocs[i], IID_NULL, NULL));
+                CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
+            }
+
+            const UINT64 secondAllocOffset = allocs[1]->GetOffset();
+
+            // Print the offset of the 2nd buffer.
+            wprintf(L"    In D3D12_HEAP_TYPE_%s, with MinAllocationAlignment=%llu, a %llu B buffer was aligned to %llu B.\n",
+                HEAP_TYPE_NAMES[(size_t)heapType],
+                poolDesc.MinAllocationAlignment,
+                resDesc.Width,
+                secondAllocOffset);
+
+            UINT64 expectedMinAlignment = 1;
+            if (isTightAlignmentEnabled)
+            {
+                if (minAlignmentTestIndex == 0)
+                    expectedMinAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+            }
+            else
+                expectedMinAlignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+            CHECK_BOOL(secondAllocOffset % expectedMinAlignment == 0);
+        }
+    }
+}
+
 static void TestVirtualBlocks(const TestContext& ctx)
 {
     wprintf(L"Test virtual blocks\n");
@@ -3720,6 +3796,11 @@ static void ProcessDefragmentationPass(const TestContext& ctx, D3D12MA::DEFRAGME
             const bool isDefaultHeap = stepInfo.pMoves[i].pSrcAllocation->GetHeap()->GetDesc().Properties.Type == D3D12_HEAP_TYPE_DEFAULT;
             // Create new resource
             D3D12_RESOURCE_DESC desc = stepInfo.pMoves[i].pSrcAllocation->GetResource()->GetDesc();
+
+            // Fix for D3D12 ERROR: ID3D12Device::CreatePlacedResource: D3D12_RESOURCE_DESC::Alignment is invalid. The value is 8. When D3D12_RESOURCE_DESC::Flag bit for D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT is set, Alignment must be 0. [ STATE_CREATION ERROR #721: CREATERESOURCE_INVALIDALIGNMENT]
+            if ((desc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) != 0)
+                desc.Alignment = 0;
+
             ComPtr<ID3D12Resource> dstRes;
             CHECK_HR(ctx.device->CreatePlacedResource(stepInfo.pMoves[i].pDstTmpAllocation->GetHeap(),
                 stepInfo.pMoves[i].pDstTmpAllocation->GetOffset(), &desc,
@@ -4625,6 +4706,7 @@ static void TestGroupBasics(const TestContext& ctx)
 #endif
 
     TestGPUUploadHeap(ctx);
+    TestTightAlignment(ctx);
 
     FILE* file;
     fopen_s(&file, "Results.csv", "w");
