@@ -102,7 +102,7 @@ Project setup and initialization</h1>
 <div class="line">HRESULT hr = <a class="code hl_function" href="namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0">D3D12MA::CreateAllocator</a>(&amp;allocatorDesc, &amp;allocator);</div>
 <div class="line"><span class="comment">// Check hr...</span></div>
 <div class="ttc" id="a_d3_d12_mem_alloc_8h_html_accfbeae642feeacf353ce695e91a5e73"><div class="ttname"><a href="_d3_d12_mem_alloc_8h.html#accfbeae642feeacf353ce695e91a5e73">D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</a></div><div class="ttdeci">#define D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS</div><div class="ttdoc">Set of flags recommended for use in D3D12MA::ALLOCATOR_DESC::Flags for optimal performance.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:128</div></div>
-<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocator_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocator.html">D3D12MA::Allocator</a></div><div class="ttdoc">Represents main object of this library initialized for particular ID3D12Device.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1163</div></div>
+<div class="ttc" id="aclass_d3_d12_m_a_1_1_allocator_html"><div class="ttname"><a href="class_d3_d12_m_a_1_1_allocator.html">D3D12MA::Allocator</a></div><div class="ttdoc">Represents main object of this library initialized for particular ID3D12Device.</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1174</div></div>
 <div class="ttc" id="anamespace_d3_d12_m_a_html_ab7a1cd1683986d75ce1488b0920f4cb0"><div class="ttname"><a href="namespace_d3_d12_m_a.html#ab7a1cd1683986d75ce1488b0920f4cb0">D3D12MA::CreateAllocator</a></div><div class="ttdeci">D3D12MA_API HRESULT CreateAllocator(const ALLOCATOR_DESC *pDesc, Allocator **ppAllocator)</div><div class="ttdoc">Creates new main D3D12MA::Allocator object and returns it through ppAllocator.</div></div>
 </div><!-- fragment --><p>(5.) Right before destroying the D3D12 device, destroy the allocator object.</p>
 <div class="fragment"><div class="line">allocator-&gt;Release();</div>
@@ -273,7 +273,7 @@ Helper structures</h1>
 <div class="line">HRESULT hr = allocator-&gt;<a class="code hl_function" href="class_d3_d12_m_a_1_1_allocator.html#aa37d6b9fe8ea0864f7a35b9d68e8345a">CreateResource</a>(&amp;allocDesc, &amp;resDesc,</div>
 <div class="line">    D3D12_RESOURCE_STATE_COMMON, NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
 <div class="line"><span class="comment">// Check hr...</span></div>
-<div class="ttc" id="astruct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a></div><div class="ttdoc">Helper structure that helps with complete and conscise initialization of the D3D12MA::ALLOCATION_DESC...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1659</div></div>
+<div class="ttc" id="astruct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c_html"><div class="ttname"><a href="struct_d3_d12_m_a_1_1_c_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html">D3D12MA::CALLOCATION_DESC</a></div><div class="ttdoc">Helper structure that helps with complete and conscise initialization of the D3D12MA::ALLOCATION_DESC...</div><div class="ttdef"><b>Definition</b> D3D12MemAlloc.h:1676</div></div>
 </div><!-- fragment --> </div></div><!-- contents -->
 </div><!-- PageDoc -->
 <!-- start footer part -->
