@@ -7849,6 +7849,7 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
     if (inOutResourceDesc.Alignment == 0 &&
+        !IsTightAlignmentEnabled() &&
         (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
             inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
             inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) &&
