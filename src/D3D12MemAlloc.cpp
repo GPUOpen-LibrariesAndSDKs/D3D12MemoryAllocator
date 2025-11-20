@@ -817,11 +817,9 @@ static bool ValidateAllocateMemoryParameters(
     return pAllocDesc &&
         pAllocInfo &&
         ppAllocation &&
-        (pAllocInfo->Alignment == 0 ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) &&
-        pAllocInfo->SizeInBytes != 0 &&
-        pAllocInfo->SizeInBytes % (64ull * 1024) == 0;
+        IsPow2(pAllocInfo->Alignment) &&
+        pAllocInfo->SizeInBytes > 0 &&
+        pAllocInfo->SizeInBytes % 4 == 0;
 }
 
 #endif // _D3D12MA_FUNCTIONS
@@ -9880,7 +9878,7 @@ HRESULT Allocator::AllocateMemory(
         return E_INVALIDARG;
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-        return m_Pimpl->AllocateMemory(pAllocDesc, pAllocInfo, ppAllocation);
+    return m_Pimpl->AllocateMemory(pAllocDesc, pAllocInfo, ppAllocation);
 }
 
 HRESULT Allocator::CreateAliasingResource(
