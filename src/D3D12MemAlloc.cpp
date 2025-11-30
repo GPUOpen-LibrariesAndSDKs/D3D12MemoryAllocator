@@ -215,6 +215,7 @@ static const D3D12_HEAP_FLAGS RESOURCE_CLASS_HEAP_FLAGS =
 static const D3D12_RESIDENCY_PRIORITY D3D12_RESIDENCY_PRIORITY_NONE = D3D12_RESIDENCY_PRIORITY(0);
 
 static const D3D12_HEAP_TYPE D3D12_HEAP_TYPE_GPU_UPLOAD_COPY = (D3D12_HEAP_TYPE)5;
+static const D3D12_RESOURCE_FLAGS D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY = (D3D12_RESOURCE_FLAGS)0x400;
 
 #ifndef _D3D12MA_ENUM_DECLARATIONS
 
@@ -816,11 +817,9 @@ static bool ValidateAllocateMemoryParameters(
     return pAllocDesc &&
         pAllocInfo &&
         ppAllocation &&
-        (pAllocInfo->Alignment == 0 ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
-            pAllocInfo->Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT) &&
-        pAllocInfo->SizeInBytes != 0 &&
-        pAllocInfo->SizeInBytes % (64ull * 1024) == 0;
+        IsPow2(pAllocInfo->Alignment) &&
+        pAllocInfo->SizeInBytes > 0 &&
+        pAllocInfo->SizeInBytes % 4 == 0;
 }
 
 #endif // _D3D12MA_FUNCTIONS
@@ -7849,6 +7848,7 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
     if (inOutResourceDesc.Alignment == 0 &&
+        (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) == 0 &&
         (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
             inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
             inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) &&
@@ -9878,7 +9878,7 @@ HRESULT Allocator::AllocateMemory(
         return E_INVALIDARG;
     }
     D3D12MA_DEBUG_GLOBAL_MUTEX_LOCK
-        return m_Pimpl->AllocateMemory(pAllocDesc, pAllocInfo, ppAllocation);
+    return m_Pimpl->AllocateMemory(pAllocDesc, pAllocInfo, ppAllocation);
 }
 
 HRESULT Allocator::CreateAliasingResource(

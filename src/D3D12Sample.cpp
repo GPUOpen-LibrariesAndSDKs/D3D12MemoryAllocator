@@ -605,8 +605,8 @@ static void PrintAdapterInformation(IDXGIAdapter1* adapter)
         assert(0);
     }
 
-    wprintf(L"D3D12_FEATURE_DATA_D3D12_OPTIONS16:\n");
-    wprintf(L"    GPUUploadHeapSupported = %u\n", g_Allocator->IsGPUUploadHeapSupported() ? 1 : 0);
+    wprintf(L"GPUUploadHeapSupported = %u\n", g_Allocator->IsGPUUploadHeapSupported() ? 1 : 0);
+    wprintf(L"TightAlignmentSupported = %u\n", g_Allocator->IsTightAlignmentSupported() ? 1 : 0);
 
     ComPtr<IDXGIAdapter3> adapter3;
     if(SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(&adapter3))))
