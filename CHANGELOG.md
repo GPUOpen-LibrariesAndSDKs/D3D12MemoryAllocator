@@ -1,6 +1,6 @@
 # 3.1.0 (2026-02-23)
 
-- Added supported for resource tight alignment (feature added in Agility SDK 1.618.1). It is used automatically when available.
+- Added support for resource tight alignment (feature added in Agility SDK 1.618.1). It is used automatically when available.
   - Added function `Allocator::IsTightAlignmentSupported`.
   - Added `ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT`.
 - Fixes and improvements in the internal function `AllocatorPimpl::GetResourceAllocationInfo` (which decides when to use small alignment or tight alignment), including:
