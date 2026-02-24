@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -7815,12 +7815,17 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
 
 #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
-    if (IsTightAlignmentEnabled() &&
+    if (IsTightAlignmentEnabled())
+    {
         // Don't allow USE_TIGHT_ALIGNMENT together with ALLOW_CROSS_ADAPTER as there is a D3D Debug Layer error:
         // D3D12 ERROR: ID3D12Device::GetResourceAllocationInfo: D3D12_RESOURCE_DESC::Flag D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT will be ignored since D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER is set. [ STATE_CREATION ERROR #599: CREATERESOURCE_INVALIDMISCFLAGS]
-        (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER) == 0)
-    {
-        inOutResourceDesc.Flags |= D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT;
+        // Also don't allow it together with D3D12_TEXTURE_LAYOUT_64KB_*_SWIZZLE, as there is this error (see issue #86):
+        // D3D12 ERROR: ID3D12Device::GetResourceAllocationInfo: D3D12_RESOURCE_DESC::Flag D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT is not valid when the layout is either D3D12_TEXTURE_LAYOUT_64KB_STANDARD_SWIZZLE or D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE (...). [ STATE_CREATION ERROR #599: CREATERESOURCE_INVALIDMISCFLAGS]
+        if((inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER) == 0
+            && (inOutResourceDesc.Layout != D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE && inOutResourceDesc.Layout != D3D12_TEXTURE_LAYOUT_64KB_STANDARD_SWIZZLE))
+        {
+            inOutResourceDesc.Flags |= D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT;
+        }
     }
 #endif // #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
 
