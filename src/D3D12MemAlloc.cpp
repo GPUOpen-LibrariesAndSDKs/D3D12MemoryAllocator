@@ -163,6 +163,14 @@ especially to test compatibility with D3D12_RESOURCE_HEAP_TIER_1 on modern GPUs.
     #endif
 #endif
 
+#ifndef D3D12MA_OPTIONS4_SUPPORTED
+    #ifdef __ID3D12Device5_INTERFACE_DEFINED__
+        #define D3D12MA_OPTIONS4_SUPPORTED 1
+    #else
+        #define D3D12MA_OPTIONS4_SUPPORTED 0
+    #endif
+#endif
+
 #ifndef D3D12MA_DEBUG_LOG
    #define D3D12MA_DEBUG_LOG(format, ...)
    /*
@@ -778,7 +786,7 @@ static ResourceClass ResourceDescToResourceClass(const D3D12_RESOURCE_DESC_T& re
     return isRenderTargetOrDepthStencil ? ResourceClass::RT_DS_Texture : ResourceClass::Non_RT_DS_Texture;
 }
     
-// This algorithm is overly conservative.
+// This algorithm is overly conservative and applies only to the legacy non-MSAA small-alignment path.
 template<typename D3D12_RESOURCE_DESC_T>
 static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
 {
@@ -5998,6 +6006,7 @@ public:
     BOOL IsCacheCoherentUMA() const { return m_D3D12Architecture.CacheCoherentUMA; }
     bool SupportsResourceHeapTier2() const { return m_D3D12Options.ResourceHeapTier >= D3D12_RESOURCE_HEAP_TIER_2; }
     bool IsGPUUploadHeapSupported() const { return m_GPUUploadHeapSupported != FALSE; }
+    bool IsMsaa64KBAlignedTextureSupported() const { return m_MSAA64KBAlignedTextureSupported != FALSE; }
     bool IsTightAlignmentSupported() const { return m_TightAlignmentSupported != FALSE; }
     bool IsTightAlignmentEnabled() const { return IsTightAlignmentSupported() && m_UseTightAlignment; }
     bool UseMutex() const { return m_UseMutex; }
@@ -6115,6 +6124,7 @@ private:
     DXGI_ADAPTER_DESC m_AdapterDesc;
     D3D12_FEATURE_DATA_D3D12_OPTIONS m_D3D12Options;
     BOOL m_GPUUploadHeapSupported = FALSE;
+    BOOL m_MSAA64KBAlignedTextureSupported = FALSE;
     BOOL m_TightAlignmentSupported = FALSE;
     D3D12_FEATURE_DATA_ARCHITECTURE m_D3D12Architecture;
     AllocationObjectAllocator m_AllocationObjectAllocator;
@@ -6290,6 +6300,17 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         }
     }
 #endif // #if D3D12MA_OPTIONS16_SUPPORTED
+
+#if D3D12MA_OPTIONS4_SUPPORTED
+    {
+        D3D12_FEATURE_DATA_D3D12_OPTIONS4 options4 = {};
+        hr = m_Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS4, &options4, sizeof(options4));
+        if (SUCCEEDED(hr))
+        {
+            m_MSAA64KBAlignedTextureSupported = options4.MSAA64KBAlignedTextureSupported;
+        }
+    }
+#endif // #if D3D12MA_OPTIONS4_SUPPORTED
 
 #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
     {
@@ -7863,6 +7884,23 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
     HRESULT hr = S_OK;
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
+    if (inOutResourceDesc.Alignment == 0 &&
+        IsMsaa64KBAlignedTextureSupported() &&
+        (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) == 0 &&
+        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+        inOutResourceDesc.SampleDesc.Count > 1)
+    {
+        // This capability-driven MSAA path is separate from the legacy CanUseSmallAlignment heuristic.
+        inOutResourceDesc.Alignment = D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
+        hr = GetResourceAllocationInfoMiddle(
+            inOutResourceDesc, NumCastableFormats, pCastableFormats, outAllocInfo);
+        if (SUCCEEDED(hr) && outAllocInfo.Alignment == D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT)
+        {
+            return S_OK;
+        }
+        inOutResourceDesc.Alignment = 0; // Restore original
+    }
+
     if (inOutResourceDesc.Alignment == 0 &&
         (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) == 0 &&
         (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||

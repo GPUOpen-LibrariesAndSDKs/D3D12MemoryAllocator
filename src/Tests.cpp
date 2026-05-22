@@ -165,6 +165,22 @@ static void FillResourceDescForBuffer(D3D12_RESOURCE_DESC_T& outResourceDesc, UI
     outResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 }
 
+static void FillResourceDescForSmallMsaaRenderTarget(D3D12_RESOURCE_DESC& outResourceDesc)
+{
+    outResourceDesc = {};
+    outResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    outResourceDesc.Alignment = 0;
+    outResourceDesc.Width = 64;
+    outResourceDesc.Height = 64;
+    outResourceDesc.DepthOrArraySize = 1;
+    outResourceDesc.MipLevels = 1;
+    outResourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    outResourceDesc.SampleDesc.Count = 2;
+    outResourceDesc.SampleDesc.Quality = 0;
+    outResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    outResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+}
+
 static void FillData(void* outPtr, const UINT64 sizeInBytes, UINT seed)
 {
     UINT* outValues = (UINT*)outPtr;
@@ -359,6 +375,30 @@ static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFile
     ctx.allocator->BuildStatsString(&s, detailed);
     SaveFile(dstFilePath, s, wcslen(s) * sizeof(WCHAR));
     ctx.allocator->FreeStatsString(s);
+}
+
+static bool QueryMsaa64KBAlignedTextureSupported(const TestContext& ctx)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS4 options4 = {};
+    CHECK_HR(ctx.device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS4, &options4, sizeof(options4)));
+    return options4.MSAA64KBAlignedTextureSupported != FALSE;
+}
+
+static UINT64 ExpectedMsaaTexturePlacementAlignment(bool msaa64KBAlignedTextureSupported)
+{
+    return msaa64KBAlignedTextureSupported ?
+        D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT :
+        D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
+}
+
+static void ValidatePlacedSmallMsaaTextureAllocation(const D3D12MA::Allocation* alloc, UINT64 expectedAlignment)
+{
+    CHECK_BOOL(alloc != nullptr);
+    CHECK_BOOL(alloc->GetResource() != nullptr);
+    CHECK_BOOL(alloc->GetHeap() != nullptr);
+    CHECK_BOOL(alloc->GetAlignment() == expectedAlignment);
+    CHECK_BOOL(alloc->GetOffset() % expectedAlignment == 0);
+    CHECK_BOOL(alloc->GetHeap()->GetDesc().Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT);
 }
 
 
@@ -1780,6 +1820,57 @@ static void TestPoolMsaaTextureAsCommitted(const TestContext& ctx)
     CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, &alloc, IID_NULL, nullptr));
     // Committed allocation should not have explicit heap
     CHECK_BOOL(alloc->GetHeap() == nullptr);
+    CHECK_BOOL(alloc->GetOffset() == 0);
+}
+
+static void TestMsaa64KBAlignedTextureSupported_DefaultPool(const TestContext& ctx)
+{
+    wprintf(L"Test MSAA 64 KB alignment in default pool\n");
+
+    CHECK_BOOL((ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED) == 0);
+    CHECK_BOOL((ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED) == 0);
+
+    const UINT64 expectedAlignment =
+        ExpectedMsaaTexturePlacementAlignment(QueryMsaa64KBAlignedTextureSupported(ctx));
+
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ D3D12_HEAP_TYPE_DEFAULT };
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForSmallMsaaRenderTarget(resDesc);
+
+    ComPtr<D3D12MA::Allocation> alloc;
+    ComPtr<ID3D12Resource> resource;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET,
+        nullptr, &alloc, IID_PPV_ARGS(&resource)));
+
+    ValidatePlacedSmallMsaaTextureAllocation(alloc.Get(), expectedAlignment);
+}
+
+static void TestMsaa64KBAlignedTextureSupported_CustomPool(const TestContext& ctx)
+{
+    wprintf(L"Test MSAA 64 KB alignment in custom pool\n");
+
+    const UINT64 expectedAlignment =
+        ExpectedMsaaTexturePlacementAlignment(QueryMsaa64KBAlignedTextureSupported(ctx));
+
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES,
+        D3D12MA::POOL_FLAG_NONE };
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    FillResourceDescForSmallMsaaRenderTarget(resDesc);
+
+    ComPtr<D3D12MA::Allocation> alloc;
+    ComPtr<ID3D12Resource> resource;
+    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET,
+        nullptr, &alloc, IID_PPV_ARGS(&resource)));
+
+    ValidatePlacedSmallMsaaTextureAllocation(alloc.Get(), expectedAlignment);
 }
 
 static void TestMapping(const TestContext& ctx)
@@ -4697,6 +4788,8 @@ static void TestGroupBasics(const TestContext& ctx)
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
     TestAliasingImplicitCommitted(ctx);
+    TestMsaa64KBAlignedTextureSupported_DefaultPool(ctx);
+    TestMsaa64KBAlignedTextureSupported_CustomPool(ctx);
     TestPoolMsaaTextureAsCommitted(ctx);
     TestMapping(ctx);
     TestStats(ctx);
