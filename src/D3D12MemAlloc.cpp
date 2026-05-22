@@ -6086,7 +6086,7 @@ private:
     const bool m_UseMutex;
     const bool m_AlwaysCommitted;
     const bool m_MsaaAlwaysCommitted;
-    bool m_PreferSmallBuffersCommitted;
+    const bool m_PreferSmallBuffersCommitted;
     const bool m_UseTightAlignment;
     bool m_DefaultPoolsNotZeroed = false;
     ID3D12Device* m_Device; // AddRef
@@ -6131,7 +6131,7 @@ private:
     */
     template<typename D3D12_RESOURCE_DESC_T>
     bool PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc,
-        ALLOCATION_FLAGS strategy);
+        ALLOCATION_FLAGS strategy, bool useTightAlignment) const;
 
     // Allocates and registers new committed resource with implicit heap, as dedicated allocation.
     // Creates and returns Allocation object and optionally D3D12 resource.
@@ -6151,6 +6151,7 @@ private:
     template<typename D3D12_RESOURCE_DESC_T>
     HRESULT CalcAllocationParams(const ALLOCATION_DESC& allocDesc, UINT64 allocSize,
         const D3D12_RESOURCE_DESC_T* resDesc, // Optional
+        bool useTightAlignment,
         BlockVector*& outBlockVector, CommittedAllocationParameters& outCommittedAllocationParams, bool& outPreferCommitted);
 
     // Returns UINT32_MAX if index cannot be calculcated.
@@ -6184,7 +6185,10 @@ private:
     template<typename D3D12_RESOURCE_DESC_T>
     HRESULT GetResourceAllocationInfo(D3D12_RESOURCE_DESC_T& inOutResourceDesc,
         UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
-        D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const;
+        D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo,
+        bool useTightAlignment) const;
+
+    bool IsTightAlignmentEnabled(const ALLOCATION_DESC& allocDesc) const;
 
     bool NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size);
 
@@ -6295,13 +6299,6 @@ HRESULT AllocatorPimpl::Init(const ALLOCATOR_DESC& desc)
         {
             m_TightAlignmentSupported = tightAlignment.SupportTier >= D3D12_TIGHT_ALIGNMENT_TIER_1;
             
-            // If tight alignment is supported (checked by the code above) and wasn't disabled by the developer
-            // (with ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT), disable the preference for creating small buffers as committed,
-            // as if ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED was specified.
-            if (IsTightAlignmentEnabled())
-            {
-                m_PreferSmallBuffersCommitted = false;
-            }
         }
     }
 #endif // #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
@@ -6500,6 +6497,7 @@ HRESULT AllocatorPimpl::CreateResource(
     }
 
     HRESULT hr = E_NOINTERFACE;
+    const bool useTightAlignment = IsTightAlignmentEnabled(*pAllocDesc);
     CREATE_RESOURCE_PARAMS finalCreateParams = createParams;
     D3D12_RESOURCE_DESC finalResourceDesc;
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
@@ -6510,7 +6508,7 @@ HRESULT AllocatorPimpl::CreateResource(
     {
         finalResourceDesc = *createParams.GetResourceDesc();
         finalCreateParams.AccessResourceDesc() = &finalResourceDesc;
-        hr = GetResourceAllocationInfo(finalResourceDesc, 0, NULL, resAllocInfo);
+        hr = GetResourceAllocationInfo(finalResourceDesc, 0, NULL, resAllocInfo, useTightAlignment);
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
@@ -6519,7 +6517,7 @@ HRESULT AllocatorPimpl::CreateResource(
         {
             finalResourceDesc1 = *createParams.GetResourceDesc1();
             finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
-            hr = GetResourceAllocationInfo(finalResourceDesc1, 0, NULL, resAllocInfo);
+            hr = GetResourceAllocationInfo(finalResourceDesc1, 0, NULL, resAllocInfo, useTightAlignment);
         }
     }
 #endif
@@ -6531,7 +6529,7 @@ HRESULT AllocatorPimpl::CreateResource(
             finalResourceDesc1 = *createParams.GetResourceDesc1();
             finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
             hr = GetResourceAllocationInfo(finalResourceDesc1,
-                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(), resAllocInfo);
+                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(), resAllocInfo, useTightAlignment);
         }
     }
 #endif
@@ -6557,14 +6555,14 @@ HRESULT AllocatorPimpl::CreateResource(
     if (createParams.Variant >= CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
     {
         hr = CalcAllocationParams<D3D12_RESOURCE_DESC1>(*pAllocDesc, resAllocInfo.SizeInBytes,
-            createParams.GetResourceDesc1(),
+            createParams.GetResourceDesc1(), useTightAlignment,
             blockVector, committedAllocationParams, preferCommitted);
     }
     else
 #endif
     {
         hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, resAllocInfo.SizeInBytes,
-            createParams.GetResourceDesc(),
+            createParams.GetResourceDesc(), useTightAlignment,
             blockVector, committedAllocationParams, preferCommitted);
     }
     if (FAILED(hr))
@@ -6611,6 +6609,7 @@ HRESULT AllocatorPimpl::AllocateMemory(
     bool preferCommitted = false;
     HRESULT hr = CalcAllocationParams<D3D12_RESOURCE_DESC>(*pAllocDesc, pAllocInfo->SizeInBytes,
         NULL, // pResDesc
+        false, // useTightAlignment - irrelevant for AllocateMemory
         blockVector, committedAllocationParams, preferCommitted);
     if (FAILED(hr))
         return hr;
@@ -6659,7 +6658,7 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
     {
         finalResourceDesc = *createParams.GetResourceDesc();
         finalCreateParams.AccessResourceDesc() = &finalResourceDesc;
-        hr = GetResourceAllocationInfo(finalResourceDesc, 0, NULL, resAllocInfo);
+        hr = GetResourceAllocationInfo(finalResourceDesc, 0, NULL, resAllocInfo, IsTightAlignmentEnabled());
     }
 #ifdef __ID3D12Device8_INTERFACE_DEFINED__
     else if (createParams.Variant == CREATE_RESOURCE_PARAMS::VARIANT_WITH_STATE_AND_DESC1)
@@ -6668,7 +6667,7 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
         {
             finalResourceDesc1 = *createParams.GetResourceDesc1();
             finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
-            hr = GetResourceAllocationInfo(finalResourceDesc1, 0, NULL, resAllocInfo);
+            hr = GetResourceAllocationInfo(finalResourceDesc1, 0, NULL, resAllocInfo, IsTightAlignmentEnabled());
         }
     }
 #endif
@@ -6680,7 +6679,7 @@ HRESULT AllocatorPimpl::CreateAliasingResource(
             finalResourceDesc1 = *createParams.GetResourceDesc1();
             finalCreateParams.AccessResourceDesc1() = &finalResourceDesc1;
             hr = GetResourceAllocationInfo(finalResourceDesc1,
-                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(), resAllocInfo);
+                createParams.GetNumCastableFormats(), createParams.GetCastableFormats(), resAllocInfo, IsTightAlignmentEnabled());
         }
     }
 #endif
@@ -7315,13 +7314,14 @@ void AllocatorPimpl::FreeStatsString(WCHAR* pStatsString)
 
 template<typename D3D12_RESOURCE_DESC_T>
 bool AllocatorPimpl::PrefersCommittedAllocation(const D3D12_RESOURCE_DESC_T& resourceDesc,
-    ALLOCATION_FLAGS strategy)
+    ALLOCATION_FLAGS strategy, bool useTightAlignment) const
 {
     // Prefer creating small buffers <= 32 KB as committed, because drivers pack them better,
     // while placed buffers require 64 KB alignment.
     if(resourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
         resourceDesc.Width <= D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT / 2 &&
         strategy != ALLOCATION_FLAG_STRATEGY_MIN_TIME &&  // Creating as committed would be slower.
+        !useTightAlignment &&
         m_PreferSmallBuffersCommitted)
     {
         return true;
@@ -7536,7 +7536,7 @@ HRESULT AllocatorPimpl::AllocateHeap(
 
 template<typename D3D12_RESOURCE_DESC_T>
 HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, UINT64 allocSize,
-    const D3D12_RESOURCE_DESC_T* resDesc,
+    const D3D12_RESOURCE_DESC_T* resDesc, bool useTightAlignment,
     BlockVector*& outBlockVector, CommittedAllocationParameters& outCommittedAllocationParams, bool& outPreferCommitted)
 {
     outBlockVector = NULL;
@@ -7609,7 +7609,7 @@ HRESULT AllocatorPimpl::CalcAllocationParams(const ALLOCATION_DESC& allocDesc, U
     {
         if (resDesc->SampleDesc.Count > 1 && msaaAlwaysCommitted)
             outBlockVector = NULL;
-        if (!outPreferCommitted && PrefersCommittedAllocation(*resDesc, allocDesc.Flags & ALLOCATION_FLAG_STRATEGY_MASK))
+        if (!outPreferCommitted && PrefersCommittedAllocation(*resDesc, allocDesc.Flags & ALLOCATION_FLAG_STRATEGY_MASK, useTightAlignment))
             outPreferCommitted = true;
     }
 
@@ -7820,12 +7820,13 @@ template<typename D3D12_RESOURCE_DESC_T>
 HRESULT AllocatorPimpl::GetResourceAllocationInfo(
     D3D12_RESOURCE_DESC_T& inOutResourceDesc,
     UINT32 NumCastableFormats, const DXGI_FORMAT* pCastableFormats,
-    D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo) const
+    D3D12_RESOURCE_ALLOCATION_INFO& outAllocInfo,
+    bool useTightAlignment) const
 {
 #ifdef __ID3D12Device1_INTERFACE_DEFINED__
 
 #if D3D12MA_TIGHT_ALIGNMENT_SUPPORTED
-    if (IsTightAlignmentEnabled())
+    if (useTightAlignment)
     {
         // Don't allow USE_TIGHT_ALIGNMENT together with ALLOW_CROSS_ADAPTER as there is a D3D Debug Layer error:
         // D3D12 ERROR: ID3D12Device::GetResourceAllocationInfo: D3D12_RESOURCE_DESC::Flag D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT will be ignored since D3D12_RESOURCE_FLAG_ALLOW_CROSS_ADAPTER is set. [ STATE_CREATION ERROR #599: CREATERESOURCE_INVALIDMISCFLAGS]
@@ -7849,7 +7850,7 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
     */
     if (inOutResourceDesc.Alignment == 0 &&
         inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
-        !IsTightAlignmentEnabled())
+        !useTightAlignment)
     {
         outAllocInfo = {
             AlignUp<UINT64>(inOutResourceDesc.Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT), // SizeInBytes
@@ -7894,6 +7895,20 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
 
     return GetResourceAllocationInfoMiddle(
         inOutResourceDesc, NumCastableFormats, pCastableFormats, outAllocInfo);
+}
+
+bool AllocatorPimpl::IsTightAlignmentEnabled(const ALLOCATION_DESC& allocDesc) const
+{
+    if (!IsTightAlignmentEnabled())
+        return false;
+
+    if (allocDesc.CustomPool != NULL &&
+        (allocDesc.CustomPool->m_Pimpl->GetDesc().Flags & POOL_FLAG_DONT_USE_TIGHT_ALIGNMENT) != 0)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 bool AllocatorPimpl::NewAllocationWithinBudget(D3D12_HEAP_TYPE heapType, UINT64 size)

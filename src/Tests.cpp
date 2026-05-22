@@ -730,70 +730,77 @@ static void TestSmallBuffers(const TestContext& ctx)
 
     const bool isTightAlignmentEnabled = ctx.allocator->IsTightAlignmentSupported() &&
         (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT) == 0;
-    const bool expectSmallBuffersCommitted = !isTightAlignmentEnabled &&
+    const bool allowSmallBuffersCommitted =
         (ctx.allocatorFlags & D3D12MA::ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED) == 0;
-        
+    const bool expectSmallBuffersCommitted = !isTightAlignmentEnabled &&
+        allowSmallBuffersCommitted;
 
-    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
-        D3D12_HEAP_TYPE_DEFAULT,
-        D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS };
-    ComPtr<D3D12MA::Pool> pool;
-    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
-
-    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
-
-    D3D12_RESOURCE_DESC resDesc;
-    FillResourceDescForBuffer(resDesc, 8 * KILOBYTE);
-
-    D3D12_RESOURCE_DESC largeResDesc = resDesc;
-    largeResDesc.Width = 128 * KILOBYTE;
-
-    std::vector<ResourceWithAllocation> resources;
-
-    // A large buffer placed inside the heap to allocate first block.
+    const auto testPool = [&](D3D12MA::POOL_FLAGS poolFlags, bool expectDefaultCommitted)
     {
-        resources.emplace_back();
-        ResourceWithAllocation& resWithAlloc = resources.back();
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &largeResDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
-        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        CHECK_BOOL(resWithAlloc.allocation->GetHeap()); // Expected to be placed.
-    }
+        D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+            D3D12_HEAP_TYPE_DEFAULT,
+            D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+            poolFlags };
+        ComPtr<D3D12MA::Pool> pool;
+        CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
 
-    // Test 1: COMMITTED.
-    {
-        resources.emplace_back();
-        ResourceWithAllocation& resWithAlloc = resources.back();
-        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
-        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        CHECK_BOOL(!resWithAlloc.allocation->GetHeap()); // Expected to be committed.
-    }
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
 
-    // Test 2: Default.
-    {
-        resources.emplace_back();
-        ResourceWithAllocation& resWithAlloc = resources.back();
-        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
-        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        // Expected to be committed?
-        const bool isCommitted = resWithAlloc.allocation->GetHeap() == NULL;
-        CHECK_BOOL(isCommitted == expectSmallBuffersCommitted);
-    }
+        D3D12_RESOURCE_DESC resDesc;
+        FillResourceDescForBuffer(resDesc, 8 * KILOBYTE);
 
-    // Test 3: NEVER_ALLOCATE.
-    {
-        resources.emplace_back();
-        ResourceWithAllocation& resWithAlloc = resources.back();
-        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
-            nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
-        CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
-        CHECK_BOOL(resWithAlloc.allocation->GetHeap()); // Expected to be placed.
-    }
+        D3D12_RESOURCE_DESC largeResDesc = resDesc;
+        largeResDesc.Width = 128 * KILOBYTE;
+
+        std::vector<ResourceWithAllocation> resources;
+
+        // A large buffer placed inside the heap to allocate first block.
+        {
+            resources.emplace_back();
+            ResourceWithAllocation& resWithAlloc = resources.back();
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &largeResDesc, D3D12_RESOURCE_STATE_COMMON,
+                nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+            CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+            CHECK_BOOL(resWithAlloc.allocation->GetHeap()); // Expected to be placed.
+        }
+
+        // Test 1: COMMITTED.
+        {
+            resources.emplace_back();
+            ResourceWithAllocation& resWithAlloc = resources.back();
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+                nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+            CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+            CHECK_BOOL(!resWithAlloc.allocation->GetHeap()); // Expected to be committed.
+        }
+
+        // Test 2: Default.
+        {
+            resources.emplace_back();
+            ResourceWithAllocation& resWithAlloc = resources.back();
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+                nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+            CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+            const bool isCommitted = resWithAlloc.allocation->GetHeap() == NULL;
+            CHECK_BOOL(isCommitted == expectDefaultCommitted);
+        }
+
+        // Test 3: NEVER_ALLOCATE.
+        {
+            resources.emplace_back();
+            ResourceWithAllocation& resWithAlloc = resources.back();
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NEVER_ALLOCATE;
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
+                nullptr, &resWithAlloc.allocation, IID_PPV_ARGS(&resWithAlloc.resource)));
+            CHECK_BOOL(resWithAlloc.allocation && resWithAlloc.allocation->GetResource());
+            CHECK_BOOL(resWithAlloc.allocation->GetHeap()); // Expected to be placed.
+        }
+    };
+
+    testPool(D3D12MA::POOL_FLAG_NONE, expectSmallBuffersCommitted);
+    testPool(D3D12MA::POOL_FLAG_DONT_USE_TIGHT_ALIGNMENT, allowSmallBuffersCommitted);
 }
 
 static void TestCustomHeapFlags(const TestContext& ctx)
@@ -3373,45 +3380,51 @@ static void TestTightAlignment(const TestContext& ctx)
     for (auto heapType : heapTypes)
     {
         poolDesc.HeapProperties.Type = heapType;
-        for (uint32_t minAlignmentTestIndex = 0; minAlignmentTestIndex < 2; ++minAlignmentTestIndex)
+        for (uint32_t poolFlagsIndex = 0; poolFlagsIndex < 2; ++poolFlagsIndex)
         {
-            // MinAllocationAlignment == 0 - default alignment.
-            // MinAllocationAlignment == 1 - minimum possible alignment.
-            poolDesc.MinAllocationAlignment = minAlignmentTestIndex;
-
-            ComPtr<Pool> pool;
-            CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
-
-            ALLOCATION_DESC allocDesc = {};
-            allocDesc.CustomPool = pool.Get();
-
-            ComPtr<Allocation> allocs[2] = {};
-
-            for (size_t i = 0; i < _countof(allocs); ++i)
+            poolDesc.Flags = poolFlagsIndex == 0 ? POOL_FLAG_NONE : POOL_FLAG_DONT_USE_TIGHT_ALIGNMENT;
+            const bool isPoolTightAlignmentEnabled = isTightAlignmentEnabled && poolDesc.Flags == POOL_FLAG_NONE;
+            for (uint32_t minAlignmentTestIndex = 0; minAlignmentTestIndex < 2; ++minAlignmentTestIndex)
             {
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
-                    D3D12_RESOURCE_STATE_COMMON, NULL, &allocs[i], IID_NULL, NULL));
-                CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
+                // MinAllocationAlignment == 0 - default alignment.
+                // MinAllocationAlignment == 1 - minimum possible alignment.
+                poolDesc.MinAllocationAlignment = minAlignmentTestIndex;
+
+                ComPtr<Pool> pool;
+                CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+                ALLOCATION_DESC allocDesc = {};
+                allocDesc.CustomPool = pool.Get();
+
+                ComPtr<Allocation> allocs[2] = {};
+
+                for (size_t i = 0; i < _countof(allocs); ++i)
+                {
+                    CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
+                        D3D12_RESOURCE_STATE_COMMON, NULL, &allocs[i], IID_NULL, NULL));
+                    CHECK_BOOL(allocs[i] && allocs[i]->GetResource());
+                }
+
+                const UINT64 secondAllocOffset = allocs[1]->GetOffset();
+
+                // Print the offset of the 2nd buffer.
+                wprintf(L"    In D3D12_HEAP_TYPE_%s, with Flags=0x%X, MinAllocationAlignment=%llu, a %llu B buffer was aligned to %llu B.\n",
+                    HEAP_TYPE_NAMES[(size_t)heapType],
+                    poolDesc.Flags,
+                    poolDesc.MinAllocationAlignment,
+                    resDesc.Width,
+                    secondAllocOffset);
+
+                UINT64 expectedMinAlignment = 1;
+                if (isPoolTightAlignmentEnabled)
+                {
+                    if (minAlignmentTestIndex == 0)
+                        expectedMinAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+                }
+                else
+                    expectedMinAlignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+                CHECK_BOOL(secondAllocOffset % expectedMinAlignment == 0);
             }
-
-            const UINT64 secondAllocOffset = allocs[1]->GetOffset();
-
-            // Print the offset of the 2nd buffer.
-            wprintf(L"    In D3D12_HEAP_TYPE_%s, with MinAllocationAlignment=%llu, a %llu B buffer was aligned to %llu B.\n",
-                HEAP_TYPE_NAMES[(size_t)heapType],
-                poolDesc.MinAllocationAlignment,
-                resDesc.Width,
-                secondAllocOffset);
-
-            UINT64 expectedMinAlignment = 1;
-            if (isTightAlignmentEnabled)
-            {
-                if (minAlignmentTestIndex == 0)
-                    expectedMinAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
-            }
-            else
-                expectedMinAlignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-            CHECK_BOOL(secondAllocOffset % expectedMinAlignment == 0);
         }
     }
 }
