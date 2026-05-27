@@ -786,44 +786,118 @@ static ResourceClass ResourceDescToResourceClass(const D3D12_RESOURCE_DESC_T& re
     return isRenderTargetOrDepthStencil ? ResourceClass::RT_DS_Texture : ResourceClass::Non_RT_DS_Texture;
 }
     
+struct SmallAlignmentTileShape
+{
+    UINT Width;
+    UINT Height;
+    UINT Depth;
+};
+
+static bool GetSmallAlignmentTileShape(
+    D3D12_RESOURCE_DIMENSION dimension,
+    UINT bitsPerUnit,
+    SmallAlignmentTileShape& outTileShape)
+{
+    switch (dimension)
+    {
+    case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+        switch (bitsPerUnit)
+        {
+        case   8: outTileShape = { 4096, 1, 1 }; return true;
+        case  16: outTileShape = { 2048, 1, 1 }; return true;
+        case  32: outTileShape = { 1024, 1, 1 }; return true;
+        case  64: outTileShape = {  512, 1, 1 }; return true;
+        case 128: outTileShape = {  256, 1, 1 }; return true;
+        default: return false;
+        }
+
+    case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+        switch (bitsPerUnit)
+        {
+        case   8: outTileShape = { 64, 64, 1 }; return true;
+        case  16: outTileShape = { 64, 32, 1 }; return true;
+        case  32: outTileShape = { 32, 32, 1 }; return true;
+        case  64: outTileShape = { 32, 16, 1 }; return true;
+        case 128: outTileShape = { 16, 16, 1 }; return true;
+        default: return false;
+        }
+
+    case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+        // 4 KB counterparts of the documented 64 KB volume-tile shapes.
+        switch (bitsPerUnit)
+        {
+        case   8: outTileShape = { 16, 16, 16 }; return true;
+        case  16: outTileShape = { 16, 16,  8 }; return true;
+        case  32: outTileShape = { 16,  8,  8 }; return true;
+        case  64: outTileShape = {  8,  8,  8 }; return true;
+        case 128: outTileShape = {  8,  8,  4 }; return true;
+        default: return false;
+        }
+
+    default:
+        return false;
+    }
+}
+
 // This algorithm is overly conservative and applies only to the legacy non-MSAA small-alignment path.
 template<typename D3D12_RESOURCE_DESC_T>
 static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
 {
-    if (resourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+    if (resourceDesc.SampleDesc.Count > 1 ||
+        resourceDesc.Width > UINT_MAX)
+    {
         return false;
-    if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0)
-        return false;
-    if (resourceDesc.SampleDesc.Count > 1)
-        return false;
-    if (resourceDesc.DepthOrArraySize != 1)
-        return false;
+    }
 
     UINT sizeX = (UINT)resourceDesc.Width;
-    UINT sizeY = resourceDesc.Height;
-    UINT bitsPerPixel = GetBitsPerPixel(resourceDesc.Format);
-    if (bitsPerPixel == 0)
+    UINT sizeY = 1;
+    UINT sizeZ = 1;
+    UINT bitsPerUnit = GetBitsPerPixel(resourceDesc.Format);
+    if (bitsPerUnit == 0)
         return false;
 
-    if (IsFormatCompressed(resourceDesc.Format))
+    switch (resourceDesc.Dimension)
     {
-        sizeX = DivideRoundingUp(sizeX, 4u);
-        sizeY = DivideRoundingUp(sizeY, 4u);
-        bitsPerPixel *= 16;
+    case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+        // For 1D arrays, small-alignment eligibility depends on the mip0 slice size, not array size.
+        if (IsFormatCompressed(resourceDesc.Format))
+            return false;
+        break;
+
+    case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+        // For 2D arrays, small-alignment eligibility depends on mip0 width/height, not array size.
+        sizeY = resourceDesc.Height;
+        if (IsFormatCompressed(resourceDesc.Format))
+        {
+            sizeX = DivideRoundingUp(sizeX, 4u);
+            sizeY = DivideRoundingUp(sizeY, 4u);
+            bitsPerUnit *= 16;
+        }
+        break;
+
+    case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+        sizeY = resourceDesc.Height;
+        sizeZ = resourceDesc.DepthOrArraySize;
+        if (IsFormatCompressed(resourceDesc.Format))
+        {
+            sizeX = DivideRoundingUp(sizeX, 4u);
+            sizeY = DivideRoundingUp(sizeY, 4u);
+            bitsPerUnit *= 16;
+        }
+        break;
+
+    default:
+        return false;
     }
 
-    UINT tileSizeX = 0, tileSizeY = 0;
-    switch (bitsPerPixel)
-    {
-    case   8: tileSizeX = 64; tileSizeY = 64; break;
-    case  16: tileSizeX = 64; tileSizeY = 32; break;
-    case  32: tileSizeX = 32; tileSizeY = 32; break;
-    case  64: tileSizeX = 32; tileSizeY = 16; break;
-    case 128: tileSizeX = 16; tileSizeY = 16; break;
-    default: return false;
-    }
+    SmallAlignmentTileShape tileShape = {};
+    if (!GetSmallAlignmentTileShape(resourceDesc.Dimension, bitsPerUnit, tileShape))
+        return false;
 
-    const UINT tileCount = DivideRoundingUp(sizeX, tileSizeX) * DivideRoundingUp(sizeY, tileSizeY);
+    const UINT64 tileCount =
+        UINT64(DivideRoundingUp(sizeX, tileShape.Width)) *
+        UINT64(DivideRoundingUp(sizeY, tileShape.Height)) *
+        UINT64(DivideRoundingUp(sizeZ, tileShape.Depth));
     return tileCount <= 16;
 }
     
@@ -7906,7 +7980,8 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
         (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
             inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
             inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) &&
-        (inOutResourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0
+        (inOutResourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0 &&
+        inOutResourceDesc.SampleDesc.Count == 1
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT == 1
         && CanUseSmallAlignment(inOutResourceDesc)
 #endif

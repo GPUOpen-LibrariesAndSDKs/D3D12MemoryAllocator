@@ -181,6 +181,25 @@ static void FillResourceDescForSmallMsaaRenderTarget(D3D12_RESOURCE_DESC& outRes
     outResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 }
 
+static void ValidatePlacedTextureAlignmentAgainstRuntime(
+    const TestContext& ctx,
+    const D3D12MA::Allocation* alloc,
+    const D3D12_RESOURCE_DESC& resourceDesc)
+{
+    CHECK_BOOL(alloc != nullptr);
+    CHECK_BOOL(alloc->GetHeap() != nullptr);
+
+    D3D12_RESOURCE_DESC alignedDesc = resourceDesc;
+    alignedDesc.Alignment = D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
+    const D3D12_RESOURCE_ALLOCATION_INFO expectedInfo =
+        ctx.device->GetResourceAllocationInfo(0, 1, &alignedDesc);
+
+    CHECK_BOOL(expectedInfo.SizeInBytes != UINT64_MAX);
+    CHECK_BOOL(alloc->GetAlignment() == expectedInfo.Alignment);
+    CHECK_BOOL(alloc->GetOffset() % expectedInfo.Alignment == 0);
+    CHECK_BOOL(alloc->GetSize() == expectedInfo.SizeInBytes);
+}
+
 static void FillData(void* outPtr, const UINT64 sizeInBytes, UINT seed)
 {
     UINT* outValues = (UINT*)outPtr;
@@ -1871,6 +1890,71 @@ static void TestMsaa64KBAlignedTextureSupported_CustomPool(const TestContext& ct
         nullptr, &alloc, IID_PPV_ARGS(&resource)));
 
     ValidatePlacedSmallMsaaTextureAllocation(alloc.Get(), expectedAlignment);
+}
+
+static void TestSmallTextureAlignmentAcrossDimensions(const TestContext& ctx)
+{
+    wprintf(L"Test small texture alignment across dimensions\n");
+
+    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+        D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES,
+        D3D12MA::POOL_FLAG_NONE };
+    ComPtr<D3D12MA::Pool> pool;
+    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
+
+    auto createAndValidate = [&](const D3D12_RESOURCE_DESC& resourceDesc)
+    {
+        ComPtr<D3D12MA::Allocation> alloc;
+        ComPtr<ID3D12Resource> resource;
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, &alloc, IID_PPV_ARGS(&resource)));
+        ValidatePlacedTextureAlignmentAgainstRuntime(ctx, alloc.Get(), resourceDesc);
+    };
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+    resDesc.Alignment = 0;
+    resDesc.Width = 1024;
+    resDesc.Height = 1;
+    resDesc.DepthOrArraySize = 7;
+    resDesc.MipLevels = 4;
+    resDesc.Format = DXGI_FORMAT_R8_UNORM;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    createAndValidate(resDesc);
+
+    resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resDesc.Alignment = 0;
+    resDesc.Width = 64;
+    resDesc.Height = 64;
+    resDesc.DepthOrArraySize = 8;
+    resDesc.MipLevels = 4;
+    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    createAndValidate(resDesc);
+
+    resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    resDesc.Alignment = 0;
+    resDesc.Width = 8;
+    resDesc.Height = 8;
+    resDesc.DepthOrArraySize = 8;
+    resDesc.MipLevels = 4;
+    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.SampleDesc.Quality = 0;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    createAndValidate(resDesc);
 }
 
 static void TestMapping(const TestContext& ctx)
@@ -4790,6 +4874,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestAliasingImplicitCommitted(ctx);
     TestMsaa64KBAlignedTextureSupported_DefaultPool(ctx);
     TestMsaa64KBAlignedTextureSupported_CustomPool(ctx);
+    TestSmallTextureAlignmentAcrossDimensions(ctx);
     TestPoolMsaaTextureAsCommitted(ctx);
     TestMapping(ctx);
     TestStats(ctx);
