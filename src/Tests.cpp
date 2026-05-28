@@ -1961,18 +1961,20 @@ static void TestSmallTextureAlignment(const TestContext& ctx)
                 CHECK_BOOL(alloc1->GetHeap() != nullptr);
                 CHECK_BOOL(alloc0->GetHeap() == alloc1->GetHeap());
 
+                // Note these asserts may fail if you use D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT=2.
                 const UINT64 expectedAlignment = belowThreshold ? smallAlignment : largeAlignment;
                 CHECK_BOOL((alloc0->GetOffset() % expectedAlignment) == 0);
                 CHECK_BOOL((alloc1->GetOffset() % expectedAlignment) == 0);
                 if (belowThreshold)
                 {
                     const UINT64 nonZeroOffset = alloc0->GetOffset() > 0 ? alloc0->GetOffset() : alloc1->GetOffset();
-                    wprintf(L"    Small alignment case: format=%u msaa=%u size=%llux%u offset=%llu\n",
+                    wprintf(L"    Small alignment case: format=%u msaa=%u size=%llux%u offset=%llu -> small alignment %s\n",
                         (UINT)textureCase.Format,
                         isMsaa ? 1u : 0u,
                         resDesc.Width,
                         resDesc.Height,
-                        nonZeroOffset);
+                        nonZeroOffset,
+                        nonZeroOffset < largeAlignment ? L"YES" : L"NO");
                 }
 
                 alloc1.Reset();
