@@ -785,6 +785,18 @@ static ResourceClass ResourceDescToResourceClass(const D3D12_RESOURCE_DESC_T& re
         (resDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0;
     return isRenderTargetOrDepthStencil ? ResourceClass::RT_DS_Texture : ResourceClass::Non_RT_DS_Texture;
 }
+
+static bool ResourceDimensionIsTexture(D3D12_RESOURCE_DIMENSION dimension)
+{
+    return dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
+        dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
+        dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+}
+
+static bool ResourceFlagsContainRenderTargetOrDepthStencil(D3D12_RESOURCE_FLAGS flags)
+{
+    return (flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0;
+}
     
 struct SmallAlignmentTileShape
 {
@@ -795,9 +807,30 @@ struct SmallAlignmentTileShape
 
 static bool GetSmallAlignmentTileShape(
     D3D12_RESOURCE_DIMENSION dimension,
+    bool isMsaa,
     UINT bitsPerUnit,
     SmallAlignmentTileShape& outTileShape)
 {
+    if (isMsaa)
+    {
+        if (dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+            return false;
+
+        switch (bitsPerUnit)
+        {
+        case    8: outTileShape = { 256, 256, 1 }; return true;
+        case   16: outTileShape = { 256, 128, 1 }; return true;
+        case   32: outTileShape = { 128, 128, 1 }; return true;
+        case   64: outTileShape = { 128,  64, 1 }; return true;
+        case  128: outTileShape = {  64,  64, 1 }; return true;
+        case  256: outTileShape = {  64,  32, 1 }; return true;
+        case  512: outTileShape = {  32,  32, 1 }; return true;
+        case 1024: outTileShape = {  32,  16, 1 }; return true;
+        case 2048: outTileShape = {  16,  16, 1 }; return true;
+        default: return false;
+        }
+    }
+
     switch (dimension)
     {
     case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
@@ -839,12 +872,25 @@ static bool GetSmallAlignmentTileShape(
     }
 }
 
-// This algorithm is overly conservative and applies only to the legacy non-MSAA small-alignment path.
+// This algorithm is overly conservative and applies only to the legacy small-alignment heuristic path.
 template<typename D3D12_RESOURCE_DESC_T>
 static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
 {
-    if (resourceDesc.SampleDesc.Count > 1 ||
+    if (resourceDesc.SampleDesc.Count == 0 ||
+        resourceDesc.Layout != D3D12_TEXTURE_LAYOUT_UNKNOWN ||
         resourceDesc.Width > UINT_MAX)
+    {
+        return false;
+    }
+
+    const bool isMsaa = resourceDesc.SampleDesc.Count > 1;
+    const bool isRtDs = ResourceFlagsContainRenderTargetOrDepthStencil(resourceDesc.Flags);
+    if (isMsaa && !isRtDs)
+    {
+        return false;
+    }
+    if (!isMsaa &&
+        isRtDs)
     {
         return false;
     }
@@ -859,6 +905,8 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
     switch (resourceDesc.Dimension)
     {
     case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+        if (isMsaa)
+            return false;
         // For 1D arrays, small-alignment eligibility depends on the mip0 slice size, not array size.
         if (IsFormatCompressed(resourceDesc.Format))
             return false;
@@ -867,6 +915,8 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
     case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
         // For 2D arrays, small-alignment eligibility depends on mip0 width/height, not array size.
         sizeY = resourceDesc.Height;
+        if (isMsaa && IsFormatCompressed(resourceDesc.Format))
+            return false;
         if (IsFormatCompressed(resourceDesc.Format))
         {
             sizeX = DivideRoundingUp(sizeX, 4u);
@@ -876,6 +926,8 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
         break;
 
     case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+        if (isMsaa)
+            return false;
         sizeY = resourceDesc.Height;
         sizeZ = resourceDesc.DepthOrArraySize;
         if (IsFormatCompressed(resourceDesc.Format))
@@ -890,15 +942,18 @@ static bool CanUseSmallAlignment(const D3D12_RESOURCE_DESC_T& resourceDesc)
         return false;
     }
 
+    bitsPerUnit *= resourceDesc.SampleDesc.Count;
+
     SmallAlignmentTileShape tileShape = {};
-    if (!GetSmallAlignmentTileShape(resourceDesc.Dimension, bitsPerUnit, tileShape))
+    if (!GetSmallAlignmentTileShape(resourceDesc.Dimension, isMsaa, bitsPerUnit, tileShape))
         return false;
 
     const UINT64 tileCount =
         UINT64(DivideRoundingUp(sizeX, tileShape.Width)) *
         UINT64(DivideRoundingUp(sizeY, tileShape.Height)) *
         UINT64(DivideRoundingUp(sizeZ, tileShape.Depth));
-    return tileCount <= 16;
+    // Non-MSAA compares 64 KB against 4 KB tiles => 16 pages. MSAA compares 4 MB against 64 KB tiles => 64 pages.
+    return tileCount <= (isMsaa ? 64 : 16);
 }
     
 static bool ValidateAllocateMemoryParameters(
@@ -7958,34 +8013,33 @@ HRESULT AllocatorPimpl::GetResourceAllocationInfo(
     HRESULT hr = S_OK;
 
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
-    if (inOutResourceDesc.Alignment == 0 &&
-        IsMsaa64KBAlignedTextureSupported() &&
-        (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) == 0 &&
-        inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
-        inOutResourceDesc.SampleDesc.Count > 1)
+    bool trySmallAlignment = false;
+
+    if (inOutResourceDesc.Alignment == 0
+        && (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) == 0
+        && inOutResourceDesc.Layout == D3D12_TEXTURE_LAYOUT_UNKNOWN
+        && ResourceDimensionIsTexture(inOutResourceDesc.Dimension))
     {
-        // This capability-driven MSAA path is separate from the legacy CanUseSmallAlignment heuristic.
-        inOutResourceDesc.Alignment = D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
-        hr = GetResourceAllocationInfoMiddle(
-            inOutResourceDesc, NumCastableFormats, pCastableFormats, outAllocInfo);
-        if (SUCCEEDED(hr) && outAllocInfo.Alignment == D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT)
+        // MSAA texture.
+        if(inOutResourceDesc.SampleDesc.Count > 1)
         {
-            return S_OK;
+            trySmallAlignment = IsMsaa64KBAlignedTextureSupported()
+                && ResourceFlagsContainRenderTargetOrDepthStencil(inOutResourceDesc.Flags)
+                && inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         }
-        inOutResourceDesc.Alignment = 0; // Restore original
+        // Non-MSAA texture.
+        else
+        {
+            trySmallAlignment = !ResourceFlagsContainRenderTargetOrDepthStencil(inOutResourceDesc.Flags);
+        }
     }
 
-    if (inOutResourceDesc.Alignment == 0 &&
-        (inOutResourceDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) == 0 &&
-        (inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
-            inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
-            inOutResourceDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) &&
-        (inOutResourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0 &&
-        inOutResourceDesc.SampleDesc.Count == 1
 #if D3D12MA_USE_SMALL_RESOURCE_PLACEMENT_ALIGNMENT == 1
-        && CanUseSmallAlignment(inOutResourceDesc)
+    if(trySmallAlignment)
+        trySmallAlignment = CanUseSmallAlignment(inOutResourceDesc);
 #endif
-        )
+    
+    if (trySmallAlignment)
     {
         /*
         The algorithm here is based on Microsoft sample: "Small Resources Sample"
