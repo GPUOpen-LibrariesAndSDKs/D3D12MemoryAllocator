@@ -1,3 +1,8 @@
+# 3.2.0 (2026-??-??)
+
+- Added `POOL_FLAG_DONT_USE_TIGHT_ALIGNMENT` (#91).
+- Further improvements in the algorithm deciding when to use small alignment or tight alignment, including added support for `D3D12_FEATURE_DATA_D3D12_OPTIONS4::MSAA64KBAlignedTextureSupported`.
+
 # 3.1.0 (2026-02-23)
 
 - Added support for resource tight alignment (feature added in Agility SDK 1.618.1). It is used automatically when available.
