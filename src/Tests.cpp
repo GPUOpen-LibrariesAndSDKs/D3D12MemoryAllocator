@@ -1889,14 +1889,14 @@ static void TestSmallTextureAlignment(const TestContext& ctx)
     static const TextureCase NON_MSAA_CASES[] =
     {
         { DXGI_FORMAT_R8_UNORM,           128, 128, 320, 320 },
-        { DXGI_FORMAT_R8G8B8A8_UNORM,     128, 128, 160, 160 },
+        { DXGI_FORMAT_R8G8B8A8_UNORM,      64,  64, 160, 160 },
         { DXGI_FORMAT_BC1_UNORM,          128, 128, 640, 256 },
     };
     static const TextureCase MSAA_CASES[] =
     {
-        { DXGI_FORMAT_R8G8B8A8_UNORM,     512, 512, 1152, 512 },
-        { DXGI_FORMAT_R16G16B16A16_FLOAT, 512, 256, 576,  512 },
-        { DXGI_FORMAT_R32G32B32A32_FLOAT, 512, 256, 576,  256 },
+        { DXGI_FORMAT_R8G8B8A8_UNORM,     256, 256, 1152, 512 },
+        { DXGI_FORMAT_R16G16B16A16_FLOAT, 256, 128, 576,  512 },
+        { DXGI_FORMAT_R32G32B32A32_FLOAT, 256, 128, 576,  256 },
     };
 
     for (UINT msaaIndex = 0; msaaIndex < 2; ++msaaIndex)
@@ -1964,6 +1964,16 @@ static void TestSmallTextureAlignment(const TestContext& ctx)
                 const UINT64 expectedAlignment = belowThreshold ? smallAlignment : largeAlignment;
                 CHECK_BOOL((alloc0->GetOffset() % expectedAlignment) == 0);
                 CHECK_BOOL((alloc1->GetOffset() % expectedAlignment) == 0);
+                if (belowThreshold)
+                {
+                    const UINT64 nonZeroOffset = alloc0->GetOffset() > 0 ? alloc0->GetOffset() : alloc1->GetOffset();
+                    wprintf(L"    Small alignment case: format=%u msaa=%u size=%llux%u offset=%llu\n",
+                        (UINT)textureCase.Format,
+                        isMsaa ? 1u : 0u,
+                        resDesc.Width,
+                        resDesc.Height,
+                        nonZeroOffset);
+                }
 
                 alloc1.Reset();
                 alloc0.Reset();
