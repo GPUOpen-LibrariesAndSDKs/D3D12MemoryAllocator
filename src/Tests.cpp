@@ -181,25 +181,6 @@ static void FillResourceDescForSmallMsaaRenderTarget(D3D12_RESOURCE_DESC& outRes
     outResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 }
 
-static void ValidatePlacedTextureAlignmentAgainstRuntime(
-    const TestContext& ctx,
-    const D3D12MA::Allocation* alloc,
-    const D3D12_RESOURCE_DESC& resourceDesc)
-{
-    CHECK_BOOL(alloc != nullptr);
-    CHECK_BOOL(alloc->GetHeap() != nullptr);
-
-    D3D12_RESOURCE_DESC alignedDesc = resourceDesc;
-    alignedDesc.Alignment = D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
-    const D3D12_RESOURCE_ALLOCATION_INFO expectedInfo =
-        ctx.device->GetResourceAllocationInfo(0, 1, &alignedDesc);
-
-    CHECK_BOOL(expectedInfo.SizeInBytes != UINT64_MAX);
-    CHECK_BOOL(alloc->GetAlignment() == expectedInfo.Alignment);
-    CHECK_BOOL(alloc->GetOffset() % expectedInfo.Alignment == 0);
-    CHECK_BOOL(alloc->GetSize() == expectedInfo.SizeInBytes);
-}
-
 static void FillData(void* outPtr, const UINT64 sizeInBytes, UINT seed)
 {
     UINT* outValues = (UINT*)outPtr;
@@ -1892,69 +1873,105 @@ static void TestMsaa64KBAlignedTextureSupported_CustomPool(const TestContext& ct
     ValidatePlacedSmallMsaaTextureAllocation(alloc.Get(), expectedAlignment);
 }
 
-static void TestSmallTextureAlignmentAcrossDimensions(const TestContext& ctx)
+static void TestSmallTextureAlignment(const TestContext& ctx)
 {
-    wprintf(L"Test small texture alignment across dimensions\n");
+    wprintf(L"Test small texture alignment\n");
 
-    D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
-        D3D12_HEAP_TYPE_DEFAULT,
-        D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES,
-        D3D12MA::POOL_FLAG_NONE };
-    ComPtr<D3D12MA::Pool> pool;
-    CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
-
-    D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
-
-    auto createAndValidate = [&](const D3D12_RESOURCE_DESC& resourceDesc)
+    struct TextureCase
     {
-        ComPtr<D3D12MA::Allocation> alloc;
-        ComPtr<ID3D12Resource> resource;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, &alloc, IID_PPV_ARGS(&resource)));
-        ValidatePlacedTextureAlignmentAgainstRuntime(ctx, alloc.Get(), resourceDesc);
+        DXGI_FORMAT Format;
+        UINT WidthBelowThreshold;
+        UINT HeightBelowThreshold;
+        UINT WidthAboveThreshold;
+        UINT HeightAboveThreshold;
     };
 
-    D3D12_RESOURCE_DESC resDesc = {};
-    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE1D;
-    resDesc.Alignment = 0;
-    resDesc.Width = 1024;
-    resDesc.Height = 1;
-    resDesc.DepthOrArraySize = 7;
-    resDesc.MipLevels = 4;
-    resDesc.Format = DXGI_FORMAT_R8_UNORM;
-    resDesc.SampleDesc.Count = 1;
-    resDesc.SampleDesc.Quality = 0;
-    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    createAndValidate(resDesc);
+    static const TextureCase NON_MSAA_CASES[] =
+    {
+        { DXGI_FORMAT_R8_UNORM,           128, 128, 320, 320 },
+        { DXGI_FORMAT_R8G8B8A8_UNORM,     128, 128, 160, 160 },
+        { DXGI_FORMAT_BC1_UNORM,          128, 128, 640, 256 },
+    };
+    static const TextureCase MSAA_CASES[] =
+    {
+        { DXGI_FORMAT_R8G8B8A8_UNORM,     512, 512, 1152, 512 },
+        { DXGI_FORMAT_R16G16B16A16_FLOAT, 512, 256, 576,  512 },
+        { DXGI_FORMAT_R32G32B32A32_FLOAT, 512, 256, 576,  256 },
+    };
 
-    resDesc = {};
-    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resDesc.Alignment = 0;
-    resDesc.Width = 64;
-    resDesc.Height = 64;
-    resDesc.DepthOrArraySize = 8;
-    resDesc.MipLevels = 4;
-    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    resDesc.SampleDesc.Count = 1;
-    resDesc.SampleDesc.Quality = 0;
-    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    createAndValidate(resDesc);
+    for (UINT msaaIndex = 0; msaaIndex < 2; ++msaaIndex)
+    {
+        const bool isMsaa = msaaIndex != 0;
+        const UINT64 largeAlignment = isMsaa ?
+            D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT :
+            D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+        const UINT64 smallAlignment = isMsaa ?
+            D3D12_SMALL_MSAA_RESOURCE_PLACEMENT_ALIGNMENT :
+            D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT;
+        const TextureCase* textureCases = isMsaa ? MSAA_CASES : NON_MSAA_CASES;
+        const size_t textureCaseCount = isMsaa ? _countof(MSAA_CASES) : _countof(NON_MSAA_CASES);
+        const D3D12_HEAP_FLAGS heapFlags = isMsaa ?
+            D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES :
+            D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+        const D3D12_RESOURCE_FLAGS resourceFlags = isMsaa ?
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET :
+            D3D12_RESOURCE_FLAG_NONE;
+        const D3D12_RESOURCE_STATES initialState = isMsaa ?
+            D3D12_RESOURCE_STATE_RENDER_TARGET :
+            D3D12_RESOURCE_STATE_COPY_DEST;
 
-    resDesc = {};
-    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    resDesc.Alignment = 0;
-    resDesc.Width = 8;
-    resDesc.Height = 8;
-    resDesc.DepthOrArraySize = 8;
-    resDesc.MipLevels = 4;
-    resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    resDesc.SampleDesc.Count = 1;
-    resDesc.SampleDesc.Quality = 0;
-    resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    createAndValidate(resDesc);
+        D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+            D3D12_HEAP_TYPE_DEFAULT,
+            heapFlags,
+            D3D12MA::POOL_FLAG_DONT_USE_TIGHT_ALIGNMENT,
+            16 * MEGABYTE,
+            0,
+            1 };
+        ComPtr<D3D12MA::Pool> pool;
+        CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+
+        D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get() };
+
+        for (size_t textureCaseIndex = 0; textureCaseIndex < textureCaseCount; ++textureCaseIndex)
+        {
+            const TextureCase& textureCase = textureCases[textureCaseIndex];
+            for (UINT thresholdIndex = 0; thresholdIndex < 2; ++thresholdIndex)
+            {
+                const bool belowThreshold = thresholdIndex == 0;
+                D3D12_RESOURCE_DESC resDesc = {};
+                resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                resDesc.Alignment = 0;
+                resDesc.Width = belowThreshold ? textureCase.WidthBelowThreshold : textureCase.WidthAboveThreshold;
+                resDesc.Height = belowThreshold ? textureCase.HeightBelowThreshold : textureCase.HeightAboveThreshold;
+                resDesc.DepthOrArraySize = 1;
+                resDesc.MipLevels = 1;
+                resDesc.Format = textureCase.Format;
+                resDesc.SampleDesc.Count = isMsaa ? 2 : 1;
+                resDesc.SampleDesc.Quality = 0;
+                resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+                resDesc.Flags = resourceFlags;
+
+                ComPtr<D3D12MA::Allocation> alloc0, alloc1;
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, initialState,
+                    nullptr, &alloc0, IID_NULL, nullptr));
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, initialState,
+                    nullptr, &alloc1, IID_NULL, nullptr));
+
+                CHECK_BOOL(alloc0->GetHeap() != nullptr);
+                CHECK_BOOL(alloc1->GetHeap() != nullptr);
+                CHECK_BOOL(alloc0->GetHeap() == alloc1->GetHeap());
+
+                const UINT64 expectedAlignment = belowThreshold ? smallAlignment : largeAlignment;
+                CHECK_BOOL((alloc0->GetOffset() % expectedAlignment) == 0);
+                CHECK_BOOL((alloc1->GetOffset() % expectedAlignment) == 0);
+
+                alloc1.Reset();
+                alloc0.Reset();
+            }
+        }
+
+        pool.Reset();
+    }
 }
 
 static void TestMapping(const TestContext& ctx)
@@ -4874,7 +4891,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestAliasingImplicitCommitted(ctx);
     TestMsaa64KBAlignedTextureSupported_DefaultPool(ctx);
     TestMsaa64KBAlignedTextureSupported_CustomPool(ctx);
-    TestSmallTextureAlignmentAcrossDimensions(ctx);
+    TestSmallTextureAlignment(ctx);
     TestPoolMsaaTextureAsCommitted(ctx);
     TestMapping(ctx);
     TestStats(ctx);
