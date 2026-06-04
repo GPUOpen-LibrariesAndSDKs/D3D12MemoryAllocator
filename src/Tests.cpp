@@ -3574,6 +3574,7 @@ static void TestTightAlignment(const TestContext& ctx)
 
     // Use a custom pool to make sure our small buffers are not created as committed.
     POOL_DESC poolDesc = {};
+    poolDesc.HeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
     poolDesc.BlockSize = MEGABYTE;
     poolDesc.MinBlockCount = poolDesc.MaxBlockCount = 1;
 
