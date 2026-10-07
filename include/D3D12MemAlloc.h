@@ -1319,7 +1319,7 @@ public:
     This function is similar to `ID3D12Device::CreateHeap`, but it may really assign
     part of a larger, existing heap to the allocation.
 
-    `pAllocDesc->heapFlags` should contain one of these values, depending on type of resources you are going to create in this memory:
+    `pAllocDesc->ExtraHeapFlags` should contain one of these values, depending on type of resources you are going to create in this memory:
     `D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES`,
     `D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES`.
