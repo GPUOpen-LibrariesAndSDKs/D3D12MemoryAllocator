@@ -3,7 +3,7 @@ var searchData=
   ['begindefragmentation_0',['BeginDefragmentation',['../class_d3_d12_m_a_1_1_pool.html#adc87bb49c192de8f5a9ca0484c499575',1,'D3D12MA::Pool::BeginDefragmentation()'],['../class_d3_d12_m_a_1_1_allocator.html#a08e1468f1dbb63ce3bf6680e592b2143',1,'D3D12MA::Allocator::BeginDefragmentation()']]],
   ['beginpass_1',['BeginPass',['../class_d3_d12_m_a_1_1_defragmentation_context.html#a1606c015d02edc094bb246986159d592',1,'D3D12MA::DefragmentationContext']]],
   ['benefits_2',['Features and benefits',['../custom_pools.html#custom_pools_features_and_benefits',1,'']]],
-  ['block_3',['block',['../class_d3_d12_m_a_1_1_allocation.html#a413aec64eba9f4ec57e912511591b3b8',1,'D3D12MA::Allocation::block'],['../virtual_allocator.html#virtual_allocator_creating_virtual_block',1,'Creating virtual block']]],
+  ['block_3',['Creating virtual block',['../virtual_allocator.html#virtual_allocator_creating_virtual_block',1,'']]],
   ['blockbytes_4',['BlockBytes',['../struct_d3_d12_m_a_1_1_statistics.html#a65557893f80ff116c43965dbd8d45812',1,'D3D12MA::Statistics']]],
   ['blockcount_5',['BlockCount',['../struct_d3_d12_m_a_1_1_statistics.html#a780b0ddd26d8f6b033ddaa3ba436bf65',1,'D3D12MA::Statistics']]],
   ['blocksize_6',['BlockSize',['../struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#af7284cc51a8ed5b551075584256de23c',1,'D3D12MA::POOL_DESC']]],

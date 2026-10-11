@@ -46,6 +46,15 @@ if(BUILD_SHARED_LIBS)
     )
 endif()
 
+if(D3D12MA_USING_DIRECTX_HEADERS)
+    target_link_libraries(D3D12MemoryAllocator PUBLIC
+        Microsoft::DirectX-Headers
+    )
+    target_compile_definitions(D3D12MemoryAllocator PUBLIC
+        D3D12MA_USING_DIRECTX_HEADERS
+    )
+endif()
+
 set(D3D12MA_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(D3D12MA_VERSION_CONFIG "${D3D12MA_GENERATED_DIR}/${PROJECT_NAME}ConfigVersion.cmake")
 set(D3D12MA_PROJECT_CONFIG "${D3D12MA_GENERATED_DIR}/${PROJECT_NAME}Config.cmake")

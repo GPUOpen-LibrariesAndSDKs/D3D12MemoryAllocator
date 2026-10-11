@@ -236,7 +236,7 @@ static void FillAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D12MA:
                     resDesc.Alignment = 0;
 
                 ComPtr<D3D12MA::Allocation> uploadAlloc;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &uploadAlloc, IID_NULL, nullptr));
 
                 D3D12_RANGE range = {};
@@ -333,7 +333,7 @@ static void ValidateAllocationsDataGPU(const TestContext& ctx, const ComPtr<D3D1
                     resDesc.Alignment = 0;
 
                 ComPtr<D3D12MA::Allocation> downloadAlloc;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &downloadAlloc, IID_NULL, nullptr));
 
                 barrier.Transition.pResource = alloc->GetResource();
@@ -443,7 +443,7 @@ static void TestDebugMargin(const TestContext& ctx)
             CHECK_HR(ctx.allocator->CreateResource(
                 &allocDesc,
                 &resDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
+                D3D12_RESOURCE_STATE_COMMON,
                 nullptr,
                 &buffers[allocIndex],
                 IID_NULL, nullptr));
@@ -922,7 +922,7 @@ static void TestPlacedResources(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDesc,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL,
             &resources[i].allocation,
             IID_PPV_ARGS(&resources[i].resource)) );
@@ -1086,7 +1086,7 @@ static void TestCustomPools(const TestContext& ctx)
     for(uint32_t i = 0; i < 2; ++i)
     {
         CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, // pOptimizedClearValue
             &allocs[i],
             __uuidof(ID3D12Resource), NULL) ); // riidResource, ppvResource
@@ -1123,7 +1123,7 @@ static void TestCustomPools(const TestContext& ctx)
             D3D12MA::ALLOCATION_FLAG_COMMITTED;
         ComPtr<D3D12MA::Allocation> alloc;
         const HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, // pOptimizedClearValue
             &alloc,
             __uuidof(ID3D12Resource), NULL); // riidResource, ppvResource
@@ -1137,7 +1137,7 @@ static void TestCustomPools(const TestContext& ctx)
     {
         ComPtr<D3D12MA::Allocation> alloc;
         HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &resDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, // pOptimizedClearValue
             &alloc,
             __uuidof(ID3D12Resource), NULL); // riidResource, ppvResource
@@ -1175,7 +1175,7 @@ static void TestCustomPools(const TestContext& ctx)
     CHECK_HR( ctx.allocator->CreateAliasingResource(allocs[0].Get(),
         0, // AllocationLocalOffset
         &resDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_COMMON,
         NULL, // pOptimizedClearValue
         IID_PPV_ARGS(&res)) );
 
@@ -1337,7 +1337,7 @@ static void TestCustomPool_MinAllocationAlignment(const TestContext& ctx)
     for(size_t i = 0; i < BUFFER_COUNT; ++i)
     {
         CHECK_HR( ctx.allocator->CreateResource(&allocDesc, &resDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, // pOptimizedClearValue
             &allocs[i],
             IID_NULL, NULL) ); // riidResource, ppvResource
@@ -1762,6 +1762,74 @@ static void TestAliasingMemory(const TestContext& ctx)
     // You can use res1 and res2, but not at the same time!
 }
 
+static void TestAllocateMemorySmallAlignment(const TestContext& ctx)
+{
+    wprintf(L"Test raw memory small alignment and size\n");
+
+    struct TestCase
+    {
+        UINT64 AllocationAlignment;
+        D3D12_HEAP_FLAGS HeapFlags;
+        UINT64 ExpectedHeapAlignment;
+    };
+    const TestCase testCases[] =
+    {
+        { D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT,
+            D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES,
+            D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT },
+        { D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+            D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
+            D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT },
+    };
+
+    for (const auto& testCase : testCases)
+    {
+        for (UINT customPoolIndex = 0; customPoolIndex < 2; ++customPoolIndex)
+        {
+            ComPtr<D3D12MA::Pool> pool;
+            D3D12MA::CALLOCATION_DESC allocDesc = D3D12MA::CALLOCATION_DESC{
+                D3D12_HEAP_TYPE_DEFAULT, D3D12MA::ALLOCATION_FLAG_COMMITTED,
+                nullptr, testCase.HeapFlags };
+            if (customPoolIndex != 0)
+            {
+                D3D12MA::CPOOL_DESC poolDesc = D3D12MA::CPOOL_DESC{
+                    D3D12_HEAP_TYPE_DEFAULT, testCase.HeapFlags, D3D12MA::POOL_FLAG_NONE };
+                CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+                allocDesc = D3D12MA::CALLOCATION_DESC{ pool.Get(), D3D12MA::ALLOCATION_FLAG_COMMITTED };
+            }
+
+            // Preserve the 64 KB case and also test 4 KB textures and 256 B buffers.
+            const UINT64 allocationSizes[] =
+            {
+                D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+                testCase.AllocationAlignment,
+            };
+            for (UINT64 allocationSize : allocationSizes)
+            {
+                D3D12_RESOURCE_ALLOCATION_INFO allocInfo = {};
+                allocInfo.SizeInBytes = allocationSize;
+                allocInfo.Alignment = testCase.AllocationAlignment;
+
+                // Force a standalone heap so the result doesn't depend on available pool blocks.
+                ComPtr<D3D12MA::Allocation> alloc;
+                const HRESULT hr = ctx.allocator->AllocateMemory(&allocDesc, &allocInfo, &alloc);
+                wprintf(L"    %s pool, allocation size=%llu alignment=%llu: AllocateMemory returned 0x%08X\n",
+                    customPoolIndex != 0 ? L"Custom" : L"Default",
+                    allocInfo.SizeInBytes, allocInfo.Alignment, (UINT)hr);
+                // Regression: resource alignment must not be passed directly to CreateHeap.
+                CHECK_HR(hr);
+                CHECK_BOOL(alloc != nullptr && alloc->GetHeap() != nullptr);
+                CHECK_BOOL(alloc->GetOffset() == 0);
+                CHECK_BOOL(alloc->GetSize() == allocInfo.SizeInBytes);
+                CHECK_BOOL(alloc->GetAlignment() == allocInfo.Alignment);
+                const D3D12_HEAP_DESC heapDesc = alloc->GetHeap()->GetDesc();
+                CHECK_BOOL(heapDesc.Alignment == testCase.ExpectedHeapAlignment);
+                CHECK_BOOL(heapDesc.SizeInBytes >= allocInfo.SizeInBytes);
+            }
+        }
+    }
+}
+
 static void TestAliasingImplicitCommitted(const TestContext& ctx)
 {
     wprintf(L"Test aliasing implicit dedicated\n");
@@ -1778,7 +1846,7 @@ static void TestAliasingImplicitCommitted(const TestContext& ctx)
 
     ComPtr<D3D12MA::Allocation> alloc;
     CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, NULL,
+        D3D12_RESOURCE_STATE_COMMON, NULL,
         &alloc, IID_NULL, NULL));
     CHECK_BOOL(alloc != NULL && alloc->GetHeap() != NULL);
 
@@ -1787,7 +1855,7 @@ static void TestAliasingImplicitCommitted(const TestContext& ctx)
     CHECK_HR(ctx.allocator->CreateAliasingResource(alloc.Get(),
         0, // AllocationLocalOffset
         &resDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, NULL, IID_PPV_ARGS(&aliasingRes)));
+        D3D12_RESOURCE_STATE_COMMON, NULL, IID_PPV_ARGS(&aliasingRes)));
     CHECK_BOOL(aliasingRes != NULL);
 }
 
@@ -2004,7 +2072,7 @@ static void TestMapping(const TestContext& ctx)
         CHECK_HR( ctx.allocator->CreateResource(
             &allocDesc,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             NULL,
             &resources[i].allocation,
             IID_PPV_ARGS(&resources[i].resource)) );
@@ -2404,7 +2472,7 @@ static void TestMultithreading(const TestContext& ctx)
                 CHECK_HR( ctx.allocator->CreateResource(
                     &allocDesc,
                     &resourceDesc,
-                    D3D12_RESOURCE_STATE_GENERIC_READ,
+                    D3D12_RESOURCE_STATE_COMMON,
                     NULL,
                     &res.allocation,
                     IID_PPV_ARGS(&res.resource)) );
@@ -2447,7 +2515,7 @@ static void TestMultithreading(const TestContext& ctx)
                     CHECK_HR( ctx.allocator->CreateResource(
                         &allocDesc,
                         &resourceDesc,
-                        D3D12_RESOURCE_STATE_GENERIC_READ,
+                        D3D12_RESOURCE_STATE_COMMON,
                         NULL,
                         &res.allocation,
                         IID_PPV_ARGS(&res.resource)) );
@@ -2547,7 +2615,7 @@ static void TestLinearAllocator(const TestContext& ctx)
         {
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             const UINT64 offset = newBuffInfo.Allocation->GetOffset();
             CHECK_BOOL(i == 0 || offset > prevOffset);
@@ -2579,7 +2647,7 @@ static void TestLinearAllocator(const TestContext& ctx)
         {
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             const UINT64 offset = newBuffInfo.Allocation->GetOffset();
             CHECK_BOOL(i == 0 || offset > prevOffset);
@@ -2596,7 +2664,7 @@ static void TestLinearAllocator(const TestContext& ctx)
         {
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             const UINT64 offset = newBuffInfo.Allocation->GetOffset();
             CHECK_BOOL(i == 0 || offset > prevOffset);
@@ -2616,7 +2684,7 @@ static void TestLinearAllocator(const TestContext& ctx)
         for (size_t i = 0; i < maxBufCount; ++i)
         {
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             const UINT64 offset = newBuffInfo.Allocation->GetOffset();
             CHECK_BOOL(i == 0 || offset > prevOffset);
@@ -2634,7 +2702,7 @@ static void TestLinearAllocator(const TestContext& ctx)
             for (size_t bufPerIter = 0; bufPerIter < buffersPerIter; ++bufPerIter)
             {
                 BufferInfo newBuffInfo;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
                 buffInfo.push_back(std::move(newBuffInfo));
             }
@@ -2645,7 +2713,7 @@ static void TestLinearAllocator(const TestContext& ctx)
         while (true)
         {
             BufferInfo newBuffInfo;
-            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer));
             ++debugIndex;
             if (SUCCEEDED(hr))
@@ -2681,7 +2749,7 @@ static void TestLinearAllocator(const TestContext& ctx)
                 allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             const UINT64 offset = newBuffInfo.Allocation->GetOffset();
             if (upperAddress)
@@ -2712,7 +2780,7 @@ static void TestLinearAllocator(const TestContext& ctx)
                 allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             buffInfo.push_back(std::move(newBuffInfo));
         }
@@ -2733,7 +2801,7 @@ static void TestLinearAllocator(const TestContext& ctx)
                 allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
             buffDesc.Width = AlignUp<UINT64>(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16);
             BufferInfo newBuffInfo;
-            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer));
             if (SUCCEEDED(hr))
             {
@@ -2769,7 +2837,7 @@ static void TestLinearAllocator(const TestContext& ctx)
         while (true)
         {
             BufferInfo newBuffInfo;
-            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            HRESULT hr = ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer));
             if (SUCCEEDED(hr))
             {
@@ -2823,7 +2891,7 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         while (true)
         {
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             ID3D12Heap* heap = newBuffInfo.Allocation->GetHeap();
             buffInfo.push_back(std::move(newBuffInfo));
@@ -2859,7 +2927,7 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         while (true)
         {
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             ID3D12Heap* heap = newBuffInfo.Allocation->GetHeap();
             buffInfo.push_back(std::move(newBuffInfo));
@@ -2875,7 +2943,7 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
         for (UINT32 i = 0; i < 5; ++i)
         {
             BufferInfo newBuffInfo;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
             buffInfo.push_back(std::move(newBuffInfo));
         }
@@ -2891,7 +2959,7 @@ static void TestLinearAllocatorMultiBlock(const TestContext& ctx)
 
         // Add one more buffer.
         BufferInfo newBuffInfo;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
@@ -2951,34 +3019,34 @@ static void ManuallyTestLinearAllocator(const TestContext& ctx)
         */
 
         buffDesc.Width = 32;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
         buffDesc.Width = 1024;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
         buffDesc.Width = 32;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
         allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_UPPER_ADDRESS;
 
         buffDesc.Width = 128;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
         buffDesc.Width = 1024;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
         buffDesc.Width = 16;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &buffDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &newBuffInfo.Allocation, IID_PPV_ARGS(&newBuffInfo.Buffer)));
         buffInfo.push_back(std::move(newBuffInfo));
 
@@ -4020,9 +4088,10 @@ static void ProcessDefragmentationPass(const TestContext& ctx, D3D12MA::DEFRAGME
                 desc.Alignment = 0;
 
             ComPtr<ID3D12Resource> dstRes;
+            // Copying implicitly promotes a buffer from COMMON to COPY_DEST.
             CHECK_HR(ctx.device->CreatePlacedResource(stepInfo.pMoves[i].pDstTmpAllocation->GetHeap(),
                 stepInfo.pMoves[i].pDstTmpAllocation->GetOffset(), &desc,
-                isDefaultHeap ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_GENERIC_READ,
+                desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST,
                 nullptr, IID_PPV_ARGS(&dstRes)));
             stepInfo.pMoves[i].pDstTmpAllocation->SetResource(dstRes.Get());
 
@@ -4202,7 +4271,7 @@ static void TestDefragmentationSimple(const TestContext& ctx)
             for (size_t i = 0; i < BLOCK_SIZE / BUF_SIZE * 2; ++i)
             {
                 ComPtr<D3D12MA::Allocation> alloc;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &alloc, IID_NULL, nullptr));
                 if (persistentlyMapped)
                 {
@@ -4218,7 +4287,7 @@ static void TestDefragmentationSimple(const TestContext& ctx)
 
             // Set data for defragmentation retrieval
             for (auto& alloc : allocations)
-                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_COMMON);
 
             D3D12MA::DEFRAGMENTATION_STATS defragStats;
             Defragment(ctx, defragDesc, pool.Get(), & defragStats);
@@ -4236,7 +4305,7 @@ static void TestDefragmentationSimple(const TestContext& ctx)
             for (size_t i = 0; i < BLOCK_SIZE / BUF_SIZE * 2; ++i)
             {
                 ComPtr<D3D12MA::Allocation> alloc;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &alloc, IID_NULL, nullptr));
                 if (persistentlyMapped)
                 {
@@ -4252,7 +4321,7 @@ static void TestDefragmentationSimple(const TestContext& ctx)
 
             // Set data for defragmentation retrieval
             for (auto& alloc : allocations)
-                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_COMMON);
 
             defragDesc.MaxAllocationsPerPass = 1;
             defragDesc.MaxBytesPerPass = BUF_SIZE;
@@ -4290,7 +4359,7 @@ static void TestDefragmentationSimple(const TestContext& ctx)
                 localResDesc.Width = RandomBufSize();
 
                 ComPtr<D3D12MA::Allocation> alloc;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &localResDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &localResDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &alloc, IID_NULL, nullptr));
                 if (persistentlyMapped)
                 {
@@ -4321,7 +4390,7 @@ static void TestDefragmentationSimple(const TestContext& ctx)
 
             // Set data for defragmentation retrieval
             for (auto& alloc : allocations)
-                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_COMMON);
 
             defragDesc.MaxAllocationsPerPass = 0;
             defragDesc.MaxBytesPerPass = 0;
@@ -4414,7 +4483,7 @@ static void TestDefragmentationAlgorithms(const TestContext& ctx)
                 resDesc.Width = RandomBufSize();
 
                 ComPtr<D3D12MA::Allocation> alloc;
-                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
                     nullptr, &alloc, IID_NULL, nullptr));
                 allocations.emplace_back(std::move(alloc));
             }
@@ -4440,7 +4509,7 @@ static void TestDefragmentationAlgorithms(const TestContext& ctx)
 
             // Set data for defragmentation retrieval
             for (auto& alloc : allocations)
-                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+                alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_COMMON);
 
             std::wstring output = DefragmentationAlgorithmToStr(defragDesc.Flags);
             if (j == 0)
@@ -4502,7 +4571,7 @@ static void TestDefragmentationFull(const TestContext& ctx)
     for (size_t i = 0; i < 400; ++i)
     {
         ComPtr<D3D12MA::Allocation> alloc;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &alloc, IID_NULL, nullptr));
         allocations.emplace_back(std::move(alloc));
     }
@@ -4521,7 +4590,7 @@ static void TestDefragmentationFull(const TestContext& ctx)
     {
         // Set data for defragmentation retrieval
         for (auto& alloc : allocations)
-            alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_GENERIC_READ);
+            alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_COMMON);
 
         const UINT32 defragCount = 1;
         for (UINT32 defragIndex = 0; defragIndex < defragCount; ++defragIndex)
@@ -4580,7 +4649,7 @@ static void TestDefragmentationGpu(const TestContext& ctx)
         resDesc.Width = AlignUp(rand.Generate() % (bufSizeMax - bufSizeMin) + bufSizeMin, 32ull);
 
         ComPtr<D3D12MA::Allocation> alloc;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &alloc, IID_NULL, nullptr));
         allocations.emplace_back(std::move(alloc));
     }
@@ -4677,7 +4746,7 @@ static void TestDefragmentationIncrementalBasic(const TestContext& ctx)
         resDesc.Width = AlignUp(rand.Generate() % (bufSizeMax - bufSizeMin) + bufSizeMin, 32ull);
 
         ComPtr<D3D12MA::Allocation> alloc;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &alloc, IID_NULL, nullptr));
 
         alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
@@ -4786,7 +4855,7 @@ void TestDefragmentationIncrementalComplex(const TestContext& ctx)
         resDesc.Width = AlignUp(rand.Generate() % (bufSizeMax - bufSizeMin) + bufSizeMin, 32ull);
 
         ComPtr<D3D12MA::Allocation> alloc;
-        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+        CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
             nullptr, &alloc, IID_NULL, nullptr));
 
         alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
@@ -4818,9 +4887,9 @@ void TestDefragmentationIncrementalComplex(const TestContext& ctx)
         {
             resDesc.Width = AlignUp(bufSizeMin + rand.Generate() % (bufSizeMax - bufSizeMin), 16ull);
             ComPtr<D3D12MA::Allocation> alloc;
-            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+            CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_COMMON,
                 nullptr, &alloc, IID_NULL, nullptr));
-            alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            alloc->SetPrivateData((void*)D3D12_RESOURCE_STATE_COMMON);
             additionalAllocations.emplace_back(std::move(alloc));
         }
     };
@@ -4901,6 +4970,7 @@ static void TestGroupBasics(const TestContext& ctx)
     TestCustomHeaps(ctx);
     TestStandardCustomCommittedPlaced(ctx);
     TestAliasingMemory(ctx);
+    TestAllocateMemorySmallAlignment(ctx);
     TestAliasingImplicitCommitted(ctx);
     TestMsaa64KBAlignedTextureSupported_DefaultPool(ctx);
     TestMsaa64KBAlignedTextureSupported_CustomPool(ctx);

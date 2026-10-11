@@ -48,12 +48,11 @@ var searchData=
   ['allocator_5fflag_5fsinglethreaded_45',['ALLOCATOR_FLAG_SINGLETHREADED',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916a1b06bb21df006f76a9ed1bc41838bc52',1,'D3D12MA']]],
   ['allocator_5fflags_46',['ALLOCATOR_FLAGS',['../namespace_d3_d12_m_a.html#ad5ae5a5e42b878f2e18ab5d1fbfb9916',1,'D3D12MA']]],
   ['allochandle_47',['AllocHandle',['../struct_d3_d12_m_a_1_1_virtual_allocation.html#a5d3166cf1f284fbbea4d0b169c4dba13',1,'D3D12MA::VirtualAllocation::AllocHandle'],['../namespace_d3_d12_m_a.html#a15e349adce86a40e0417d405aef1af80',1,'D3D12MA::AllocHandle']]],
-  ['allochandle_48',['allocHandle',['../class_d3_d12_m_a_1_1_allocation.html#a5c38846905b1ca0ff228c6081f2fc20c',1,'D3D12MA::Allocation']]],
-  ['and_20benefits_49',['Features and benefits',['../custom_pools.html#custom_pools_features_and_benefits',1,'']]],
-  ['and_20compatibility_50',['Versioning and compatibility',['../general_considerations.html#general_considerations_versioning_and_compatibility',1,'']]],
-  ['and_20initialization_51',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
-  ['and_20units_52',['Alignment and units',['../virtual_allocator.html#virtual_allocator_alignment_and_units',1,'']]],
-  ['asked_20questions_53',['Frequently asked questions',['../faq.html',1,'index']]],
-  ['at_20once_54',['Free-at-once',['../linear_algorithm.html#linear_algorithm_free_at_once',1,'']]],
-  ['avoiding_20running_20out_20of_20memory_55',['Avoiding running out of memory',['../optimal_allocation.html#optimal_allocation_avoiding_running_out_of_memory',1,'']]]
+  ['and_20benefits_48',['Features and benefits',['../custom_pools.html#custom_pools_features_and_benefits',1,'']]],
+  ['and_20compatibility_49',['Versioning and compatibility',['../general_considerations.html#general_considerations_versioning_and_compatibility',1,'']]],
+  ['and_20initialization_50',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
+  ['and_20units_51',['Alignment and units',['../virtual_allocator.html#virtual_allocator_alignment_and_units',1,'']]],
+  ['asked_20questions_52',['Frequently asked questions',['../faq.html',1,'index']]],
+  ['at_20once_53',['Free-at-once',['../linear_algorithm.html#linear_algorithm_free_at_once',1,'']]],
+  ['avoiding_20running_20out_20of_20memory_54',['Avoiding running out of memory',['../optimal_allocation.html#optimal_allocation_avoiding_running_out_of_memory',1,'']]]
 ];

@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['residencypriority_0',['ResidencyPriority',['../struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a2e6074af8c8ff7b957fe8d4b5036a5e6',1,'D3D12MA::POOL_DESC']]]
+  ['total_0',['Total',['../struct_d3_d12_m_a_1_1_total_statistics.html#ac0bb53579457ddec2872c547ae8922a6',1,'D3D12MA::TotalStatistics']]]
 ];

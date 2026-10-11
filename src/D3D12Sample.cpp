@@ -930,7 +930,7 @@ static void InitD3D() // initializes direct3d 12
         CHECK_HR( g_Allocator->CreateResource(
             &constantBufferUploadAllocDesc,
             &constantBufferResourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_RESOURCE_STATE_COMMON,
             nullptr,
             &g_ConstantBufferUploadAllocation[i],
             IID_PPV_ARGS(&g_ConstantBufferUploadHeap[i])) );
@@ -1085,7 +1085,7 @@ static void InitD3D() // initializes direct3d 12
     CHECK_HR( g_Allocator->CreateResource(
         &vBufferUploadAllocDesc,
         &vertexBufferUploadResourceDesc, // resource description for a buffer
-        D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
+        D3D12_RESOURCE_STATE_COMMON, // GPU will read from this buffer and copy its contents to the default heap
         nullptr,
         &vBufferUploadHeapAllocation,
         IID_PPV_ARGS(&vBufferUploadHeap)) );
@@ -1192,7 +1192,7 @@ static void InitD3D() // initializes direct3d 12
     CHECK_HR( g_Allocator->CreateResource(
         &iBufferUploadAllocDesc,
         &indexBufferUploadResourceDesc, // resource description for a buffer
-        D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
+        D3D12_RESOURCE_STATE_COMMON, // GPU will read from this buffer and copy its contents to the default heap
         nullptr,
         &iBufferUploadHeapAllocation,
         IID_PPV_ARGS(&iBufferUploadHeap)) );
@@ -1248,7 +1248,7 @@ static void InitD3D() // initializes direct3d 12
         CHECK_HR( g_Allocator->CreateResource(
             &cbPerObjectUploadAllocDesc,
             &cbPerObjectUploadResourceDesc, // size of the resource heap. Must be a multiple of 64KB for single-textures and constant buffers
-            D3D12_RESOURCE_STATE_GENERIC_READ, // will be data that is read from so we keep it in the generic read state
+            D3D12_RESOURCE_STATE_COMMON, // implicitly promoted when the GPU reads the buffer
             nullptr, // we do not have use an optimized clear value for constant buffers
             &g_CbPerObjectUploadHeapAllocations[i],
             IID_PPV_ARGS(&g_CbPerObjectUploadHeaps[i])) );
@@ -1346,7 +1346,7 @@ static void InitD3D() // initializes direct3d 12
     CHECK_HR( g_Allocator->CreateResource(
         &textureUploadAllocDesc,
         &textureUploadResourceDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        D3D12_RESOURCE_STATE_COMMON,
         nullptr, // pOptimizedClearValue
         &textureUploadAllocation,
         IID_PPV_ARGS(&textureUpload)) );

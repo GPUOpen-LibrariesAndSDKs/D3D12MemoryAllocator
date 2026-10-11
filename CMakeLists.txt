@@ -7,6 +7,11 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 find_package(Doxygen)
 option(BUILD_DOCUMENTATION "Create and install the HTML-based API documentation (requires Doxygen)" OFF)
 option(BUILD_SHARED_LIBS "Build D3D12 Memory Allocator shared library" OFF)
+option(D3D12MA_USING_DIRECTX_HEADERS "Build D3D12 Memory Allocator with the open sourced DirectX headers" OFF)
+
+if(D3D12MA_USING_DIRECTX_HEADERS)
+    find_package(directx-headers REQUIRED)
+endif()
 
 if(BUILD_DOCUMENTATION)
     if(DOXYGEN_FOUND)

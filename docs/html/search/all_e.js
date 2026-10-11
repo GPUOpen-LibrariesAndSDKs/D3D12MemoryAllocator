@@ -23,8 +23,7 @@ var searchData=
   ['pprivatedata_20',['pPrivateData',['../struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___c_a_l_l_b_a_c_k_s.html#a98173cc9e239a84c2ce369854966e1e3',1,'D3D12MA::ALLOCATION_CALLBACKS::pPrivateData'],['../struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#ac638dd987f1326e2fdab91892d994d35',1,'D3D12MA::ALLOCATION_DESC::pPrivateData'],['../struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___d_e_s_c.html#aa1281297154e3823e98a7cc7e23b5d6b',1,'D3D12MA::VIRTUAL_ALLOCATION_DESC::pPrivateData'],['../struct_d3_d12_m_a_1_1_v_i_r_t_u_a_l___a_l_l_o_c_a_t_i_o_n___i_n_f_o.html#a05c258ea40ea47667ddcc395b13a47a5',1,'D3D12MA::VIRTUAL_ALLOCATION_INFO::pPrivateData']]],
   ['pprotectedsession_21',['pProtectedSession',['../struct_d3_d12_m_a_1_1_p_o_o_l___d_e_s_c.html#a475840ec05c19732c8d5aa8bb27270f4',1,'D3D12MA::POOL_DESC']]],
   ['preferredblocksize_22',['PreferredBlockSize',['../struct_d3_d12_m_a_1_1_a_l_l_o_c_a_t_o_r___d_e_s_c.html#a97149c9559deae943c2cfa49aeeff8a6',1,'D3D12MA::ALLOCATOR_DESC']]],
-  ['prev_23',['prev',['../class_d3_d12_m_a_1_1_allocation.html#adc3ac89758a915a409e047f9b89aa160',1,'D3D12MA::Allocation']]],
-  ['priority_24',['Residency priority',['../optimal_allocation.html#optimal_allocation_residency_priority',1,'']]],
-  ['project_20setup_20and_20initialization_25',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
-  ['psrcallocation_26',['pSrcAllocation',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___m_o_v_e.html#a4946b874c958a71c21fac25b515cf5f7',1,'D3D12MA::DEFRAGMENTATION_MOVE']]]
+  ['priority_23',['Residency priority',['../optimal_allocation.html#optimal_allocation_residency_priority',1,'']]],
+  ['project_20setup_20and_20initialization_24',['Project setup and initialization',['../quick_start.html#quick_start_project_setup',1,'']]],
+  ['psrcallocation_25',['pSrcAllocation',['../struct_d3_d12_m_a_1_1_d_e_f_r_a_g_m_e_n_t_a_t_i_o_n___m_o_v_e.html#a4946b874c958a71c21fac25b515cf5f7',1,'D3D12MA::DEFRAGMENTATION_MOVE']]]
 ];
