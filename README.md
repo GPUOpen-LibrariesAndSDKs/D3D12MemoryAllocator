@@ -28,6 +28,7 @@ Additional features:
 - Thread-safety: Library is designed to be used in multithreaded code.
 - Configuration: Fill optional members of `ALLOCATOR_DESC` structure to provide custom CPU memory allocator and other parameters.
 - Customization and integration with custom engines: Predefine appropriate macros to provide your own implementation of external facilities used by the library, like assert, mutex, and atomic.
+- Automatic usage of *small resource placement alignment* and *tight alignment* when available.
 - Support for resource aliasing (overlap).
 - Custom memory pools: Create a pool with desired parameters (e.g. fixed or limited maximum size, custom `D3D12_HEAP_PROPERTIES` and `D3D12_HEAP_FLAGS`) and allocate memory out of it.
 - Support for GPU Upload Heaps from preview Agility SDK (needs compilation with `D3D12MA_OPTIONS16_SUPPORTED` macro).
