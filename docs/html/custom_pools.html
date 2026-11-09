@@ -119,7 +119,7 @@ Usage</h1>
 <div class="line">D3D12_RESOURCE_DESC resDesc = ...</div>
 <div class="line">Allocation* alloc;</div>
 <div class="line">hr = allocator-&gt;CreateResource(&amp;allocDesc, &amp;resDesc,</div>
-<div class="line">    D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &amp;alloc, IID_NULL, NULL);</div>
+<div class="line">    D3D12_RESOURCE_STATE_COMMON, NULL, &amp;alloc, IID_NULL, NULL);</div>
 </div><!-- fragment --><p>All allocations must be released before releasing the pool. The pool must be released before relasing the allocator.</p>
 <div class="fragment"><div class="line">alloc-&gt;Release();</div>
 <div class="line">pool-&gt;Release();</div>
@@ -143,7 +143,7 @@ Features and benefits</h1>
 <div class="line">Allocation* alloc;</div>
 <div class="line">ID3D12Resource* res;</div>
 <div class="line">hr = allocator-&gt;CreateResource(&amp;allocDesc, &amp;resDesc,</div>
-<div class="line">    D3D12_RESOURCE_STATE_GENERIC_READ, NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
+<div class="line">    D3D12_RESOURCE_STATE_COMMON, NULL, &amp;alloc, IID_PPV_ARGS(&amp;res));</div>
 </div><!-- fragment --><p>This feature may seem unnecessary, but creating committed allocations from custom pools may be useful in some cases, e.g. to have separate memory usage statistics for some group of resources or to use extended allocation parameters, like custom <span class="tt">D3D12_HEAP_PROPERTIES</span>, which are available only in custom pools. </p>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->

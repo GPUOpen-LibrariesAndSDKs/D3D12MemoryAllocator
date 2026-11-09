@@ -22,6 +22,45 @@
 
 #include "Common.h"
 
+void DeviceFeatureSupport::Init(ID3D12Device* device)
+{
+    assert(device != nullptr);
+    m_Device = device;
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+    m_Device16.Reset();
+    m_SDKVersion = 0;
+    device->QueryInterface(IID_PPV_ARGS(&m_Device16));
+#ifdef __ID3D12DeviceConfiguration_INTERFACE_DEFINED__
+    ComPtr<ID3D12DeviceConfiguration> deviceConfiguration;
+    if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&deviceConfiguration))))
+    {
+        m_SDKVersion = deviceConfiguration->GetDesc().SDKVersion;
+    }
+#endif
+#endif
+}
+
+void DeviceFeatureSupport::Reset()
+{
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+    m_Device16.Reset();
+    m_SDKVersion = 0;
+#endif
+    m_Device.Reset();
+}
+
+HRESULT DeviceFeatureSupport::CheckFeatureSupport(D3D12_FEATURE feature, void* featureSupportData, UINT featureSupportDataSize) const
+{
+    assert(m_Device);
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+    if (m_Device16 && m_SDKVersion != 0)
+    {
+        return m_Device16->CheckFeatureSupport1(feature, featureSupportData, featureSupportDataSize, m_SDKVersion);
+    }
+#endif
+    return m_Device->CheckFeatureSupport(feature, featureSupportData, featureSupportDataSize);
+}
+
 void ReadFile(std::vector<char>& out, const wchar_t* fileName)
 {
     std::ifstream file(fileName, std::ios::ate | std::ios::binary);

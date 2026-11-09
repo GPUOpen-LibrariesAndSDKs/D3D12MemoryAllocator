@@ -99,6 +99,7 @@ static float g_TimeDelta;
 
 static DXGIUsage* g_DXGIUsage;
 static ComPtr<ID3D12Device> g_Device;
+static DeviceFeatureSupport g_FeatureSupport;
 DXGI_ADAPTER_DESC1 g_AdapterDesc;
 static ComPtr<D3D12MA::Allocator> g_Allocator;
 
@@ -628,7 +629,7 @@ static void PrintAdapterInformation(IDXGIAdapter1* adapter)
 
     assert(g_Device);
     D3D12_FEATURE_DATA_ARCHITECTURE1 architecture1 = {};
-    if(SUCCEEDED(g_Device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE1, &architecture1, sizeof architecture1)))
+    if(SUCCEEDED(g_FeatureSupport.CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE1, &architecture1, sizeof architecture1)))
     {
         wprintf(L"D3D12_FEATURE_DATA_ARCHITECTURE1:\n");
         wprintf(L"    UMA: %u\n", architecture1.UMA ? 1 : 0);
@@ -661,6 +662,7 @@ static void InitD3D() // initializes direct3d 12
         MY_D3D_FEATURE_LEVEL,
         IID_PPV_ARGS(&device)) );
     g_Device.Attach(device);
+    g_FeatureSupport.Init(device);
 
     // Create allocator
 
@@ -1601,6 +1603,7 @@ void Cleanup() // release com ojects and clean up memory
         assert(g_CpuAllocationCount.load() == 0);
     }
     
+    g_FeatureSupport.Reset();
     g_Device.Reset();
     g_SwapChain.Reset();
 }
@@ -1612,6 +1615,7 @@ static void ExecuteTests()
         TestContext ctx = {};
         ctx.allocationCallbacks = &g_AllocationCallbacks;
         ctx.device = g_Device.Get();
+        ctx.featureSupport = &g_FeatureSupport;
         ctx.allocator = g_Allocator.Get();
         ctx.allocatorFlags = g_AllocatorFlags;
         Test(ctx);

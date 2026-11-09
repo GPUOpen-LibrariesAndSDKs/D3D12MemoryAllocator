@@ -24,10 +24,13 @@
 
 #include "D3D12MemAlloc.h"
 
+class DeviceFeatureSupport;
+
 struct TestContext
 {
     D3D12MA::ALLOCATION_CALLBACKS* allocationCallbacks;
     ID3D12Device* device;
+    const DeviceFeatureSupport* featureSupport;
     D3D12MA::Allocator* allocator;
     D3D12MA::ALLOCATOR_FLAGS allocatorFlags;
 };

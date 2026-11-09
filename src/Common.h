@@ -70,6 +70,22 @@ const uint32_t VENDOR_ID_AMD = 0x1002;
 const uint32_t VENDOR_ID_NVIDIA = 0x10DE;
 const uint32_t VENDOR_ID_INTEL = 0x8086;
 
+// Feature queries for the sample and tests, independent of the allocator's wrapper.
+class DeviceFeatureSupport
+{
+public:
+    void Init(ID3D12Device* device);
+    void Reset();
+    HRESULT CheckFeatureSupport(D3D12_FEATURE feature, void* featureSupportData, UINT featureSupportDataSize) const;
+
+private:
+    ComPtr<ID3D12Device> m_Device;
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+    ComPtr<ID3D12Device16> m_Device16;
+    UINT m_SDKVersion = 0; // 0 selects legacy feature queries.
+#endif
+};
+
 template <typename T>
 inline constexpr T CeilDiv(T x, T y)
 {

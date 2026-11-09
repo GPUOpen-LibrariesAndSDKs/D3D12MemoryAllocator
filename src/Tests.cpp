@@ -24,6 +24,13 @@
 #include "Tests.h"
 #include <thread>
 
+// This new constant is absent from older Windows SDK dxguid.lib versions.
+#include <initguid.h>
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+DEFINE_GUID(D3D12_GUID_TEXTURE_LAYOUT_ROW_MAJOR_WITH_RENDER_AND_VPBLT_CAPABILITY,
+    0x451b3cc7, 0x91ce, 0x49fa, 0xba, 0x67, 0x0d, 0xca, 0x71, 0x9c, 0xcb, 0xb8);
+#endif
+
 // Define to the same value as you did for D3D12MemAlloc.cpp.
 #ifndef D3D12MA_DEBUG_MARGIN
     #define D3D12MA_DEBUG_MARGIN 0
@@ -380,7 +387,7 @@ static void SaveStatsStringToFile(const TestContext& ctx, const wchar_t* dstFile
 static bool QueryMsaa64KBAlignedTextureSupported(const TestContext& ctx)
 {
     D3D12_FEATURE_DATA_D3D12_OPTIONS4 options4 = {};
-    CHECK_HR(ctx.device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS4, &options4, sizeof(options4)));
+    CHECK_HR(ctx.featureSupport->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS4, &options4, sizeof(options4)));
     return options4.MSAA64KBAlignedTextureSupported != FALSE;
 }
 
@@ -391,11 +398,21 @@ static UINT64 ExpectedMsaaTexturePlacementAlignment(bool msaa64KBAlignedTextureS
         D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
 }
 
-static void ValidatePlacedSmallMsaaTextureAllocation(const D3D12MA::Allocation* alloc, UINT64 expectedAlignment)
+static void ValidatePlacedSmallMsaaTextureAllocation(const TestContext& ctx,
+    const D3D12MA::Allocation* alloc, UINT64 expectedAlignment)
 {
     CHECK_BOOL(alloc != nullptr);
     CHECK_BOOL(alloc->GetResource() != nullptr);
     CHECK_BOOL(alloc->GetHeap() != nullptr);
+    D3D12_RESOURCE_DESC desc = alloc->GetResource()->GetDesc();
+    if ((desc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) != 0)
+    {
+        // Tight alignment may be smaller than the traditional small-MSAA alignment, e.g. on WARP.
+        desc.Alignment = 0;
+        const D3D12_RESOURCE_ALLOCATION_INFO info = ctx.device->GetResourceAllocationInfo(0, 1, &desc);
+        CHECK_BOOL(info.SizeInBytes != UINT64_MAX && info.Alignment != 0);
+        expectedAlignment = std::max(info.Alignment, UINT64(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+    }
     CHECK_BOOL(alloc->GetAlignment() == expectedAlignment);
     CHECK_BOOL(alloc->GetOffset() % expectedAlignment == 0);
     CHECK_BOOL(alloc->GetHeap()->GetDesc().Alignment == D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT);
@@ -1911,7 +1928,7 @@ static void TestMsaa64KBAlignedTextureSupported_DefaultPool(const TestContext& c
     CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET,
         nullptr, &alloc, IID_PPV_ARGS(&resource)));
 
-    ValidatePlacedSmallMsaaTextureAllocation(alloc.Get(), expectedAlignment);
+    ValidatePlacedSmallMsaaTextureAllocation(ctx, alloc.Get(), expectedAlignment);
 }
 
 static void TestMsaa64KBAlignedTextureSupported_CustomPool(const TestContext& ctx)
@@ -1938,7 +1955,7 @@ static void TestMsaa64KBAlignedTextureSupported_CustomPool(const TestContext& ct
     CHECK_HR(ctx.allocator->CreateResource(&allocDesc, &resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET,
         nullptr, &alloc, IID_PPV_ARGS(&resource)));
 
-    ValidatePlacedSmallMsaaTextureAllocation(alloc.Get(), expectedAlignment);
+    ValidatePlacedSmallMsaaTextureAllocation(ctx, alloc.Get(), expectedAlignment);
 }
 
 static void TestSmallTextureAlignment(const TestContext& ctx)
@@ -2567,7 +2584,7 @@ static void TestMultithreading(const TestContext& ctx)
 static bool IsProtectedResourceSessionSupported(const TestContext& ctx)
 {
     D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT support = {};
-    CHECK_HR(ctx.device->CheckFeatureSupport(
+    CHECK_HR(ctx.featureSupport->CheckFeatureSupport(
         D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_SUPPORT, &support, sizeof support));
     return support.Support > D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG_NONE;
 }
@@ -3484,6 +3501,303 @@ static void TestDevice12(const TestContext& ctx)
     CHECK_BOOL(alloc0 && res0);
 }
 #endif // #ifdef __ID3D12Device12_INTERFACE_DEFINED__
+
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+static D3D12_RESOURCE_ALLOCATION_INFO GetAllocationInfo4(ID3D12Device16* device,
+    const D3D12_RESOURCE_DESC2& desc, UINT32 formatCount = 0, const DXGI_FORMAT* formats = nullptr)
+{
+    return device->GetResourceAllocationInfo4(0, 1, &desc, &formatCount, &formats, nullptr);
+}
+
+#ifdef __ID3D12Resource3_INTERFACE_DEFINED__
+static D3D12_RESOURCE_DESC2 GetDesc2(ID3D12Resource* resource)
+{
+    ComPtr<ID3D12Resource3> resource3;
+    CHECK_HR(resource->QueryInterface(IID_PPV_ARGS(&resource3)));
+    return resource3->GetDesc2();
+}
+
+static void CheckDesc2(ID3D12Resource* resource, const D3D12_RESOURCE_DESC2& expected,
+    UINT32 formatCount, const DXGI_FORMAT* formats)
+{
+    const D3D12_RESOURCE_DESC2 actual = GetDesc2(resource);
+    CHECK_BOOL(actual.Dimension == expected.Dimension && actual.Width == expected.Width && actual.Height == expected.Height);
+    CHECK_BOOL(actual.DepthOrArraySize == expected.DepthOrArraySize && actual.MipLevels == expected.MipLevels);
+    CHECK_BOOL(actual.Format == expected.Format && actual.SampleDesc.Count == expected.SampleDesc.Count &&
+        actual.SampleDesc.Quality == expected.SampleDesc.Quality && actual.Layout == expected.Layout);
+    CHECK_BOOL(IsEqualGUID(actual.LayoutGuid, expected.LayoutGuid));
+    CHECK_BOOL(actual.SamplerFeedbackMipRegion.Width == expected.SamplerFeedbackMipRegion.Width &&
+        actual.SamplerFeedbackMipRegion.Height == expected.SamplerFeedbackMipRegion.Height &&
+        actual.SamplerFeedbackMipRegion.Depth == expected.SamplerFeedbackMipRegion.Depth);
+    CHECK_BOOL((actual.Flags & ~D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) ==
+        (expected.Flags & ~D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY));
+    if (expected.Layout == D3D12_TEXTURE_LAYOUT_GUID)
+        CHECK_BOOL(actual.Flags == expected.Flags);
+    ComPtr<ID3D12Resource3> resource3;
+    CHECK_HR(resource->QueryInterface(IID_PPV_ARGS(&resource3)));
+    CHECK_BOOL(resource3->GetCastableFormatsCount() == formatCount);
+    if (formatCount)
+    {
+        std::vector<DXGI_FORMAT> actualFormats(formatCount);
+        CHECK_HR(resource3->GetCastableFormats(actualFormats.data()));
+        CHECK_BOOL(std::equal(actualFormats.begin(), actualFormats.end(), formats));
+    }
+}
+
+static void TestDesc2Paths(const TestContext& ctx, ID3D12Device16* device,
+    const D3D12_RESOURCE_DESC2& inputDesc, UINT32 formatCount = 0, const DXGI_FORMAT* formats = nullptr)
+{
+    wprintf(L"  Resource paths: dimension %u, format %u, alignment %llu, formats %u, layout %u\n",
+        UINT(inputDesc.Dimension), UINT(inputDesc.Format), inputDesc.Alignment, formatCount, UINT(inputDesc.Layout));
+    const D3D12_RESOURCE_DESC2 originalDesc = inputDesc;
+    for (UINT mode = 0; mode < 5; ++mode)
+    {
+        D3D12MA::CALLOCATION_DESC allocDesc{D3D12_HEAP_TYPE_DEFAULT};
+        D3D12MA::CPOOL_DESC poolDesc{D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_NONE};
+        poolDesc.Flags = D3D12MA::POOL_FLAG_NONE; // Force placed MSAA resources as well as ordinary textures.
+        poolDesc.BlockSize = 16 * MEGABYTE;
+        poolDesc.HeapFlags = inputDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS :
+            (inputDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0 ?
+            D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES : D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+        if (mode == 3) poolDesc.MinAllocationAlignment = 8;
+        ComPtr<D3D12MA::Pool> pool;
+        if (mode == 0 || mode == 1)
+            allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        if (mode == 1)
+            allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_CAN_ALIAS;
+        if (mode >= 3)
+        {
+            if (mode == 4) poolDesc.Flags = D3D12MA::POOL_FLAG_DONT_USE_TIGHT_ALIGNMENT;
+            CHECK_HR(ctx.allocator->CreatePool(&poolDesc, &pool));
+            allocDesc.CustomPool = pool.Get();
+        }
+
+        ComPtr<D3D12MA::Allocation> allocation;
+        ComPtr<ID3D12Resource> resource;
+        CHECK_HR(ctx.allocator->CreateResource4(&allocDesc, &inputDesc,
+            D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, formatCount, formats, &allocation, IID_PPV_ARGS(&resource)));
+        CHECK_BOOL(allocation->GetResource() == resource.Get());
+        CHECK_BOOL((allocation->GetHeap() == nullptr) == (mode == 0));
+        CHECK_BOOL(memcmp(&inputDesc, &originalDesc, sizeof(inputDesc)) == 0);
+        CheckDesc2(resource.Get(), inputDesc, formatCount, formats);
+        const D3D12_RESOURCE_DESC2 actualDesc = GetDesc2(resource.Get());
+        D3D12_RESOURCE_DESC2 queryDesc = actualDesc;
+        // Committed tight buffers may expose a 4 KiB heap alignment, above the placed-query buffer maximum.
+        if ((queryDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) != 0)
+            queryDesc.Alignment = inputDesc.Alignment;
+        const D3D12_RESOURCE_ALLOCATION_INFO info = GetAllocationInfo4(device, queryDesc, formatCount, formats);
+        CHECK_BOOL(info.SizeInBytes != UINT64_MAX && info.SizeInBytes > 0 && info.Alignment > 0);
+        CHECK_BOOL(allocation->GetSize() >= info.SizeInBytes && allocation->GetOffset() % info.Alignment == 0);
+        if (mode == 4)
+        {
+            CHECK_BOOL((actualDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) ==
+                (inputDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY));
+            if (inputDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && inputDesc.Alignment == 0)
+                CHECK_BOOL(allocation->GetSize() == AlignUp(inputDesc.Width, UINT64(D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT)));
+        }
+        if (allocation->GetHeap())
+        {
+            ComPtr<ID3D12Resource> alias;
+            CHECK_HR(ctx.allocator->CreateAliasingResource3(allocation.Get(), 0, &inputDesc,
+                D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, formatCount, formats, IID_PPV_ARGS(&alias)));
+            CheckDesc2(alias.Get(), inputDesc, formatCount, formats);
+            CHECK_BOOL(allocation->GetResource() == resource.Get());
+            if (mode == 4)
+                CHECK_BOOL((GetDesc2(alias.Get()).Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY) ==
+                    (inputDesc.Flags & D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY));
+
+            // Recreate from resource-reported desc2 and formats, preserving GUIDs and castable-format metadata.
+            ComPtr<ID3D12Resource3> source3;
+            CHECK_HR(resource->QueryInterface(IID_PPV_ARGS(&source3)));
+            std::vector<DXGI_FORMAT> recoveredFormats(source3->GetCastableFormatsCount());
+            if (!recoveredFormats.empty()) CHECK_HR(source3->GetCastableFormats(recoveredFormats.data()));
+            ComPtr<ID3D12Resource> recreated;
+            CHECK_HR(ctx.allocator->CreateAliasingResource3(allocation.Get(), 0, &queryDesc,
+                D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, UINT32(recoveredFormats.size()), recoveredFormats.data(),
+                IID_PPV_ARGS(&recreated)));
+            CheckDesc2(recreated.Get(), queryDesc, UINT32(recoveredFormats.size()), recoveredFormats.data());
+
+            for (UINT64 invalidOffset : {UINT64(1), allocation->GetSize(), UINT64_MAX})
+            {
+                ID3D12Resource* failedResource = reinterpret_cast<ID3D12Resource*>(uintptr_t(1));
+                CHECK_BOOL(ctx.allocator->CreateAliasingResource3(allocation.Get(), invalidOffset, &actualDesc,
+                    D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, formatCount, formats,
+                    __uuidof(ID3D12Resource), reinterpret_cast<void**>(&failedResource)) == E_INVALIDARG);
+                CHECK_BOOL(failedResource == nullptr);
+            }
+        }
+
+        // Optional resource output still leaves the allocation owning its resource.
+        ComPtr<D3D12MA::Allocation> allocationOnly;
+        CHECK_HR(ctx.allocator->CreateResource4(&allocDesc, &inputDesc,
+            D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, formatCount, formats,
+            &allocationOnly, __uuidof(ID3D12Resource), nullptr));
+        CheckDesc2(allocationOnly->GetResource(), inputDesc, formatCount, formats);
+        if (allocationOnly->GetHeap() && inputDesc.Alignment != 0)
+            CHECK_BOOL(allocationOnly->GetOffset() % inputDesc.Alignment == 0);
+    }
+
+    // A raw allocation containing padding permits a nonzero allocation-local alias offset.
+    const D3D12_RESOURCE_ALLOCATION_INFO info = GetAllocationInfo4(device, inputDesc, formatCount, formats);
+    CHECK_BOOL(info.SizeInBytes != UINT64_MAX && info.Alignment != 0);
+    const UINT64 aliasAlignment = std::max(info.Alignment, inputDesc.Alignment);
+    D3D12_RESOURCE_ALLOCATION_INFO backingInfo = {info.SizeInBytes + aliasAlignment, aliasAlignment};
+    D3D12MA::CALLOCATION_DESC backingDesc{D3D12_HEAP_TYPE_DEFAULT, D3D12MA::ALLOCATION_FLAG_COMMITTED};
+    backingDesc.ExtraHeapFlags = inputDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS :
+        (inputDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) != 0 ?
+        D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES : D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+    ComPtr<D3D12MA::Allocation> backing;
+    CHECK_HR(ctx.allocator->AllocateMemory(&backingDesc, &backingInfo, &backing));
+    ComPtr<ID3D12Resource> offsetAlias;
+    const HRESULT offsetHr = ctx.allocator->CreateAliasingResource3(backing.Get(), aliasAlignment, &inputDesc,
+        D3D12_BARRIER_LAYOUT_UNDEFINED, nullptr, formatCount, formats, IID_PPV_ARGS(&offsetAlias));
+    if (FAILED(offsetHr))
+        wprintf(L"  Nonzero alias failed: HRESULT 0x%08lX, native size %llu, native alignment %llu, backing size %llu\n",
+            offsetHr, info.SizeInBytes, info.Alignment, backing->GetSize());
+    CHECK_HR(offsetHr);
+    CheckDesc2(offsetAlias.Get(), inputDesc, formatCount, formats);
+}
+
+#endif // #ifdef __ID3D12Resource3_INTERFACE_DEFINED__
+
+static void TestDevice16(const TestContext& ctx)
+{
+    wprintf(L"Test ID3D12Device16\n");
+    D3D12_RESOURCE_DESC2 desc;
+    FillResourceDescForBuffer(desc, MEGABYTE);
+    D3D12MA::CALLOCATION_DESC allocDesc{D3D12_HEAP_TYPE_DEFAULT};
+    ComPtr<ID3D12Device16> device;
+    if (FAILED(ctx.device->QueryInterface(IID_PPV_ARGS(&device))))
+    {
+        ComPtr<D3D12MA::Allocation> allocation;
+        ComPtr<ID3D12Resource> resource;
+        CHECK_BOOL(ctx.allocator->CreateResource4(&allocDesc, &desc, D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr, 0, nullptr, &allocation, IID_PPV_ARGS(&resource)) == E_NOINTERFACE);
+        CHECK_BOOL(!allocation && !resource);
+        D3D12_RESOURCE_ALLOCATION_INFO info = {2 * MEGABYTE, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT};
+        allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        allocDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+        CHECK_HR(ctx.allocator->AllocateMemory(&allocDesc, &info, &allocation));
+        CHECK_BOOL(ctx.allocator->CreateAliasingResource3(allocation.Get(), 0, &desc, D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr, 0, nullptr, IID_PPV_ARGS(&resource)) == E_NOINTERFACE);
+        CHECK_BOOL(!resource);
+        wprintf(L"  SKIP desc2 creation: Device16 unavailable; E_NOINTERFACE behavior passed.\n");
+        return;
+    }
+#ifdef __ID3D12Resource3_INTERFACE_DEFINED__
+    TestDesc2Paths(ctx, device.Get(), desc);
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = desc.Height = 256;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    TestDesc2Paths(ctx, device.Get(), desc);
+    D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {};
+    if (SUCCEEDED(ctx.featureSupport->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12))) &&
+        options12.RelaxedFormatCastingSupported)
+    {
+        const DXGI_FORMAT formats[] = {DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB};
+        TestDesc2Paths(ctx, device.Get(), desc, _countof(formats), formats);
+    }
+    else wprintf(L"  SKIP castable formats: relaxed format casting unavailable.\n");
+
+    D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msaa = {};
+    msaa.Format = desc.Format;
+    msaa.SampleCount = 4;
+    if (SUCCEEDED(ctx.featureSupport->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &msaa, sizeof(msaa))) &&
+        msaa.NumQualityLevels != 0)
+    {
+        desc.SampleDesc.Count = 4;
+        desc.Width = desc.Height = 64;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        TestDesc2Paths(ctx, device.Get(), desc);
+    }
+
+    FillResourceDescForBuffer(desc, MEGABYTE);
+    if (ctx.allocator->IsTightAlignmentSupported())
+    {
+        desc.Alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+        desc.Width = 1025;
+        desc.Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT_COPY;
+        TestDesc2Paths(ctx, device.Get(), desc);
+    }
+    // Input validation is handled before passing malformed format arrays to D3D12.
+    ComPtr<D3D12MA::Allocation> allocation;
+    ComPtr<ID3D12Resource> resource;
+    CHECK_BOOL(ctx.allocator->CreateResource4(&allocDesc, &desc, D3D12_BARRIER_LAYOUT_UNDEFINED,
+        nullptr, 1, nullptr, &allocation, IID_PPV_ARGS(&resource)) == E_INVALIDARG);
+    CHECK_BOOL(!allocation && !resource);
+    FillResourceDescForBuffer(desc, MEGABYTE);
+    for (UINT mode = 0; mode < 3; ++mode)
+    {
+        allocDesc.Flags = mode == 2 ? D3D12MA::ALLOCATION_FLAG_NONE : D3D12MA::ALLOCATION_FLAG_COMMITTED;
+        if (mode == 1) allocDesc.Flags |= D3D12MA::ALLOCATION_FLAG_CAN_ALIAS;
+        D3D12MA::TotalStatistics before, after;
+        ctx.allocator->CalculateStatistics(&before);
+        // Resources do not expose ID3D12Heap. Failure must unwind resource/allocation ownership.
+        void* invalidInterface = reinterpret_cast<void*>(uintptr_t(1));
+        CHECK_BOOL(ctx.allocator->CreateResource4(&allocDesc, &desc, D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr, 0, nullptr, &allocation, __uuidof(ID3D12Heap), &invalidInterface) == E_NOINTERFACE);
+        CHECK_BOOL(!allocation && invalidInterface == nullptr);
+        ctx.allocator->CalculateStatistics(&after);
+        CHECK_BOOL(before.Total.Stats.AllocationCount == after.Total.Stats.AllocationCount &&
+            before.Total.Stats.AllocationBytes == after.Total.Stats.AllocationBytes);
+    }
+#endif
+    wprintf(L"  Device16 resource paths passed.\n");
+}
+
+#ifdef __ID3D12Resource3_INTERFACE_DEFINED__
+static void TestGuidTextureLayout(const TestContext& ctx)
+{
+    wprintf(L"Test GUID texture layout on %s\n", g_AdapterDesc.Description);
+    ComPtr<ID3D12Device16> device;
+    if (FAILED(ctx.device->QueryInterface(IID_PPV_ARGS(&device))))
+    {
+        wprintf(L"  SKIP: Device16 unavailable.\n");
+        return;
+    }
+    D3D12_RESOURCE_DESC2 desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = desc.Height = 256;
+    desc.DepthOrArraySize = desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_GUID;
+    // The fixture only creates resources; some video layouts expose no shader access.
+    desc.Flags = D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+    const DXGI_FORMAT formats[] = {DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_NV12};
+    for (DXGI_FORMAT format : formats)
+    {
+        desc.Format = format;
+        std::vector<GUID> guids{D3D12_GUID_TEXTURE_LAYOUT_ROW_MAJOR_WITH_RENDER_AND_VPBLT_CAPABILITY};
+        D3D12_TEXTURE_LAYOUT_FILTER filter = {};
+        filter.Desc = desc;
+        filter.Support1 = D3D12_FORMAT_SUPPORT1_TEXTURE2D;
+        UINT count = 0;
+        if (SUCCEEDED(device->GetTextureLayoutCount(&filter, &count)) && count)
+        {
+            std::vector<GUID> enumerated(count);
+            CHECK_HR(device->GetTextureLayouts(&filter, count, enumerated.data()));
+            guids.insert(guids.end(), enumerated.begin(), enumerated.end());
+        }
+        for (const GUID& guid : guids)
+        {
+            desc.LayoutGuid = guid;
+            D3D12_FEATURE_DATA_GUID_TEXTURE_LAYOUT support = {};
+            support.pDesc = &desc;
+            const HRESULT hr = ctx.featureSupport->CheckFeatureSupport(D3D12_FEATURE_GUID_TEXTURE_LAYOUT, &support, sizeof(support));
+            if (FAILED(hr) || support.GuidTextureLayoutTier < D3D12_GUID_TEXTURE_LAYOUT_TIER_1 || !support.GuidSupported ||
+                (support.Support1 & D3D12_FORMAT_SUPPORT1_TEXTURE2D) == 0)
+                continue;
+            wprintf(L"  Supported format %u, GUID 0x%08lX; testing committed/placed/aliasing paths.\n", UINT(format), guid.Data1);
+            TestDesc2Paths(ctx, device.Get(), desc);
+            wprintf(L"  GUID texture paths passed.\n");
+            return;
+        }
+    }
+    wprintf(L"  SKIP: no supported GUID layout for the RGBA8/NV12 fixtures.\n");
+}
+#endif
+#endif // #ifdef __ID3D12Device16_INTERFACE_DEFINED__
 
 static void TestGPUUploadHeap(const TestContext& ctx)
 {
@@ -4996,6 +5310,12 @@ static void TestGroupBasics(const TestContext& ctx)
     TestDevice12(ctx);
 #endif
 
+#ifdef __ID3D12Device16_INTERFACE_DEFINED__
+    TestDevice16(ctx);
+#ifdef __ID3D12Resource3_INTERFACE_DEFINED__
+    TestGuidTextureLayout(ctx);
+#endif
+#endif
     TestGPUUploadHeap(ctx);
     TestTightAlignment(ctx);
 
