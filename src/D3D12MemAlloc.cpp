@@ -3840,7 +3840,7 @@ void BlockMetadata_Linear::AddDetailedStatistics(DetailedStatistics& inoutStats)
         {
             // Find next non-null allocation or move nextAllocIndex to the end.
             while (nextAlloc2ndIndex < suballoc2ndCount &&
-                suballocations2nd[nextAlloc2ndIndex].privateData == NULL)
+                suballocations2nd[nextAlloc2ndIndex].type == SUBALLOCATION_TYPE_FREE)
             {
                 ++nextAlloc2ndIndex;
             }
@@ -3889,7 +3889,7 @@ void BlockMetadata_Linear::AddDetailedStatistics(DetailedStatistics& inoutStats)
     {
         // Find next non-null allocation or move nextAllocIndex to the end.
         while (nextAlloc1stIndex < suballoc1stCount &&
-            suballocations1st[nextAlloc1stIndex].privateData == NULL)
+            suballocations1st[nextAlloc1stIndex].type == SUBALLOCATION_TYPE_FREE)
         {
             ++nextAlloc1stIndex;
         }
@@ -3937,7 +3937,7 @@ void BlockMetadata_Linear::AddDetailedStatistics(DetailedStatistics& inoutStats)
         {
             // Find next non-null allocation or move nextAllocIndex to the end.
             while (nextAlloc2ndIndex != SIZE_MAX &&
-                suballocations2nd[nextAlloc2ndIndex].privateData == NULL)
+                suballocations2nd[nextAlloc2ndIndex].type == SUBALLOCATION_TYPE_FREE)
             {
                 --nextAlloc2ndIndex;
             }
@@ -4004,7 +4004,7 @@ void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
         {
             // Find next non-null allocation or move nextAlloc2ndIndex to the end.
             while (nextAlloc2ndIndex < suballoc2ndCount &&
-                suballocations2nd[nextAlloc2ndIndex].privateData == NULL)
+                suballocations2nd[nextAlloc2ndIndex].type == SUBALLOCATION_TYPE_FREE)
             {
                 ++nextAlloc2ndIndex;
             }
@@ -4053,7 +4053,7 @@ void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
     {
         // Find next non-null allocation or move nextAllocIndex to the end.
         while (nextAlloc1stIndex < suballoc1stCount &&
-            suballocations1st[nextAlloc1stIndex].privateData == NULL)
+            suballocations1st[nextAlloc1stIndex].type == SUBALLOCATION_TYPE_FREE)
         {
             ++nextAlloc1stIndex;
         }
@@ -4100,7 +4100,7 @@ void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
         {
             // Find next non-null allocation or move nextAlloc2ndIndex to the end.
             while (nextAlloc2ndIndex != SIZE_MAX &&
-                suballocations2nd[nextAlloc2ndIndex].privateData == NULL)
+                suballocations2nd[nextAlloc2ndIndex].type == SUBALLOCATION_TYPE_FREE)
             {
                 --nextAlloc2ndIndex;
             }
@@ -4154,7 +4154,7 @@ void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
         {
             // Find next non-null allocation or move nextAlloc2ndIndex to the end.
             while (nextAlloc2ndIndex < suballoc2ndCount &&
-                suballocations2nd[nextAlloc2ndIndex].privateData == NULL)
+                suballocations2nd[nextAlloc2ndIndex].type == SUBALLOCATION_TYPE_FREE)
             {
                 ++nextAlloc2ndIndex;
             }
@@ -4201,7 +4201,7 @@ void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
     {
         // Find next non-null allocation or move nextAllocIndex to the end.
         while (nextAlloc1stIndex < suballoc1stCount &&
-            suballocations1st[nextAlloc1stIndex].privateData == NULL)
+            suballocations1st[nextAlloc1stIndex].type == SUBALLOCATION_TYPE_FREE)
         {
             ++nextAlloc1stIndex;
         }
@@ -4249,7 +4249,7 @@ void BlockMetadata_Linear::WriteAllocationInfoToJson(JsonWriter& json) const
         {
             // Find next non-null allocation or move nextAlloc2ndIndex to the end.
             while (nextAlloc2ndIndex != SIZE_MAX &&
-                suballocations2nd[nextAlloc2ndIndex].privateData == NULL)
+                suballocations2nd[nextAlloc2ndIndex].type == SUBALLOCATION_TYPE_FREE)
             {
                 --nextAlloc2ndIndex;
             }
